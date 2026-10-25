@@ -1,0 +1,14 @@
+# Large virtual machine images and disk containers
+*.ova
+*.ovf
+*.vdi
+*.vmdk
+
+# Large installers, archives and temporary tools
+SQL2022-SSEI-Expr.exe
+7za920.zip
+/tools/
+vm_screen.png
+
+# Ignore original VIDA installation directory by default (databases, JDK, JBoss binaries)
+VIDA/

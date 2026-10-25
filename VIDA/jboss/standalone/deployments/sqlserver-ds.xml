@@ -1,0 +1,294 @@
+<?xml version="1.0"?>
+<datasources xmlns="http://www.jboss.org/ironjacamar/schema">
+    <datasource 
+        jndi-name="jdbc/accessserver" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=accessserver;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    <datasource 
+        jndi-name="jdbc/BaseData" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=basedata;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+<datasource 
+        jndi-name="jdbc/image" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=imagerepository;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+<datasource 
+        jndi-name="jdbc/epc" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=EPC;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+<datasource 
+        jndi-name="jdbc/service_en-GB" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_en-GB;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+<datasource 
+        jndi-name="jdbc/carcom" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=carcom;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    <datasource 
+        jndi-name="jdbc/service_zh-TW" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_zh-TW;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    <datasource 
+        jndi-name="jdbc/service_it-IT" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_it-IT;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    <datasource 
+        jndi-name="jdbc/service_nl-NL" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_nl-NL;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_en-US" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_en-US;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_de-DE" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_de-DE;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_ja-JP" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_ja-JP;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_zh-CN" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_zh-CN;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_tr-TR" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_tr-TR;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_th-TH" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_th-TH;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_es-ES" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_es-ES;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_pt-PT" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_pt-PT;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_bn-BN" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_bn-BN;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_ru-RU" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_ru-RU;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_ko-KR" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_ko-KR;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_fi-FI" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_fi-FI;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_fr-FR" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_fr-FR;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+    
+    <datasource 
+        jndi-name="jdbc/service_sv-SE" 
+        enabled="true" 
+        use-java-context="true" pool-name="employeedb">
+        <connection-url>jdbc:sqlserver://127.0.0.1:1433;DatabaseName=servicerep_sv-SE;SelectMethod=cursor</connection-url>
+        <driver>sqljdbc4.jar</driver>
+        <pool></pool>
+        <security>
+            <user-name>sa</user-name>
+            <password>GunnarS3g3</password>
+        </security>
+    </datasource>
+
+</datasources>

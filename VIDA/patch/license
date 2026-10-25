@@ -1,0 +1,150 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<licence>
+	<user customerType="AUTH. DEALER" partnerGroupCode="INT" partnerId="INT" password="x" userId="p-ceh3"/>
+	<subscriptions>
+		<subscription allowDraftModels="true" countryCode="RU" id="de9d8bf8-3a28-11d9-991b-c09d3ede2bc8" noOfLicences="10" serverType="AIOC" subscriptionExpireDate="2050-12-31 23:59:59" subscriptionName=" AlO Full">
+			<subscriptionPackages>
+				<SubscriptionPackage description="Diagnos" lexiconId="c56fb3ca-8d1a-4f94-add6-ee5c1d190dbd" name="Diagnostic workflow [D]" requiredSubscriptionPackageTypeDef="8b91e94f-4dbe-11d8-b486-a324711eb700" shortDescription="D">
+					<SubscriptionPackageTypeDef description="The complete diagnostic tool" name="DIAGNOS">
+						<SubscriptionPackageType description="" id="7eb46e2e-4810-11d8-84f4-f09eeb920af1" objVersion="0" type=""/>
+						<qualInfoTypes/>
+					</SubscriptionPackageTypeDef>
+					<SubscriptionProductStatus description="Released Edition" status="RELEASED"/>
+					<softwareProductTypes/>
+					<functionalities>
+						<Functionality description="If the user, in the diagnostic manager, is allowed to access symptom fault tracing." functionalityCode="ADD_SYMPTOMS" lexiconId="7c0c7ffb-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Diagnostic is accessible for the user." functionalityCode="DIAG_MGR" lexiconId="7bd59169-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="If the user, in the diagnostic manager - DTC subpage, is allowed to access to linked DTC information." functionalityCode="DTC_INFORMATION" lexiconId="7c129a7d-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="If the user, in the Vehicle profile tab, can access the button and function Read vehicle." functionalityCode="READ_OUT_VEHICLE" lexiconId="7be1c66d-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="If the user, in the diagnostic manager - network subpage, is allowed to access to linked service information." functionalityCode="REFERENCE_INFORMATION" lexiconId="7c1bc241-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Search is accessible for the user." functionalityCode="SEARCH" lexiconId="7bc62813-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Vehicle profile is accessible for the user." functionalityCode="SET_VEHICLE_PROFILE" lexiconId="7bc19431-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="If the user, in the diagnostic manager, is allowed to access symptom fault tracing." functionalityCode="SYMPTOM_FAULT_TRACE" lexiconId="7c172e5f-4810-11d8-84f4-f09eeb920af1"/>
+					</functionalities>
+				</SubscriptionPackage>
+				<SubscriptionPackage description="Parts info" lexiconId="fe5281e2-c210-4b95-91ab-5f521b304c51" name="Parts Catalogue [P]" shortDescription="P">
+					<SubscriptionPackageTypeDef description="Parts" name="PARTS">
+						<SubscriptionPackageType description="" id="7ea52bec-4810-11d8-84f4-f09eeb920af1" objVersion="0" type=""/>
+						<qualInfoTypes>
+							<QualInfoType cid="35" description="Parts Catalogue " lexiconId="fc81e3bc-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="12:01"/>
+						</qualInfoTypes>
+					</SubscriptionPackageTypeDef>
+					<SubscriptionProductStatus description="Released Edition" status="RELEASED"/>
+					<softwareProductTypes/>
+					<functionalities>
+						<Functionality description="The main tab Information is accessible for the user." functionalityCode="INFO_MGR" lexiconId="7bcc69a5-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Parts list is accessible for the user." functionalityCode="PARTS_LIST" lexiconId="7bd0fd87-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Search is accessible for the user." functionalityCode="SEARCH" lexiconId="7bc62813-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Vehicle profile is accessible for the user." functionalityCode="SET_VEHICLE_PROFILE" lexiconId="7bc19431-4810-11d8-84f4-f09eeb920af1"/>
+					</functionalities>
+				</SubscriptionPackage>
+				<SubscriptionPackage description="Service Info" lexiconId="596c1b9e-07e5-47aa-a3f8-d9d54e2c1e0a" name="Service Information [S]" requiredSubscriptionPackageTypeDef="7ffb6d20-4810-11d8-84f4-f09eeb920af1" shortDescription="S">
+					<SubscriptionPackageTypeDef description="Service" name="SERVICE">
+						<SubscriptionPackageType description="" id="7ebaafbf-4810-11d8-84f4-f09eeb920af1" objVersion="0" type=""/>
+						<qualInfoTypes>
+							<QualInfoType cid="1" description="General Safety Information" lexiconId="fd9fafeb-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="01:01"/>
+							<QualInfoType cid="2" description="General Information" lexiconId="fda7510c-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="01:02"/>
+							<QualInfoType cid="3" description="Training Information" lexiconId="fdaef22d-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="01:03"/>
+							<QualInfoType cid="4" description="Visual Identification " lexiconId="fdb6934e-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="02:01"/>
+							<QualInfoType cid="5" description="Design and Function " lexiconId="fdbcadcf-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="03:01"/>
+							<QualInfoType cid="6" description="Component location " lexiconId="fdc2c850-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="04:01"/>
+							<QualInfoType cid="7" description="General Information Bulletins " lexiconId="fdca6971-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:01"/>
+							<QualInfoType cid="8" description="Manual Update Bulletins " lexiconId="fdd083f2-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:02"/>
+							<QualInfoType cid="9" description="Product Fix Bulletins " lexiconId="fdd82513-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:03"/>
+							<QualInfoType cid="10" description="Service Campaign Bulletins " lexiconId="fddfc634-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:04"/>
+							<QualInfoType cid="11" description="Emission Recall Campaign Bulletins " lexiconId="fde5e0b5-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:05"/>
+							<QualInfoType cid="12" description="Safety Recall Campaign Bulletins " lexiconId="fdef2f86-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:06"/>
+							<QualInfoType cid="13" description="Goodwill Policy Program Bulletins " lexiconId="fdf54a07-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:07"/>
+							<QualInfoType cid="14" description="Parts Bulletins" lexiconId="fdfe71c8-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:08"/>
+							<QualInfoType cid="15" description="WB, electrical tools" lexiconId="fe0612e9-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:09"/>
+							<QualInfoType cid="16" description="WB, bodywork tools" lexiconId="fe0db40a-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:10"/>
+							<QualInfoType cid="17" description="WB, mechanical tools" lexiconId="fe13ce8b-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:11"/>
+							<QualInfoType cid="18" description="WB, equipment" lexiconId="fe1b6fac-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="05:12"/>
+							<QualInfoType cid="19" description="General Diagnostics and Tests " lexiconId="fc8e18bd-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="06:01"/>
+							<QualInfoType cid="20" description="Diagnostic Trouble Codes and Associated Procedures " lexiconId="fc95b9de-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="06:02"/>
+							<QualInfoType cid="21" description="Symptom Related Diagnostic Procedures " lexiconId="fc9d5aff-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="06:03"/>
+							<QualInfoType cid="22" description="Service programmes " lexiconId="fe2310cd-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="07:01"/>
+							<QualInfoType cid="23" description="Removal, replacement and installation " lexiconId="fe292b4e-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="08:01"/>
+							<QualInfoType cid="24" description="Overhaul instructions " lexiconId="fe30cc6f-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="08:02"/>
+							<QualInfoType cid="25" description="Cleaning, Inspection and Adjustment " lexiconId="fe386d90-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="08:03"/>
+							<QualInfoType cid="26" description="Installation instructions, accessories" lexiconId="fe419551-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="08:04"/>
+							<QualInfoType cid="27" description="Specifications, electrical/electronic " lexiconId="fe47afd2-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="09:01"/>
+							<QualInfoType cid="28" description="Specifications, mechanical " lexiconId="fe4dca53-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="09:02"/>
+							<QualInfoType cid="29" description="Specifications, other " lexiconId="fe56f214-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="09:03"/>
+							<QualInfoType cid="30" description="Wiring diagrams " lexiconId="fe5d33a5-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="10:01"/>
+							<QualInfoType cid="31" description="Mechanical schematics and diagrams " lexiconId="fe64d4c6-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="10:02"/>
+							<QualInfoType cid="32" description="Gas, Vacuum and Fluids Schematics and Diagrams " lexiconId="fe6c75e7-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="10:03"/>
+							<QualInfoType cid="33" description="Fibre Optics" lexiconId="fe729068-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="10:04"/>
+							<QualInfoType cid="34" description="Special Tools and Equipment " lexiconId="fe7a3189-5ba2-11d8-a2c6-808cbafdeb94" qualifierCode="11:01"/>
+						</qualInfoTypes>
+					</SubscriptionPackageTypeDef>
+					<SubscriptionProductStatus description="Released Edition" status="RELEASED"/>
+					<softwareProductTypes/>
+					<functionalities>
+						<Functionality description="The main tab Information is accessible for the user." functionalityCode="INFO_MGR" lexiconId="7bcc69a5-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Search is accessible for the user." functionalityCode="SEARCH" lexiconId="7bc62813-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Vehicle profile is accessible for the user." functionalityCode="SET_VEHICLE_PROFILE" lexiconId="7bc19431-4810-11d8-84f4-f09eeb920af1"/>
+					</functionalities>
+				</SubscriptionPackage>
+				<SubscriptionPackage description="Software Ordering and Download" lexiconId="50c800f1-2643-4cae-bc81-a0826c3c3a02" name="Software Ordering and Download [SW]" requiredSubscriptionPackageTypeDef="ff54b30a-5ba2-11d8-a2c6-808cbafdeb94" shortDescription="SW">
+					<SubscriptionPackageTypeDef description="Software Order and Downloading" name="SWODL">
+						<SubscriptionPackageType description="" id="7eab466d-4810-11d8-84f4-f09eeb920af1" objVersion="0" type=""/>
+						<qualInfoTypes/>
+					</SubscriptionPackageTypeDef>
+					<SubscriptionProductStatus description="Released Edition" status="RELEASED"/>
+					<softwareProductTypes/>
+					<functionalities>
+						<Functionality description="If the user, in the Vehicle profile tab, can access the button and function Read vehicle." functionalityCode="READ_OUT_VEHICLE" lexiconId="7be1c66d-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Search is accessible for the user." functionalityCode="SEARCH" lexiconId="7bc62813-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Vehicle profile is accessible for the user." functionalityCode="SET_VEHICLE_PROFILE" lexiconId="7bc19431-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="If the user, in the software manager, is allowed to see the button to add software products to the parts list." functionalityCode="SW_ADD_TO_PARTS_LIST" lexiconId="7bec74d1-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="If the user, in the parts list, is allowed to add software to the software manager by using add checked items or add all." functionalityCode="SW_ADD_TO_SW_MGR" lexiconId="7bfa3075-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="If the user, in the information manager, will get a link from software products to the software manager, with the purpose to load software." functionalityCode="SW_LOAD" lexiconId="7bf415f3-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="The main tab Softwareis accessible for the user." functionalityCode="SW_MGR" lexiconId="7bda254b-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="If the user, in the information manager, will get a link from software products to the software manager, with the purpose to order software." functionalityCode="SW_ORDER" lexiconId="7be65a4f-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="If the user, in the software manager, is allowed to enter software product numbers directly (even product numbers that can not be found in the local information). " functionalityCode="SW_PRODUCT_MANUAL_ENTRY" lexiconId="7c07ec19-4810-11d8-84f4-f09eeb920af1"/>
+						<Functionality description="If the user, in the software manager, is allowed to access the function to purchase  software." functionalityCode="SW_PURCHASE" lexiconId="7c01d197-4810-11d8-84f4-f09eeb920af1"/>
+					</functionalities>
+				</SubscriptionPackage>
+			</subscriptionPackages>
+			<instances><ASInstance PIEClientId="444083" changed="2007-11-19 16:58:05" computerName="nb-elektro" fkCustomerOrg="cfc64de1-3940-11d9-9edb-b58aa062f31b" id="aaca1480-4810-11d8-84f4-f09eeb920af1" objVersion="0" syncId="9879846f-96c0-11dc-98d9-fd18dee797af"><ASConfig asConfigType="" id="7aca1480-4810-11d8-84f4-f09eeb920af1" lexiconId="" objVersion="0"><descriptions/></ASConfig></ASInstance></instances>
+			<models>
+				<Model cid="275"/>
+				<Model cid="136"/>
+				<Model cid="965"/>
+				<Model cid="295"/>
+				<Model cid="876"/>
+				<Model cid="875"/>
+				<Model cid="135"/>
+				<Model cid="285"/>
+				<Model cid="545"/>
+				<Model cid="645"/>
+				<Model cid="964"/>
+				<Model cid="124"/>
+				<Model cid="184"/>
+				<Model cid="874"/>
+				<Model cid="384"/>
+				<Model cid="544"/>
+				<Model cid="644"/>
+				<Model cid="872"/>
+				<Model cid="873"/>
+				<Model cid="542"/>
+				<Model cid="533"/>
+				<Model cid="960"/>
+				<Model cid="946"/>
+				<Model cid="940"/>
+				<Model cid="850"/>
+				<Model cid="780"/>
+				<Model cid="760"/>
+				<Model cid="740"/>
+				<Model cid="480"/>
+				<Model cid="460"/>
+				<Model cid="440"/>
+				<Model cid="360"/>
+				<Model cid="340"/>
+				<Model cid="260"/>
+				<Model cid="240"/>
+			</models>
+		</subscription>
+	</subscriptions>
+</licence>
