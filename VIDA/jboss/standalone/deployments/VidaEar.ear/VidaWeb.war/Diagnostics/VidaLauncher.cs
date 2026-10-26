@@ -32,6 +32,10 @@ static class Program
             PropertyInfo p = sess.GetType().GetProperty("CommToolType", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             if (p != null && p.CanWrite) p.SetValue(sess, 1, null);
         } catch {}
+        try {
+            PropertyInfo p = sess.GetType().GetProperty("CultureName", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (p != null && p.CanWrite) p.SetValue(sess, "en-US", null);
+        } catch {}
     }
 
     [STAThread]
