@@ -132,6 +132,23 @@ static class Program
                                 object wf = wfField.GetValue(vehInfoInstance);
                                 if (wf != null)
                                 {
+                                    // 1. Configure CurrentCommTool
+                                    FieldInfo ctField = wf.GetType().GetField("_currentCommTool", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (ctField != null)
+                                    {
+                                        object ct = ctField.GetValue(wf);
+                                        if (ct != null)
+                                        {
+                                            ct.GetType().GetProperty("CommToolName").SetValue(ct, "DiCE-206751", null);
+                                            ct.GetType().GetProperty("CommToolType").SetValue(ct, 1, null); // DICE = 1
+                                        }
+                                    }
+
+                                    // 2. Disable pre-check that aborts before readout
+                                    PropertyInfo dvcProp = wf.GetType().GetProperty("DisableVehicleCheck");
+                                    if (dvcProp != null) dvcProp.SetValue(wf, true, null);
+
+                                    // 3. Initialize _session
                                     FieldInfo sessField = wf.GetType().GetField("_session", BindingFlags.NonPublic | BindingFlags.Instance);
                                     if (sessField != null)
                                     {
@@ -146,6 +163,29 @@ static class Program
                                             if (refProp != null) refProp.SetValue(sess, false, null);
                                         }
                                     }
+
+                                    // 4. Set _initResult to CorrectVin
+                                    FieldInfo initResField = viType.GetField("_initResult", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    MethodInfo initMethod = wf.GetType().GetMethod("Initialize", BindingFlags.Public | BindingFlags.Instance);
+                                    if (initMethod != null && initResField != null)
+                                    {
+                                        object initRes = initMethod.Invoke(wf, null);
+                                        initResField.SetValue(vehInfoInstance, initRes);
+                                        Console.WriteLine("[Launcher] Workflow Initialize result: " + initRes);
+                                    }
+                                }
+                            }
+
+                            // 5. Update SessionManager.Instance.Current CommTool
+                            Type smType = typeof(DiagApplication).Assembly.GetType("Vcc.Vida.DiagSwdl.Core.SessionManager");
+                            if (smType != null)
+                            {
+                                object sm = smType.GetProperty("Instance").GetValue(null, null);
+                                object curr = smType.GetProperty("Current").GetValue(sm, null);
+                                if (curr != null)
+                                {
+                                    curr.GetType().GetProperty("CommToolName").SetValue(curr, "DiCE-206751", null);
+                                    curr.GetType().GetProperty("CommToolType").SetValue(curr, 1, null);
                                 }
                             }
 
@@ -180,21 +220,22 @@ static class Program
         {
             try
             {
+                if (vehInfoInstance != null)
+                {
+                    MethodInfo mi = vehInfoInstance.GetType().GetMethod("PerformReadout", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (mi != null)
+                    {
+                        Console.WriteLine("[Launcher] Directly triggering PerformReadout()...");
+                        mi.Invoke(vehInfoInstance, null);
+                        return;
+                    }
+                }
                 if (internalReadoutBtn != null)
                 {
                     MethodInfo mi = internalReadoutBtn.GetType().GetMethod("PerformClick");
                     if (mi != null)
                     {
                         mi.Invoke(internalReadoutBtn, null);
-                        return;
-                    }
-                }
-                if (vehInfoInstance != null)
-                {
-                    MethodInfo mi = vehInfoInstance.GetType().GetMethod("PerformReadout", BindingFlags.NonPublic | BindingFlags.Instance);
-                    if (mi != null)
-                    {
-                        mi.Invoke(vehInfoInstance, null);
                         return;
                     }
                 }
