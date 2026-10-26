@@ -45,6 +45,32 @@ static class Program
         mainForm.StartPosition = FormStartPosition.CenterScreen;
         mainForm.WindowState = FormWindowState.Maximized;
 
+        // Top Toolbar
+        Panel topBar = new Panel();
+        topBar.Dock = DockStyle.Top;
+        topBar.Height = 44;
+        topBar.BackColor = Color.FromArgb(240, 242, 245);
+        topBar.BorderStyle = BorderStyle.FixedSingle;
+
+        Button btnReadVehicle = new Button();
+        btnReadVehicle.Text = "⚡ READ VEHICLE FROM DiCE (OBD-II)";
+        btnReadVehicle.Font = new Font("Segoe UI", 10f, FontStyle.Bold);
+        btnReadVehicle.BackColor = Color.FromArgb(0, 102, 204);
+        btnReadVehicle.ForeColor = Color.White;
+        btnReadVehicle.FlatStyle = FlatStyle.Flat;
+        btnReadVehicle.FlatAppearance.BorderSize = 0;
+        btnReadVehicle.SetBounds(10, 6, 280, 30);
+        btnReadVehicle.Cursor = Cursors.Hand;
+        topBar.Controls.Add(btnReadVehicle);
+
+        Label lblInfo = new Label();
+        lblInfo.Text = "Tool: DiCE-206751  |  Status: Mode II (Ignition ON)  |  Click button or 'UPDATE' below to read vehicle";
+        lblInfo.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+        lblInfo.ForeColor = Color.FromArgb(60, 64, 67);
+        lblInfo.AutoSize = true;
+        lblInfo.Location = new Point(305, 12);
+        topBar.Controls.Add(lblInfo);
+
         Console.WriteLine("[Launcher] Initializing DiagnosticMainForm...");
         var diag = new DiagnosticMainForm();
         diag.Dock = DockStyle.Fill;
@@ -62,6 +88,10 @@ static class Program
         diag.VIN = "";
 
         mainForm.Controls.Add(diag);
+        mainForm.Controls.Add(topBar);
+
+        Control internalReadoutBtn = null;
+        object vehInfoInstance = null;
 
         mainForm.Load += (s, e) =>
         {
@@ -70,11 +100,91 @@ static class Program
                 Console.WriteLine("[Launcher] Calling diag.LoadControl()...");
                 diag.LoadControl();
                 Console.WriteLine("[Launcher] diag.LoadControl() succeeded!");
+
+                // Enable vehicle readout in session via reflection on internal DiagnosticManager
+                Type mgrType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticManager");
+                if (mgrType != null)
+                {
+                    object mgr = mgrType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+                    FieldInfo viField = mgrType.GetField("_vehicleInformationForm", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (viField != null)
+                    {
+                        vehInfoInstance = viField.GetValue(mgr);
+                        if (vehInfoInstance != null)
+                        {
+                            Type viType = vehInfoInstance.GetType();
+                            FieldInfo wfField = viType.GetField("_vehicleInformationWf", BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (wfField != null)
+                            {
+                                object wf = wfField.GetValue(vehInfoInstance);
+                                if (wf != null)
+                                {
+                                    FieldInfo sessField = wf.GetType().GetField("_session", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (sessField != null)
+                                    {
+                                        object sess = sessField.GetValue(wf);
+                                        if (sess != null)
+                                        {
+                                            PropertyInfo allowProp = sess.GetType().GetProperty("AllowUpdate");
+                                            if (allowProp != null) allowProp.SetValue(sess, true, null);
+                                        }
+                                    }
+                                }
+                            }
+
+                            FieldInfo btnField = viType.GetField("_readOutButton", BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (btnField != null)
+                            {
+                                internalReadoutBtn = btnField.GetValue(vehInfoInstance) as Control;
+                                if (internalReadoutBtn != null)
+                                {
+                                    internalReadoutBtn.Enabled = true;
+                                    internalReadoutBtn.EnabledChanged += (sender, ev) =>
+                                    {
+                                        if (!internalReadoutBtn.Enabled) internalReadoutBtn.Enabled = true;
+                                    };
+                                }
+                            }
+
+                            MethodInfo initButtonsMethod = viType.GetMethod("initButtons", BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (initButtonsMethod != null) initButtonsMethod.Invoke(vehInfoInstance, null);
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
                 Console.WriteLine("[Launcher] Exception during LoadControl: " + ex);
                 MessageBox.Show("Error initializing Diagnostics: " + ex.Message, "VIDA Diagnostics", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        };
+
+        btnReadVehicle.Click += (s, e) =>
+        {
+            try
+            {
+                if (internalReadoutBtn != null)
+                {
+                    MethodInfo mi = internalReadoutBtn.GetType().GetMethod("PerformClick");
+                    if (mi != null)
+                    {
+                        mi.Invoke(internalReadoutBtn, null);
+                        return;
+                    }
+                }
+                if (vehInfoInstance != null)
+                {
+                    MethodInfo mi = vehInfoInstance.GetType().GetMethod("PerformReadout", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (mi != null)
+                    {
+                        mi.Invoke(vehInfoInstance, null);
+                        return;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Readout error: " + ex.Message, "VIDA Readout", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         };
 
