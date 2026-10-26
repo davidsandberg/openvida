@@ -63,12 +63,25 @@ static class Program
         btnReadVehicle.Cursor = Cursors.Hand;
         topBar.Controls.Add(btnReadVehicle);
 
+        Label lblVin = new Label();
+        lblVin.Text = "VIN:";
+        lblVin.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+        lblVin.SetBounds(305, 12, 35, 24);
+        topBar.Controls.Add(lblVin);
+
+        TextBox txtVin = new TextBox();
+        txtVin.Text = "YV1BW5251B1189886";
+        txtVin.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+        txtVin.SetBounds(345, 9, 175, 25);
+        txtVin.ReadOnly = true;
+        topBar.Controls.Add(txtVin);
+
         Label lblInfo = new Label();
-        lblInfo.Text = "Tool: DiCE-206751  |  Status: Mode II (Ignition ON)  |  Click button or 'UPDATE' below to read vehicle";
+        lblInfo.Text = "|  Volvo V70 (08-), MY 2011, D5204T2  |  DiCE-206751 (Ignition Mode II)";
         lblInfo.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
         lblInfo.ForeColor = Color.FromArgb(60, 64, 67);
         lblInfo.AutoSize = true;
-        lblInfo.Location = new Point(305, 12);
+        lblInfo.Location = new Point(530, 12);
         topBar.Controls.Add(lblInfo);
 
         Console.WriteLine("[Launcher] Initializing DiagnosticMainForm...");
@@ -84,8 +97,8 @@ static class Program
         diag.ApplicationTitle = "Volvo VIDA Standalone Diagnostics";
         diag.UserRole = "1";
         diag.AdminRole = "1";
-        diag.PartnerGroup = "INT";
-        diag.VIN = "";
+        diag.PartnerGroup = "1002";
+        diag.VIN = "YV1BW5251B1189886";
 
         mainForm.Controls.Add(diag);
         mainForm.Controls.Add(topBar);
@@ -127,6 +140,10 @@ static class Program
                                         {
                                             PropertyInfo allowProp = sess.GetType().GetProperty("AllowUpdate");
                                             if (allowProp != null) allowProp.SetValue(sess, true, null);
+                                            PropertyInfo commProp = sess.GetType().GetProperty("AllowVehicleCommunication");
+                                            if (commProp != null) commProp.SetValue(sess, true, null);
+                                            PropertyInfo refProp = sess.GetType().GetProperty("ReferenceMode");
+                                            if (refProp != null) refProp.SetValue(sess, false, null);
                                         }
                                     }
                                 }
