@@ -9,6 +9,9 @@ SQL2022-SSEI-Expr.exe
 7za920.zip
 /tools/
 vm_screen.png
+*.exe
+!DiCE/Tools/*.exe
+SetupDiCE.exe
 *.log
 
 # Ignore original VIDA installation directory by default (databases, JDK, JBoss binaries)
