@@ -9,6 +9,31 @@ using Vcc.Vida.DiagSwdl.UI.Diagnostics;
 
 static class Program
 {
+    static void SetSessionProfile(object sess, object vehProfile)
+    {
+        if (sess == null) return;
+        try {
+            PropertyInfo p = sess.GetType().GetProperty("ProfileId", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (p != null && p.CanWrite) p.SetValue(sess, "0b00c8af84add183", null);
+        } catch {}
+        try {
+            PropertyInfo p = sess.GetType().GetProperty("ProfileIds", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (p != null && p.CanWrite) p.SetValue(sess, new string[] { "0b00c8af84add183" }, null);
+        } catch {}
+        try {
+            PropertyInfo p = sess.GetType().GetProperty("Profile", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (p != null && p.CanWrite) p.SetValue(sess, vehProfile, null);
+        } catch {}
+        try {
+            PropertyInfo p = sess.GetType().GetProperty("CommToolName", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (p != null && p.CanWrite) p.SetValue(sess, "DiCE-206751", null);
+        } catch {}
+        try {
+            PropertyInfo p = sess.GetType().GetProperty("CommToolType", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            if (p != null && p.CanWrite) p.SetValue(sess, 1, null);
+        } catch {}
+    }
+
     [STAThread]
     static void Main(string[] args)
     {
@@ -186,24 +211,14 @@ static class Program
                             {
                                 object sm = smType.GetProperty("Instance").GetValue(null, null);
                                 object curr = smType.GetProperty("Current").GetValue(sm, null);
-                                if (curr != null)
-                                {
-                                    curr.GetType().GetProperty("CommToolName").SetValue(curr, "DiCE-206751", null);
-                                    curr.GetType().GetProperty("CommToolType").SetValue(curr, 1, null);
-                                    curr.GetType().GetProperty("ProfileId").SetValue(curr, "0b00c8af84add183", null);
-                                    curr.GetType().GetProperty("ProfileIds").SetValue(curr, new string[] { "0b00c8af84add183" }, null);
-                                    curr.GetType().GetProperty("Profile").SetValue(curr, vehProfile, null);
-                                }
+                                SetSessionProfile(curr, vehProfile);
                             }
 
-                            object diagSess = mgrType.GetProperty("CurrentSession").GetValue(mgr, null);
-                            if (diagSess != null)
+                            PropertyInfo csProp = mgrType.GetProperty("CurrentSession", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (csProp != null)
                             {
-                                diagSess.GetType().GetProperty("CommToolName").SetValue(diagSess, "DiCE-206751", null);
-                                diagSess.GetType().GetProperty("CommToolType").SetValue(diagSess, 1, null);
-                                diagSess.GetType().GetProperty("ProfileId").SetValue(diagSess, "0b00c8af84add183", null);
-                                diagSess.GetType().GetProperty("ProfileIds").SetValue(diagSess, new string[] { "0b00c8af84add183" }, null);
-                                diagSess.GetType().GetProperty("Profile").SetValue(diagSess, vehProfile, null);
+                                object diagSess = csProp.GetValue(mgr, null);
+                                SetSessionProfile(diagSess, vehProfile);
                             }
 
                             FieldInfo btnField = viType.GetField("_readOutButton", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -244,27 +259,20 @@ static class Program
                 {
                     object sm = smType.GetProperty("Instance").GetValue(null, null);
                     object curr = smType.GetProperty("Current").GetValue(sm, null);
-                    if (curr != null)
-                    {
-                        curr.GetType().GetProperty("CommToolName").SetValue(curr, "DiCE-206751", null);
-                        curr.GetType().GetProperty("CommToolType").SetValue(curr, 1, null);
-                        curr.GetType().GetProperty("ProfileId").SetValue(curr, "0b00c8af84add183", null);
-                        curr.GetType().GetProperty("ProfileIds").SetValue(curr, new string[] { "0b00c8af84add183" }, null);
-                        curr.GetType().GetProperty("Profile").SetValue(curr, vehProfile, null);
-                    }
+                    SetSessionProfile(curr, vehProfile);
                 }
                 Type mgrType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticManager");
                 if (mgrType != null)
                 {
                     object mgr = mgrType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
-                    object diagSess = mgrType.GetProperty("CurrentSession").GetValue(mgr, null);
-                    if (diagSess != null)
+                    if (mgr != null)
                     {
-                        diagSess.GetType().GetProperty("CommToolName").SetValue(diagSess, "DiCE-206751", null);
-                        diagSess.GetType().GetProperty("CommToolType").SetValue(diagSess, 1, null);
-                        diagSess.GetType().GetProperty("ProfileId").SetValue(diagSess, "0b00c8af84add183", null);
-                        diagSess.GetType().GetProperty("ProfileIds").SetValue(diagSess, new string[] { "0b00c8af84add183" }, null);
-                        diagSess.GetType().GetProperty("Profile").SetValue(diagSess, vehProfile, null);
+                        PropertyInfo csProp = mgrType.GetProperty("CurrentSession", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (csProp != null)
+                        {
+                            object diagSess = csProp.GetValue(mgr, null);
+                            SetSessionProfile(diagSess, vehProfile);
+                        }
                     }
                 }
 
@@ -290,7 +298,9 @@ static class Program
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Readout error: " + ex.Message, "VIDA Readout", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Exception inner = ex.InnerException != null ? ex.InnerException : ex;
+                Console.WriteLine("[Launcher] Readout exception: " + inner);
+                MessageBox.Show("Readout error: " + inner.Message, "VIDA Readout", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         };
 
