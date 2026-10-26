@@ -1,0 +1,146 @@
+<components>
+  <!-- Max one interface per component -->
+  <component class="Vcc.Vida.DiagSwdl.BizServices.AccessServer.DB.AccessServerRepository">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.AccessServer.DB.IAccessServerRepository" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="AccessServer" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.CarCom.VehicleServices.Data.VehicleServiceDatabase">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.CarCom.VehicleServices.Data.IVehicleServiceDatabase" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="CarCom" type="System.String" />
+    <propertyConfig name="UseServicesFile" value="false" type="System.Boolean" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.CarCom.DB.CarComRepository">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.CarCom.DB.ICarComRepository" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="CarCom" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.InfoElementsRepository.InfoElementsRepository">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.InfoElementsRepository.IInfoElementsRepository" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="DiagSwdlRepository" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.NavigationImageRepository.NavImageProvider">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.NavigationImageRepository.INavImageProvider" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="DiagSwdlRepository" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.VehicleImageRepository.VehicleImageProvider">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.VehicleImageRepository.IVehicleImageProvider" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="ImageRepository" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.SoftwareProductInformation.SoftwareProductInfoService">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.SoftwareProductInformation.ISoftwareProductInfoService" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="DiagSwdlRepository" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.VehicleResolver.VehicleResolverService">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.VehicleResolver.IVehicleResolverService" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="DiagSwdlRepository" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.DiagnosticSession.DiagnosticSessionService">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.DiagnosticSession.IDiagnosticSessionService" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="DiagSwdlSession" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.SoftwareOrderRepository.SoftwareOrderRepository">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.SoftwareOrderRepository.ISoftwareOrderRepository" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="DiagSwdlSession" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.PartsLists.PartsLists">
+    <propertyConfig name="PartsListsServiceUrl" value="https://vidais.volvocars.biz/integration/cwl/CwlService" type="System.String" />
+    <propertyConfig name="UseProxy" value="true" type="System.Boolean" />
+    <propertyConfig name="ProxyUrl" value="http://localhost/Vida/vidaProxyServlet" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.SoftwareOrdering.PieSoftwareOrdering">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.SoftwareOrdering.ISoftwareOrdering" />
+    <propertyConfig name="SafeEnvironment" value="2" type="System.Int32" />
+    <propertyConfig name="SssVersion" value="2" type="System.Int32" />
+    <propertyConfig name="SafeServiceUrl" value="https://vidais.volvocars.biz/integration/pie/swodl/services/SafeService" type="System.String" />
+    <propertyConfig name="UseRetrieveProxy" value="true" type="System.Boolean" />
+    <propertyConfig name="SafeSurveillanceUrl" value="https://vidais.volvocars.biz/integration/pie/suv/services/SurveillanceService" type="System.String" />
+    <propertyConfig name="UseProxy" value="true" type="System.Boolean" />
+    <propertyConfig name="ProxyUrl" value="http://localhost/Vida/vidaProxyServlet" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.SoftwareOrdering.Independent.IndependentSwdlService">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.SoftwareOrdering.Independent.IIndependentSwdlService" />
+    <propertyConfig name="IndependentServiceUrl" value="https://vidais.volvocars.biz/integration/pie/swodl/services/IndependentAIOService" type="System.String" />
+    <propertyConfig name="UseProxy" value="true" type="System.Boolean" />
+    <propertyConfig name="ProxyUrl" value="http://localhost/Vida/vidaProxyServlet" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.AppServices.Dro.DroUploadService">
+    <interface type="Vcc.Vida.DiagSwdl.AppServices.Dro.IDroUploadService" />
+    <propertyConfig name="DroServiceUrl" value="https://vidais.volvocars.biz/integration/dasig/services/FileReceiverService" type="System.String" />
+    <propertyConfig name="UseProxy" value="true" type="System.Boolean" />
+    <propertyConfig name="ProxyUrl" value="http://localhost/Vida/vidaProxyServlet" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.AppServices.SoftwareOrderProcessing.SoftwareOrderProcessor">
+    <interface type="Vcc.Vida.DiagSwdl.AppServices.SoftwareOrderProcessing.ISoftwareOrderProcessor" />
+    <propertyConfig name="BuildOrderTimeout" value="120" type="System.Int32" />
+    <propertyConfig name="ReadyPollInterval" value="10" type="System.Int32" />
+    <propertyConfig name="NumberOfDaysForOrders" value="10" type="System.Int32" />
+    <propertyConfig name="MaximumNumberOfOrderVehicles" value="50" type="System.Int32" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.ScriptRepository.ScriptProvider">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.ScriptRepository.IScriptProvider" />
+    <propertyConfig name="ScriptPath" value="res/scripts/" type="System.String" />
+    <propertyConfig name="VehType" value="p2x" type="System.String" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="DiagSwdlRepository" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.Workflow.SoftwareDownload.Downloader">
+    <interface type="Vcc.Vida.DiagSwdl.Workflow.SoftwareDownload.IDownloader" />
+    <propertyConfig name="InteractiveMode" value="false" type="System.Bool" />
+    <propertyConfig name="NumberOfDownloads" value="1" type="System.Int32" />
+    <propertyConfig name="UsbRestriction" value="true" type="System.Bool" />
+    <propertyConfig name="ParallelDownloadEnable" value="false" type="System.Bool" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.Workflow.SoftwareOrder.SoftwareOrderWF">
+    <interface type="Vcc.Vida.DiagSwdl.Workflow.SoftwareOrder.ISoftwareOrderWF" />
+    <propertyConfig name="EnableDownload" value="true" type="System.Bool" />
+    <propertyConfig name="Readout" value="true" type="System.Bool" />
+    <propertyConfig name="IndependentWebFront" value="http://www.volvotechinfo.com/independents/" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.AppServices.Scripting.ScriptEngineProvider">
+    <interface type="Vcc.Vida.DiagSwdl.AppServices.Scripting.IScriptEngineProvider" />
+    <propertyConfig name="TraceScript" value="false" type="System.Bool" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.Workflow.CarStatus.CarStatusWF">
+    <interface type="Vcc.Vida.DiagSwdl.Workflow.CarStatus.ICarStatusWF" />
+    <propertyConfig name="Disable" value="false" type="System.Bool" />
+    <propertyConfig name="Logging" value="false" type="System.Bool" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.Workflow.CommToolInformation.CommToolPropertiesXmlWriter">
+    <propertyConfig name="FileName" value="commToolInformation.xml" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.Workflow.VehicleInformation.VehicleInformationWF">
+    <interface type="Vcc.Vida.DiagSwdl.Workflow.VehicleInformation.IVehicleInformationWF" />
+    <propertyConfig name="DisableVehicleCheck" value="false" type="System.Bool" />
+  </component>
+  <component class="X40Reprogrammer2.Workflow.EmsDownloader">
+    <interface type="X40Reprogrammer2.Workflow.IEmsDownloader" />
+  </component>
+  <component class="X40Reprogrammer2.FileDB.FileDBrepository">
+    <interface type="X40Reprogrammer2.FileDB.IFileDBrepository" />
+    <propertyConfig name="DbFolder" value="res/x40db" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.BizServices.AccessServerDB.AccessServer">
+    <interface type="Vcc.Vida.DiagSwdl.BizServices.AccessServerDB.IAccessServer" />
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DatabaseInstance" value="AccessServer" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.VehCom2.J2534.Diagnostics.DiceTimingLookup">
+    <propertyConfig name="DataSource" value="(local)\SQLEXPRESS" type="System.String" />
+    <propertyConfig name="DiceTiming" value="DiceTiming" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.UI.Updates.DiceUpdateManager">
+    <propertyConfig name="SetupExePath" value="eUpdate\DiCE\SetupDice.exe" type="System.String" />
+  </component>
+  <component class="Vcc.Vida.DiagSwdl.VehCom2.J2534.J2534ChannelManager">
+    <propertyConfig name="UsingKlineD2Special" value="true" type="System.Bool" />
+  </component>
+</components>

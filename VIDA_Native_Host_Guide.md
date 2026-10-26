@@ -81,12 +81,30 @@ For VIDA's `VehCom2.DLL` and any diagnostic launcher to locate the DiCE driver, 
 
 ---
 
-## 4. Next Steps: Standalone Desktop Launcher (Phase 2)
+## 4. Standalone Desktop Launcher (Phase 2 - Complete)
 
-Because the **Diagnostics** tab in the web interface was built as an embedded .NET Windows Forms UserControl (`Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticMainForm`) that required legacy Internet Explorer ActiveX hosting, Phase 2 implements a standalone C# desktop application:
-1. Directly hosts `DiagnosticMainForm` inside a standard Windows Form window.
-2. Directly initializes `VehCom2.DLL` and `TSDiCE32.dll`.
-3. Bypasses Internet Explorer completely for:
-   - Reading and clearing Diagnostic Trouble Codes (DTCs).
-   - Viewing live sensor data and ECU parameters.
-   - Reading ECU identification and programming parameters.
+Because the **Diagnostics** tab in the web interface was built as an embedded .NET Windows Forms UserControl (`Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticMainForm`) that originally required legacy Internet Explorer ActiveX hosting, we created a native standalone C# desktop application: [`VidaLauncher.cs`](file:///C:/Users/david/git/vida/VIDA/jboss/standalone/deployments/VidaEar.ear/VidaWeb.war/Diagnostics/VidaLauncher.cs).
+
+### Key Architecture & Implementation Details:
+1. **Hosting Form**: Wraps `DiagnosticMainForm` in a standard WinForms window maximized to full screen.
+2. **Environment & Paths**: Automatically sets `VIDA_HOME` so configuration files (`diagnostic.config.xml`) and logs are discovered cleanly without hardcoded directory paths.
+3. **Database Integration**:
+   - Updated `components.config.xml` to point from legacy `(local)\VIDA` to active SQL instance `(local)\SQLEXPRESS`.
+   - Granted database permissions and repaired orphaned user SIDs with [`repair_sql_users.ps1`](file:///C:/Users/david/git/vida/repair_sql_users.ps1) for `ASUser` (`GunnarS3g3`).
+4. **Hardware Driver**:
+   - Official 64-bit DiCE drivers installed via `SetupDiCE.exe`.
+   - Verified J2534 PassThru communication with physical DiCE unit (`DICE-206751`).
+5. **Direct Execution**:
+   - Bypasses Internet Explorer completely.
+   - Run anytime via [`run_diagnostics.bat`](file:///C:/Users/david/git/vida/run_diagnostics.bat).
+
+---
+
+## 5. Quick Start: How to Run VIDA Diagnostics
+
+To start using VIDA Diagnostics on Windows 11:
+1. Power your DiCE unit (either via vehicle OBD-II port or 12V DC desk adapter) and plug in the USB cable.
+2. Double-click [`run_diagnostics.bat`](file:///C:/Users/david/git/vida/run_diagnostics.bat) in the repository root.
+   - It will verify SQL Server Express and JBoss services are active.
+   - It will launch the native VIDA Diagnostics application maximized on your desktop.
+3. Use the Diagnostics interface to read vehicle DTCs, inspect ECU parameters, and view live vehicle data!

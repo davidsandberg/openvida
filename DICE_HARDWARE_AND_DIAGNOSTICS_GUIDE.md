@@ -101,11 +101,21 @@ Once the USB connection is recognized:
 
 ---
 
-## 4. Phase 2: Standalone Desktop Launcher
+## 4. Phase 2: Standalone Desktop Launcher (Complete)
 
 Because modern browsers (Chrome and Edge) cannot execute the embedded .NET Windows Forms control in the web version's Diagnostics tab, the standalone launcher is the definitive solution:
 
 1. **Hosts `DiagnosticMainForm`**: Integrates `Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticMainForm` directly inside a modern C# Form window.
-2. **Direct Hardware Access**: Binds directly to `VehCom2.DLL` and `TSDiCE32.dll`.
-3. **Database Integration**: Queries the attached SQL Server databases (`CarCom`, `DiagSwdlRepository`) for ECU variant parameters, DTC descriptions, and diagnostic procedures.
+2. **Direct Hardware Access**: Binds directly to `VehCom2.DLL` and `TSDiCE32.dll` via the installed 64-bit DiCE driver.
+3. **Database Integration**: Automatically configured for `(local)\SQLEXPRESS` and authenticates via repaired SQL Server user `ASUser` (`GunnarS3g3`).
 4. **Zero VM & Zero IE Dependency**: Lightweight, native 64-bit host execution with instant startup.
+
+### How to Run:
+Simply execute:
+```cmd
+run_diagnostics.bat
+```
+or launch directly:
+```cmd
+VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\VidaLauncher.exe
+```
