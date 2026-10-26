@@ -99,6 +99,7 @@ static class Program
         diag.AdminRole = "1";
         diag.PartnerGroup = "1002";
         diag.VIN = "YV1BW5251B1189886";
+        diag.ProfileId = "0b00c8af84add183";
 
         mainForm.Controls.Add(diag);
         mainForm.Controls.Add(topBar);
@@ -176,7 +177,10 @@ static class Program
                                 }
                             }
 
-                            // 5. Update SessionManager.Instance.Current CommTool
+                            // 5. Update SessionManager.Instance.Current and DiagnosticManager Profile
+                            Type vpType = typeof(DiagApplication).Assembly.GetType("Vcc.Vida.DiagSwdl.Core.VehicleProfile");
+                            object vehProfile = Activator.CreateInstance(vpType, new object[] { "0b00c8af84add183" });
+
                             Type smType = typeof(DiagApplication).Assembly.GetType("Vcc.Vida.DiagSwdl.Core.SessionManager");
                             if (smType != null)
                             {
@@ -186,7 +190,20 @@ static class Program
                                 {
                                     curr.GetType().GetProperty("CommToolName").SetValue(curr, "DiCE-206751", null);
                                     curr.GetType().GetProperty("CommToolType").SetValue(curr, 1, null);
+                                    curr.GetType().GetProperty("ProfileId").SetValue(curr, "0b00c8af84add183", null);
+                                    curr.GetType().GetProperty("ProfileIds").SetValue(curr, new string[] { "0b00c8af84add183" }, null);
+                                    curr.GetType().GetProperty("Profile").SetValue(curr, vehProfile, null);
                                 }
+                            }
+
+                            object diagSess = mgrType.GetProperty("CurrentSession").GetValue(mgr, null);
+                            if (diagSess != null)
+                            {
+                                diagSess.GetType().GetProperty("CommToolName").SetValue(diagSess, "DiCE-206751", null);
+                                diagSess.GetType().GetProperty("CommToolType").SetValue(diagSess, 1, null);
+                                diagSess.GetType().GetProperty("ProfileId").SetValue(diagSess, "0b00c8af84add183", null);
+                                diagSess.GetType().GetProperty("ProfileIds").SetValue(diagSess, new string[] { "0b00c8af84add183" }, null);
+                                diagSess.GetType().GetProperty("Profile").SetValue(diagSess, vehProfile, null);
                             }
 
                             FieldInfo btnField = viType.GetField("_readOutButton", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -220,6 +237,37 @@ static class Program
         {
             try
             {
+                Type vpType = typeof(DiagApplication).Assembly.GetType("Vcc.Vida.DiagSwdl.Core.VehicleProfile");
+                object vehProfile = Activator.CreateInstance(vpType, new object[] { "0b00c8af84add183" });
+                Type smType = typeof(DiagApplication).Assembly.GetType("Vcc.Vida.DiagSwdl.Core.SessionManager");
+                if (smType != null)
+                {
+                    object sm = smType.GetProperty("Instance").GetValue(null, null);
+                    object curr = smType.GetProperty("Current").GetValue(sm, null);
+                    if (curr != null)
+                    {
+                        curr.GetType().GetProperty("CommToolName").SetValue(curr, "DiCE-206751", null);
+                        curr.GetType().GetProperty("CommToolType").SetValue(curr, 1, null);
+                        curr.GetType().GetProperty("ProfileId").SetValue(curr, "0b00c8af84add183", null);
+                        curr.GetType().GetProperty("ProfileIds").SetValue(curr, new string[] { "0b00c8af84add183" }, null);
+                        curr.GetType().GetProperty("Profile").SetValue(curr, vehProfile, null);
+                    }
+                }
+                Type mgrType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticManager");
+                if (mgrType != null)
+                {
+                    object mgr = mgrType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+                    object diagSess = mgrType.GetProperty("CurrentSession").GetValue(mgr, null);
+                    if (diagSess != null)
+                    {
+                        diagSess.GetType().GetProperty("CommToolName").SetValue(diagSess, "DiCE-206751", null);
+                        diagSess.GetType().GetProperty("CommToolType").SetValue(diagSess, 1, null);
+                        diagSess.GetType().GetProperty("ProfileId").SetValue(diagSess, "0b00c8af84add183", null);
+                        diagSess.GetType().GetProperty("ProfileIds").SetValue(diagSess, new string[] { "0b00c8af84add183" }, null);
+                        diagSess.GetType().GetProperty("Profile").SetValue(diagSess, vehProfile, null);
+                    }
+                }
+
                 if (vehInfoInstance != null)
                 {
                     MethodInfo mi = vehInfoInstance.GetType().GetMethod("PerformReadout", BindingFlags.NonPublic | BindingFlags.Instance);
