@@ -127,6 +127,22 @@ namespace IsoViewStub
             ParseCgmData(data);
         }
 
+        static string ReadCgmString(byte[] data, ref int offset)
+        {
+            if (offset >= data.Length) return "";
+            int sLen = data[offset++];
+            if (sLen == 255)
+            {
+                if (offset >= data.Length - 1) return "";
+                sLen = (data[offset] << 8) | data[offset + 1];
+                offset += 2;
+            }
+            if (offset + sLen > data.Length) sLen = data.Length - offset;
+            string s = Encoding.GetEncoding("iso-8859-1").GetString(data, offset, sLen);
+            offset += sLen;
+            return s;
+        }
+
         private void ParseCgmData(byte[] data)
         {
             try
@@ -158,31 +174,30 @@ namespace IsoViewStub
                     {
                         Array.Copy(data, pos, pd, 0, len);
                     }
-                    pos += len;
-                    if (len % 2 != 0) pos++;
                     elements.Add(new Tuple<int, int, byte[]>(ec, ei, pd));
-                }
 
-                // Polylines
-                foreach (var el in elements)
-                {
-                    if (el.Item1 == 4 && el.Item2 == 1)
+                    if (ec == 4 && (ei == 1 || ei == 2))
                     {
-                        byte[] pd = el.Item3;
-                        int count = (pd.Length / 2) & ~1;
-                        PointF[] pts = new PointF[count / 2];
-                        for (int k = 0; k < count; k += 2)
+                        int count = len / 4;
+                        if (count >= 2)
                         {
-                            short x = (short)((pd[k * 2] << 8) | pd[k * 2 + 1]);
-                            short y = (short)((pd[(k + 1) * 2] << 8) | pd[(k + 1) * 2 + 1]);
-                            pts[k / 2] = new PointF(x, y);
-                            if (x < minX) minX = x;
-                            if (x > maxX) maxX = x;
-                            if (y < minY) minY = y;
-                            if (y > maxY) maxY = y;
+                            PointF[] pts = new PointF[count];
+                            for (int k = 0; k < count; k++)
+                            {
+                                short x = (short)((pd[k * 4] << 8) | pd[k * 4 + 1]);
+                                short y = (short)((pd[k * 4 + 2] << 8) | pd[k * 4 + 3]);
+                                pts[k] = new PointF(x, y);
+                                if (x < minX) minX = x;
+                                if (x > maxX) maxX = x;
+                                if (y < minY) minY = y;
+                                if (y > maxY) maxY = y;
+                            }
+                            lines.Add(pts);
                         }
-                        if (pts.Length > 1) lines.Add(pts);
                     }
+
+                    pos += len;
+                    if ((len % 2) == 1) pos++;
                 }
 
                 // ECUs
@@ -191,18 +206,13 @@ namespace IsoViewStub
                     var el = elements[i];
                     if (el.Item1 == 0 && el.Item2 == 21) // BEGIN APS
                     {
-                        byte[] pd = el.Item3;
-                        if (pd.Length < 2) continue;
-                        int slen = pd[0];
-                        string apsId = Encoding.GetEncoding("iso-8859-1").GetString(pd, 1, Math.Min(slen, pd.Length - 1));
-
-                        if (!apsId.StartsWith("_") && !apsId.Equals("ct", StringComparison.OrdinalIgnoreCase))
-                        {
-                            continue;
-                        }
+                        int off = 0;
+                        string apsId = ReadCgmString(el.Item3, ref off).Trim();
+                        int nullIdx = apsId.IndexOf('\0');
+                        if (nullIdx >= 0) apsId = apsId.Substring(0, nullIdx);
+                        apsId = apsId.Trim();
 
                         string text = "";
-                        short txCoord = 0, tyCoord = 0, dw = 0, dh = 0;
                         List<PointF> boxPts = new List<PointF>();
 
                         int j = i + 1;
@@ -212,44 +222,48 @@ namespace IsoViewStub
                             if (cel.Item1 == 0 && cel.Item2 == 23)
                                 break;
 
-                            if (cel.Item1 == 4 && (cel.Item2 == 4 || cel.Item2 == 5))
+                            if (cel.Item1 == 4 && cel.Item2 == 5) // RESTRICTED TEXT
                             {
                                 byte[] cpd = cel.Item3;
                                 if (cpd.Length >= 11)
                                 {
-                                    dw = (short)((cpd[0] << 8) | cpd[1]);
-                                    dh = (short)((cpd[2] << 8) | cpd[3]);
-                                    txCoord = (short)((cpd[4] << 8) | cpd[5]);
-                                    tyCoord = (short)((cpd[6] << 8) | cpd[7]);
-                                    int tlen = cpd[10];
-                                    if (11 + tlen <= cpd.Length)
-                                    {
-                                        text = Encoding.GetEncoding("iso-8859-1").GetString(cpd, 11, tlen).Trim();
-                                    }
+                                    int toff = 10;
+                                    text = ReadCgmString(cpd, ref toff);
                                 }
                             }
-                            else if (cel.Item1 == 4 && cel.Item2 == 26)
+                            else if (cel.Item1 == 4 && cel.Item2 == 4) // TEXT
                             {
                                 byte[] cpd = cel.Item3;
-                                int count = (cpd.Length / 2);
-                                short[] ints = new short[count];
-                                for (int k = 0; k < count; k++)
+                                if (cpd.Length >= 5)
                                 {
-                                    ints[k] = (short)((cpd[k * 2] << 8) | cpd[k * 2 + 1]);
+                                    int toff = 4;
+                                    text = ReadCgmString(cpd, ref toff);
                                 }
-                                for (int k = 1; k < count - 1; k += 2)
+                            }
+                            else if (cel.Item1 == 4 && cel.Item2 == 26) // POLYBEZIER
+                            {
+                                byte[] cpd = cel.Item3;
+                                for (int k = 2; k < cpd.Length - 3; k += 4)
                                 {
-                                    boxPts.Add(new PointF(ints[k], ints[k + 1]));
+                                    short x = (short)((cpd[k] << 8) | cpd[k + 1]);
+                                    short y = (short)((cpd[k + 2] << 8) | cpd[k + 3]);
+                                    boxPts.Add(new PointF(x, y));
+                                }
+                            }
+                            else if (cel.Item1 == 4 && cel.Item2 == 7) // POLYGON
+                            {
+                                byte[] cpd = cel.Item3;
+                                for (int k = 0; k < cpd.Length - 3; k += 4)
+                                {
+                                    short x = (short)((cpd[k] << 8) | cpd[k + 1]);
+                                    short y = (short)((cpd[k + 2] << 8) | cpd[k + 3]);
+                                    boxPts.Add(new PointF(x, y));
                                 }
                             }
                             j++;
                         }
 
-                        EcuNode node = new EcuNode();
-                        node.Id = apsId;
-                        node.Name = string.IsNullOrEmpty(text) ? apsId : text;
-
-                        if (boxPts.Count > 0)
+                        if ((apsId.StartsWith("_") || apsId.Equals("ct", StringComparison.OrdinalIgnoreCase)) && boxPts.Count > 0)
                         {
                             float bMinX = float.MaxValue, bMaxX = float.MinValue;
                             float bMinY = float.MaxValue, bMaxY = float.MinValue;
@@ -260,36 +274,33 @@ namespace IsoViewStub
                                 if (p.Y < bMinY) bMinY = p.Y;
                                 if (p.Y > bMaxY) bMaxY = p.Y;
                             }
+
+                            EcuNode node = new EcuNode();
+                            node.Id = apsId;
+                            node.Name = string.IsNullOrEmpty(text) ? apsId : text;
                             node.MinX = bMinX;
                             node.MaxX = bMaxX;
                             node.MinY = bMinY;
                             node.MaxY = bMaxY;
-                        }
-                        else if (!string.IsNullOrEmpty(text))
-                        {
-                            node.MinX = txCoord - 200;
-                            node.MaxX = txCoord + dw + 200;
-                            node.MinY = tyCoord - 600;
-                            node.MaxY = tyCoord + 300;
-                        }
 
-                        // Preserves any existing color if re-parsing
-                        if (_ecus.ContainsKey(apsId))
-                        {
-                            node.FillColor = _ecus[apsId].FillColor;
-                            node.Highlighted = _ecus[apsId].Highlighted;
-                        }
+                            // Preserves any existing color if re-parsing
+                            if (_ecus.ContainsKey(apsId))
+                            {
+                                node.FillColor = _ecus[apsId].FillColor;
+                                node.Highlighted = _ecus[apsId].Highlighted;
+                            }
 
-                        nodes[apsId] = node;
-                        // Also index without underscore
-                        if (apsId.StartsWith("_"))
-                        {
-                            nodes[apsId.Substring(1)] = node;
-                        }
-                        // Also index by uppercase name
-                        if (!string.IsNullOrEmpty(node.Name))
-                        {
-                            nodes[node.Name] = node;
+                            nodes[apsId] = node;
+                            // Also index without underscore
+                            if (apsId.StartsWith("_"))
+                            {
+                                nodes[apsId.Substring(1)] = node;
+                            }
+                            // Also index by uppercase name
+                            if (!string.IsNullOrEmpty(node.Name))
+                            {
+                                nodes[node.Name] = node;
+                            }
                         }
 
                         i = j;
