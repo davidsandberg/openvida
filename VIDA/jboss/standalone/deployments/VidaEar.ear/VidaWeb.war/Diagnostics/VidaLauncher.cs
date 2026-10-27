@@ -2200,23 +2200,21 @@ static class Program
                 }
             };
 
-            // Hook Toggle buttons
-            btnDtcRef.Click += (s, e) =>
-            {
-                manualExplorerPnl.Visible = false;
-                tabPanel.Visible = true;
-                btnDtcRef.BackColor = Color.FromArgb(0, 102, 204);
-                btnDtcRef.ForeColor = Color.White;
-                btnDtcRef.Font = new Font("Segoe UI", 9.25f, FontStyle.Bold);
-                btnManuals.BackColor = Color.FromArgb(232, 236, 240);
-                btnManuals.ForeColor = Color.FromArgb(32, 33, 36);
-                btnManuals.Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
-            };
+            Control tabCtrl = GetFieldValue(refForm, "_tab") as Control;
+            Control cscCtrl = GetFieldValue(refForm, "_customerSymptomsCSCRefInfoControl") as Control;
+            Control dtcCtrl = GetFieldValue(refForm, "_customerSymptomsDtcRefInfoControl") as Control;
 
-            btnManuals.Click += (s, e) =>
+            // Hook Toggle buttons with complete visibility toggling to prevent car graphic bleed-through
+            Action showManualsView = () =>
             {
-                tabPanel.Visible = false;
+                if (tabCtrl != null) tabCtrl.Visible = false;
+                if (tabPanel != null) tabPanel.Visible = false;
+                if (dtcCtrl != null) dtcCtrl.Visible = false;
+                if (cscCtrl != null) cscCtrl.Visible = false;
                 manualExplorerPnl.Visible = true;
+                manualExplorerPnl.BringToFront();
+                subNav.BringToFront();
+
                 btnManuals.BackColor = Color.FromArgb(0, 102, 204);
                 btnManuals.ForeColor = Color.White;
                 btnManuals.Font = new Font("Segoe UI", 9.25f, FontStyle.Bold);
@@ -2225,6 +2223,28 @@ static class Program
                 btnDtcRef.Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
                 if (lstResults.Items.Count == 0) doSearch();
             };
+
+            Action showDtcRefView = () =>
+            {
+                manualExplorerPnl.Visible = false;
+                if (tabCtrl != null) tabCtrl.Visible = true;
+                if (tabPanel != null) tabPanel.Visible = true;
+                if (dtcCtrl != null) dtcCtrl.Visible = true;
+                if (cscCtrl != null) cscCtrl.Visible = true;
+                tabPanel.BringToFront();
+                if (tabCtrl != null) tabCtrl.BringToFront();
+                subNav.BringToFront();
+
+                btnDtcRef.BackColor = Color.FromArgb(0, 102, 204);
+                btnDtcRef.ForeColor = Color.White;
+                btnDtcRef.Font = new Font("Segoe UI", 9.25f, FontStyle.Bold);
+                btnManuals.BackColor = Color.FromArgb(232, 236, 240);
+                btnManuals.ForeColor = Color.FromArgb(32, 33, 36);
+                btnManuals.Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
+            };
+
+            btnDtcRef.Click += (s, e) => showDtcRefView();
+            btnManuals.Click += (s, e) => showManualsView();
 
             // Add to ReferenceInformationForm
             refForm.Controls.Add(manualExplorerPnl);
@@ -2243,8 +2263,8 @@ static class Program
 
             Action<Control, string> wireRefInfoControl = (ctrl, ctrlTag) =>
             {
-                if (ctrl == null || ctrl.Tag as string == "wired_clicks") return;
-                ctrl.Tag = "wired_clicks";
+                if (ctrl == null || ctrl.Tag as string == "wired_clicks_v2") return;
+                ctrl.Tag = "wired_clicks_v2";
 
                 Control statusTv = GetFieldValue(ctrl, "_statusTreeViewControl") as Control;
                 if (statusTv == null) return;
@@ -2254,28 +2274,59 @@ static class Program
                 Action<TreeNode, bool> handleNode = (node, isDoubleClick) =>
                 {
                     if (node == null) return;
+
+                    // 1. NON-LEAF NODES (branches / categories with child nodes):
+                    if (node.Nodes.Count > 0)
+                    {
+                        // Non-leaf categories must NEVER open documents!
+                        if (isDoubleClick)
+                        {
+                            if (node.IsExpanded) node.Collapse();
+                            else node.Expand();
+                        }
+                        return;
+                    }
+
+                    // 2. CSC expandable branch nodes whose children have not been loaded yet:
                     object nodeTag = node.Tag;
+                    string nodeId = nodeTag != null ? GetPropValue(nodeTag, "ID") as string : null;
+                    object ieObj = nodeTag != null ? GetPropValue(nodeTag, "InformationElement") : null;
+
+                    int numSymptomId;
+                    if (ieObj == null && !string.IsNullOrEmpty(nodeId) && int.TryParse(nodeId, out numSymptomId))
+                    {
+                        // Unexpanded CSC symptom folder: let VIDA populate sub-symptoms
+                        try
+                        {
+                            MethodInfo miClick = ctrl.GetType().GetMethod("_statusTreeViewControl_OnNodeClick", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (miClick != null) miClick.Invoke(ctrl, new object[] { node });
+                        }
+                        catch {}
+                        return;
+                    }
+
+                    // 3. ACTUAL LEAF NODES (documents / DTCs):
+                    // Documents must ONLY open on DOUBLE-CLICK! Single click is navigation only.
+                    if (!isDoubleClick)
+                    {
+                        return;
+                    }
 
                     string docId = null;
-                    if (nodeTag != null)
+                    if (ieObj != null) docId = GetPropValue(ieObj, "IEId") as string;
+                    if (string.IsNullOrEmpty(docId) && nodeTag != null)
                     {
-                        object ieObj = GetPropValue(nodeTag, "InformationElement");
-                        if (ieObj != null) docId = GetPropValue(ieObj, "IEId") as string;
-                        if (string.IsNullOrEmpty(docId))
+                        object dataObj = GetPropValue(nodeTag, "Data");
+                        if (dataObj != null)
                         {
-                            object dataObj = GetPropValue(nodeTag, "Data");
-                            if (dataObj != null)
-                            {
-                                object dataIe = GetPropValue(dataObj, "InformationElement");
-                                if (dataIe != null) docId = GetPropValue(dataIe, "IEId") as string;
-                            }
+                            object dataIe = GetPropValue(dataObj, "InformationElement");
+                            if (dataIe != null) docId = GetPropValue(dataIe, "IEId") as string;
                         }
-                        if (string.IsNullOrEmpty(docId))
-                        {
-                            string rawId = GetPropValue(nodeTag, "ID") as string;
-                            if (!string.IsNullOrEmpty(rawId) && (rawId.StartsWith("0900", StringComparison.OrdinalIgnoreCase) || rawId.StartsWith("0800", StringComparison.OrdinalIgnoreCase)))
-                                docId = rawId;
-                        }
+                    }
+                    if (string.IsNullOrEmpty(docId) && !string.IsNullOrEmpty(nodeId))
+                    {
+                        if (nodeId.StartsWith("0900", StringComparison.OrdinalIgnoreCase) || nodeId.StartsWith("0800", StringComparison.OrdinalIgnoreCase))
+                            docId = nodeId;
                     }
 
                     if (string.IsNullOrEmpty(docId) && !string.IsNullOrEmpty(node.Text))
@@ -2286,39 +2337,12 @@ static class Program
                             string dtcCode = m.Groups[1].Value;
                             docId = LookupDocumentIdByDtcOrTitle(dtcCode);
                         }
-                        if (string.IsNullOrEmpty(docId))
-                        {
-                            docId = LookupDocumentIdByDtcOrTitle(node.Text.Trim());
-                        }
                     }
 
                     if (!string.IsNullOrEmpty(docId))
                     {
-                        Console.WriteLine("[Launcher] Opening document for node: " + docId + " (" + node.Text + ")");
+                        Console.WriteLine("[Launcher] Double-clicked leaf document: " + docId + " (" + node.Text + ")");
                         ShowDocumentWindow(docId, node.Text, _mainLauncherForm);
-                        return;
-                    }
-
-                    if (node.Nodes.Count > 0)
-                    {
-                        if (isDoubleClick)
-                        {
-                            if (node.IsExpanded) node.Collapse();
-                            else node.Expand();
-                        }
-                    }
-                    else if (nodeTag != null)
-                    {
-                        string nodeId = GetPropValue(nodeTag, "ID") as string;
-                        if (!string.IsNullOrEmpty(nodeId))
-                        {
-                            try
-                            {
-                                MethodInfo miDbl = ctrl.GetType().GetMethod("_statusTreeViewControl_OnNodeDoubleClick", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                                if (miDbl != null) miDbl.Invoke(ctrl, new object[] { node });
-                            }
-                            catch {}
-                        }
                     }
                 };
 
@@ -2331,135 +2355,127 @@ static class Program
 
                 if (tvEx != null)
                 {
-                    tvEx.AfterSelect += (sTv, eTv) => { if (eTv.Node != null) handleNode(eTv.Node, false); };
                     tvEx.DoubleClick += (sTv, eTv) => { if (tvEx.SelectedNode != null) handleNode(tvEx.SelectedNode, true); };
-                    tvEx.NodeMouseClick += (sTv, eTv) => handleNode(eTv.Node, false);
                     tvEx.NodeMouseDoubleClick += (sTv, eTv) => handleNode(eTv.Node, true);
                 }
             };
 
-            Control cscCtrl = GetFieldValue(refForm, "_customerSymptomsCSCRefInfoControl") as Control;
-            Control dtcCtrl = GetFieldValue(refForm, "_customerSymptomsDtcRefInfoControl") as Control;
             wireRefInfoControl(cscCtrl, "csc");
             wireRefInfoControl(dtcCtrl, "dtc");
 
             _refFormCtrl = refForm;
             _activeDtcRefControl = dtcCtrl;
 
-            if (dtcCtrl != null && dtcCtrl.Tag as string != "dtc_configured")
+            if (dtcCtrl != null && dtcCtrl.Tag as string != "dtc_configured_v2")
             {
-                dtcCtrl.Tag = "dtc_configured";
+                dtcCtrl.Tag = "dtc_configured_v2";
 
-                Panel pnlNav = GetFieldValue(dtcCtrl, "_pnlNavigation") as Panel;
-                if (pnlNav != null)
+                // Cleanly place ECU selector on dtcCtrl without disrupting _navImage layout
+                Label lblEcuTitle = new Label { Text = "ECU Module:", AutoSize = true, Location = new Point(400, 68), Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(0, 48, 87) };
+                ComboBox cbDtcEcu = new ComboBox { Location = new Point(495, 65), Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5f) };
+
+                Tuple<string, string>[] dtcEcuList = new Tuple<string, string>[]
                 {
-                    Panel ecuBar = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Color.FromArgb(240, 244, 248), Padding = new Padding(8, 4, 8, 4) };
-                    Label lblEcuTitle = new Label { Text = "ECU Module:", AutoSize = true, Location = new Point(8, 9), Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(0, 48, 87) };
-                    ComboBox cbDtcEcu = new ComboBox { Location = new Point(105, 6), Width = 350, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5f) };
+                    Tuple.Create("284101", "ECM - Engine Control Module"),
+                    Tuple.Create("437601", "TCM - Transmission Control Module"),
+                    Tuple.Create("372302", "CEM - Central Electronic Module"),
+                    Tuple.Create("593102", "BCM - Brake Control Module"),
+                    Tuple.Create("381101", "DIM - Driver Information Module"),
+                    Tuple.Create("884701", "SRS - Supplemental Restraint System"),
+                    Tuple.Create("871101", "CCM - Climate Control Module"),
+                    Tuple.Create("465901", "DEM - Differential Electronic Module"),
+                    Tuple.Create("645902", "SAS - Steering Angle Sensor"),
+                    Tuple.Create("875401", "CPM - Combustion Pre-heater Module"),
+                    Tuple.Create("551401", "PBM - Parking Brake Module"),
+                    Tuple.Create("831701", "DDM - Driver Door Module"),
+                    Tuple.Create("831703", "PDM - Passenger Door Module"),
+                    Tuple.Create("852601", "PSM - Power Seat Module"),
+                    Tuple.Create("393901", "ICM - Infotainment Control Module"),
+                    Tuple.Create("393204", "IAM - Integrated Audio Module"),
+                    Tuple.Create("393202", "AUD - Audio Module"),
+                    Tuple.Create("366901", "KVM - Keyless Vehicle Module"),
+                    Tuple.Create("366902", "PAM - Parking Assistance Module"),
+                    Tuple.Create("892901", "TRM - Trailer Module"),
+                    Tuple.Create("832901", "POT - Power Operated Tailgate"),
+                    Tuple.Create("352902", "HCM - Headlamp Control Module"),
+                    Tuple.Create("366905", "FSM - Forward Sensing Module"),
+                    Tuple.Create("645903", "PSCM - Power Steering Control Module")
+                };
 
-                    Tuple<string, string>[] dtcEcuList = new Tuple<string, string>[]
-                    {
-                        Tuple.Create("284101", "ECM - Engine Control Module"),
-                        Tuple.Create("437601", "TCM - Transmission Control Module"),
-                        Tuple.Create("372302", "CEM - Central Electronic Module"),
-                        Tuple.Create("593102", "BCM - Brake Control Module"),
-                        Tuple.Create("381101", "DIM - Driver Information Module"),
-                        Tuple.Create("884701", "SRS - Supplemental Restraint System"),
-                        Tuple.Create("871101", "CCM - Climate Control Module"),
-                        Tuple.Create("465901", "DEM - Differential Electronic Module"),
-                        Tuple.Create("645902", "SAS - Steering Angle Sensor"),
-                        Tuple.Create("875401", "CPM - Combustion Pre-heater Module"),
-                        Tuple.Create("551401", "PBM - Parking Brake Module"),
-                        Tuple.Create("831701", "DDM - Driver Door Module"),
-                        Tuple.Create("831703", "PDM - Passenger Door Module"),
-                        Tuple.Create("852601", "PSM - Power Seat Module"),
-                        Tuple.Create("393901", "ICM - Infotainment Control Module"),
-                        Tuple.Create("393204", "IAM - Integrated Audio Module"),
-                        Tuple.Create("393202", "AUD - Audio Module"),
-                        Tuple.Create("366901", "KVM - Keyless Vehicle Module"),
-                        Tuple.Create("366902", "PAM - Parking Assistance Module"),
-                        Tuple.Create("892901", "TRM - Trailer Module"),
-                        Tuple.Create("832901", "POT - Power Operated Tailgate"),
-                        Tuple.Create("352902", "HCM - Headlamp Control Module"),
-                        Tuple.Create("366905", "FSM - Forward Sensing Module"),
-                        Tuple.Create("645903", "PSCM - Power Steering Control Module")
-                    };
+                foreach (var item in dtcEcuList)
+                {
+                    cbDtcEcu.Items.Add(item.Item2);
+                }
 
-                    foreach (var item in dtcEcuList)
+                bool updatingDtcEcu = false;
+                Action<string> selectDtcEcuById = (targetId) =>
+                {
+                    for (int k = 0; k < dtcEcuList.Length; k++)
                     {
-                        cbDtcEcu.Items.Add(item.Item2);
+                        if (dtcEcuList[k].Item1 == targetId)
+                        {
+                            updatingDtcEcu = true;
+                            cbDtcEcu.SelectedIndex = k;
+                            updatingDtcEcu = false;
+                            break;
+                        }
                     }
+                };
 
-                    bool updatingDtcEcu = false;
-                    Action<string> selectDtcEcuById = (targetId) =>
+                cbDtcEcu.SelectedIndexChanged += (sEcu, eEcu) =>
+                {
+                    if (updatingDtcEcu) return;
+                    if (cbDtcEcu.SelectedIndex >= 0 && cbDtcEcu.SelectedIndex < dtcEcuList.Length)
                     {
-                        for (int k = 0; k < dtcEcuList.Length; k++)
-                        {
-                            if (dtcEcuList[k].Item1 == targetId)
-                            {
-                                updatingDtcEcu = true;
-                                cbDtcEcu.SelectedIndex = k;
-                                updatingDtcEcu = false;
-                                break;
-                            }
-                        }
-                    };
-
-                    cbDtcEcu.SelectedIndexChanged += (sEcu, eEcu) =>
-                    {
-                        if (updatingDtcEcu) return;
-                        if (cbDtcEcu.SelectedIndex >= 0 && cbDtcEcu.SelectedIndex < dtcEcuList.Length)
-                        {
-                            string selId = dtcEcuList[cbDtcEcu.SelectedIndex].Item1;
-                            Console.WriteLine("[Launcher] DTC Ref Info: ECU selected " + dtcEcuList[cbDtcEcu.SelectedIndex].Item2 + " (" + selId + ")");
-                            try
-                            {
-                                MethodInfo miNav = dtcCtrl.GetType().GetMethod("_navImage_HotspotClicked", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                                if (miNav != null)
-                                {
-                                    miNav.Invoke(dtcCtrl, new object[] { dtcCtrl, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(selId, 1) });
-                                }
-                            }
-                            catch (Exception exNav)
-                            {
-                                Console.WriteLine("[Launcher] DTC _navImage_HotspotClicked error: " + exNav.Message);
-                            }
-                        }
-                    };
-
-                    ecuBar.Controls.AddRange(new Control[] { lblEcuTitle, cbDtcEcu });
-                    pnlNav.Controls.Add(ecuBar);
-                    ecuBar.BringToFront();
-
-                    // Register hotspot handler for DTC control
-                    _onDtcRefHotspotClicked = (clickedId) =>
-                    {
-                        Console.WriteLine("[Launcher] DTC Ref Info hotspot clicked for ECU: " + clickedId);
-                        selectDtcEcuById(clickedId);
+                        string selId = dtcEcuList[cbDtcEcu.SelectedIndex].Item1;
+                        Console.WriteLine("[Launcher] DTC Ref Info: ECU selected " + dtcEcuList[cbDtcEcu.SelectedIndex].Item2 + " (" + selId + ")");
                         try
                         {
                             MethodInfo miNav = dtcCtrl.GetType().GetMethod("_navImage_HotspotClicked", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                             if (miNav != null)
                             {
-                                miNav.Invoke(dtcCtrl, new object[] { dtcCtrl, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(clickedId, 1) });
+                                miNav.Invoke(dtcCtrl, new object[] { dtcCtrl, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(selId, 1) });
                             }
                         }
                         catch (Exception exNav)
                         {
-                            Console.WriteLine("[Launcher] DTC hotspot dispatch error: " + exNav.Message);
+                            Console.WriteLine("[Launcher] DTC _navImage_HotspotClicked error: " + exNav.Message);
                         }
-                    };
-
-                    // Auto-select ECM initially so Related DTCs are immediately loaded
-                    if (cbDtcEcu.Items.Count > 0)
-                    {
-                        cbDtcEcu.SelectedIndex = 0;
                     }
+                };
+
+                dtcCtrl.Controls.Add(lblEcuTitle);
+                dtcCtrl.Controls.Add(cbDtcEcu);
+                lblEcuTitle.BringToFront();
+                cbDtcEcu.BringToFront();
+
+                // Register hotspot handler for DTC control
+                _onDtcRefHotspotClicked = (clickedId) =>
+                {
+                    Console.WriteLine("[Launcher] DTC Ref Info hotspot clicked for ECU: " + clickedId);
+                    selectDtcEcuById(clickedId);
+                    try
+                    {
+                        MethodInfo miNav = dtcCtrl.GetType().GetMethod("_navImage_HotspotClicked", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (miNav != null)
+                        {
+                            miNav.Invoke(dtcCtrl, new object[] { dtcCtrl, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(clickedId, 1) });
+                        }
+                    }
+                    catch (Exception exNav)
+                    {
+                        Console.WriteLine("[Launcher] DTC hotspot dispatch error: " + exNav.Message);
+                    }
+                };
+
+                // Auto-select ECM initially so Related DTCs are immediately loaded
+                if (cbDtcEcu.Items.Count > 0)
+                {
+                    cbDtcEcu.SelectedIndex = 0;
                 }
             }
 
             RegisterDummyIsoViewHotspot();
-
             _manualsTabConfigured = true;
             Console.WriteLine("[Launcher] Successfully embedded Workshop Service Manuals Explorer into ReferenceInformationForm!");
         }
