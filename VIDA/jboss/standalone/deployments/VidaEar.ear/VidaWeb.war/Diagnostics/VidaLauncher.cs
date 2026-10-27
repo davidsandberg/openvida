@@ -271,6 +271,115 @@ static class Program
         PopulateSessionParameters(sess, vehProfile);
     }
 
+    static string lastSelectedParameter = "";
+
+    static string RenderDocumentHtml(string docId, string highlight)
+    {
+        try
+        {
+            byte[] bytes = null;
+            using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=servicerep_en-US;Integrated Security=True"))
+            {
+                conn.Open();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT XmlContent FROM Document WHERE chronicleId = @id";
+                    cmd.Parameters.AddWithValue("@id", docId);
+                    var obj = cmd.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value) bytes = (byte[])obj;
+                }
+            }
+
+            if (bytes == null)
+            {
+                return "<html><body style='font-family:sans-serif;padding:20px;'><h3>Document " + docId + " not found in service repository.</h3></body></html>";
+            }
+
+            string xmlContent = "";
+            using (var ms = new System.IO.MemoryStream(bytes))
+            using (var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Read))
+            {
+                foreach (var entry in zip.Entries)
+                {
+                    using (var r = new System.IO.StreamReader(entry.Open(), System.Text.Encoding.UTF8))
+                    {
+                        xmlContent = r.ReadToEnd();
+                        break;
+                    }
+                }
+            }
+
+            var doc = System.Xml.Linq.XDocument.Parse(xmlContent);
+            var sb = new System.Text.StringBuilder();
+            sb.Append("<!DOCTYPE html><html><head><meta charset='utf-8'>");
+            sb.Append("<style>");
+            sb.Append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 24px; line-height: 1.6; color: #222; background: #fff; }");
+            sb.Append("h1 { color: #003057; border-bottom: 2px solid #003057; padding-bottom: 8px; font-size: 22px; margin-top: 0; }");
+            sb.Append("h2 { color: #005087; margin-top: 28px; font-size: 17px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }");
+            sb.Append(".procstep { margin: 12px 0 16px 0; padding: 12px 16px; border-left: 3px solid #005087; background: #f8fafc; border-radius: 3px; }");
+            sb.Append(".highlight { background: #fff9c4 !important; border-left: 5px solid #f57f17 !important; box-shadow: 0 0 10px rgba(0,0,0,0.12); }");
+            sb.Append(".procstep-title { font-weight: bold; font-size: 15px; color: #003057; margin-bottom: 6px; }");
+            sb.Append(".hint { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 12px; margin: 16px 0; border-radius: 3px; }");
+            sb.Append("p { margin: 6px 0; font-size: 13px; }");
+            sb.Append("</style></head><body>");
+
+            var mainTitle = doc.Root.Element("title");
+            if (mainTitle != null) sb.AppendFormat("<h1>{0}</h1>", mainTitle.Value);
+
+            foreach (var hint in doc.Descendants("hint"))
+            {
+                sb.Append("<div class='hint'>");
+                foreach (var p in hint.Descendants("ptxt")) sb.AppendFormat("<p>{0}</p>", p.Value);
+                sb.Append("</div>");
+            }
+
+            bool foundTarget = false;
+            foreach (var grp in doc.Descendants("stepgrp"))
+            {
+                var grpTitle = grp.Element("title");
+                if (grpTitle != null) sb.AppendFormat("<h2>{0}</h2>", grpTitle.Value);
+
+                foreach (var step in grp.Elements("procstep"))
+                {
+                    var title = step.Element("title");
+                    string titleText = title != null ? title.Value : "";
+                    bool isMatch = !string.IsNullOrEmpty(highlight) && titleText.IndexOf(highlight, StringComparison.OrdinalIgnoreCase) >= 0;
+
+                    string targetAttr = "";
+                    if (isMatch && !foundTarget)
+                    {
+                        targetAttr = " id='target'";
+                        foundTarget = true;
+                    }
+
+                    sb.AppendFormat("<div class='procstep{0}'{1}>", isMatch ? " highlight" : "", targetAttr);
+                    sb.AppendFormat("<div class='procstep-title'>{0}</div>", titleText);
+
+                    foreach (var para in step.Descendants("para"))
+                    {
+                        foreach (var ptxt in para.Elements("ptxt"))
+                        {
+                            sb.AppendFormat("<p>{0}</p>", ptxt.Value);
+                        }
+                    }
+                    sb.Append("</div>");
+                }
+            }
+
+            if (foundTarget)
+            {
+                sb.Append("<script>window.onload = function() { var el = document.getElementById('target'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'}); };</script>");
+            }
+
+            sb.Append("</body></html>");
+            return sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            return "<html><body><h3>Error rendering document: " + ex.Message + "</h3></body></html>";
+        }
+    }
+
     [STAThread]
     static void Main(string[] args)
     {
@@ -509,7 +618,7 @@ static class Program
                             onNavClick.Invoke(vcForm, new object[] { vcForm, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs("284101", 1) });
                         }
 
-                        // Enable Description button and wire informational popup for selected parameters
+                        // Enable Description button and track selected parameter
                         FieldInfo rpField = vcForm.GetType().GetField("_readParametersPage", BindingFlags.NonPublic | BindingFlags.Instance);
                         if (rpField != null)
                         {
@@ -524,24 +633,10 @@ static class Program
                                 {
                                     btnDesc.Tag = "wired";
                                     tv.AfterSelect += (sTv, eTv) => {
-                                        if (eTv.Node != null) btnDesc.Enabled = true;
-                                    };
-                                    btnDesc.Click += (sDesc, eDesc) => {
-                                        if (tv.SelectedNode != null)
+                                        if (eTv.Node != null)
                                         {
-                                            TreeNode sel = tv.SelectedNode;
-                                            string pName = sel.Text;
-                                            string pCat = sel.Parent != null ? sel.Parent.Text : "General";
-                                            MessageBox.Show(
-                                                "Parameter: " + pName + "\n" +
-                                                "Category: " + pCat + "\n" +
-                                                "Module: Engine Control Module (ECM)\n\n" +
-                                                "Status: Parameter selected for diagnostics.\n" +
-                                                "Live Data: When connected to the car (Ignition Position II), values will continuously update in the Value column.\n\n" +
-                                                "(Click 'ADD TO LIST' to monitor, or 'OPEN GRAPHIC DISPLAY' to plot real-time curves)",
-                                                "Parameter Description - " + pName,
-                                                MessageBoxButtons.OK,
-                                                MessageBoxIcon.Information);
+                                            lastSelectedParameter = eTv.Node.Text;
+                                            btnDesc.Enabled = true;
                                         }
                                     };
                                 }
@@ -570,8 +665,10 @@ static class Program
                 WebBrowser wb = new WebBrowser();
                 wb.Dock = DockStyle.Fill;
                 wb.ScriptErrorsSuppressed = true;
-                string url = "http://localhost/Vida/getXmlDocument.do?docId=" + docId + "&synchronize=true";
-                wb.Navigate(url);
+
+                string html = RenderDocumentHtml(docId, lastSelectedParameter);
+                wb.DocumentText = html;
+
                 docForm.Controls.Add(wb);
                 docForm.Show(mainForm);
             }
