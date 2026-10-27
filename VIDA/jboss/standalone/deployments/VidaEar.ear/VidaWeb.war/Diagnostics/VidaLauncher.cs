@@ -454,9 +454,55 @@ static class Program
         };
 
         btnTabVehProfile.Click += (s, e) => { switchTab("_vehicleInfoButton_Click"); setActiveTabButton(btnTabVehProfile); };
-        btnTabFaultTrace.Click += (s, e) => { switchTab("_customerSymptomsFaultTraceButton_Click"); setActiveTabButton(btnTabFaultTrace); };
+        btnTabFaultTrace.Click += (s, e) => {
+            switchTab("_customerSymptomsFaultTraceButton_Click");
+            setActiveTabButton(btnTabFaultTrace);
+            try
+            {
+                Type dmType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticManager");
+                object dm = dmType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+                if (dm != null)
+                {
+                    object csftForm = dmType.GetMethod("GetCustomerSymptomsFaultTraceFormForm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Invoke(dm, null);
+                    if (csftForm != null)
+                    {
+                        FieldInfo tabField = csftForm.GetType().GetField("_tab", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (tabField != null)
+                        {
+                            object tabCtrl = tabField.GetValue(csftForm);
+                            if (tabCtrl != null)
+                            {
+                                tabCtrl.GetType().GetProperty("SelectedIndex").SetValue(tabCtrl, 0, null);
+                            }
+                        }
+                    }
+                }
+            }
+            catch {}
+        };
         btnTabNetwork.Click += (s, e) => { switchTab("_networkStatusButton_Click"); setActiveTabButton(btnTabNetwork); };
-        btnTabVehComm.Click += (s, e) => { switchTab("_vehCommButton_Click"); setActiveTabButton(btnTabVehComm); };
+        btnTabVehComm.Click += (s, e) => {
+            switchTab("_vehCommButton_Click");
+            setActiveTabButton(btnTabVehComm);
+            try
+            {
+                Type dmType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticManager");
+                object dm = dmType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+                if (dm != null)
+                {
+                    object vcForm = dmType.GetMethod("GetVehCommForm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Invoke(dm, null);
+                    if (vcForm != null)
+                    {
+                        MethodInfo onNavClick = vcForm.GetType().GetMethod("OnNavImageClick", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (onNavClick != null)
+                        {
+                            onNavClick.Invoke(vcForm, new object[] { vcForm, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs("284101", 1) });
+                        }
+                    }
+                }
+            }
+            catch {}
+        };
         btnTabRefInfo.Click += (s, e) => { switchTab("_referenceInformationButton_Click"); setActiveTabButton(btnTabRefInfo); };
 
         Console.WriteLine("[Launcher] Initializing DiagnosticMainForm...");
@@ -1121,6 +1167,37 @@ static class Program
                             Console.WriteLine("[Launcher] Step 3: Switching to Vehicle Comm tab...");
                             switchTab("_vehCommButton_Click");
                             setActiveTabButton(btnTabVehComm);
+                            // After tab activates, select ECM (284101) to populate parameters
+                            Timer ecTimer = new Timer();
+                            ecTimer.Interval = 1500;
+                            ecTimer.Tick += (s2, e2) =>
+                            {
+                                ecTimer.Stop();
+                                try
+                                {
+                                    Type dmType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticManager");
+                                    object dm = dmType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+                                    if (dm != null)
+                                    {
+                                        object vcForm = dmType.GetMethod("GetVehCommForm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Invoke(dm, null);
+                                        if (vcForm != null)
+                                        {
+                                            MethodInfo onNavClick = vcForm.GetType().GetMethod("OnNavImageClick", BindingFlags.NonPublic | BindingFlags.Instance);
+                                            if (onNavClick != null)
+                                            {
+                                                Console.WriteLine("[Launcher] Selecting ECM (284101) in Vehicle Comm tab via DiagnosticManager.GetVehCommForm()...");
+                                                onNavClick.Invoke(vcForm, new object[] { vcForm, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs("284101", 1) });
+                                                Console.WriteLine("[Launcher] Selected ECM successfully!");
+                                            }
+                                        }
+                                    }
+                                }
+                                catch (Exception ex)
+                                {
+                                    Console.WriteLine("[Launcher] Select ECM error: " + ex);
+                                }
+                            };
+                            ecTimer.Start();
                             break;
                         case 4:
                             captureTab("Vehicle Comm", "launcher_test_vehcomm.png");
