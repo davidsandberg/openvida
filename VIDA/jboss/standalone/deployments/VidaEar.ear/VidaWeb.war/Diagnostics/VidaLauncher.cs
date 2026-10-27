@@ -1666,6 +1666,287 @@ static class Program
         }
     }
 
+    static bool _manualsTabConfigured = false;
+    static void SetupWorkshopManualsTab(object mObj)
+    {
+        if (_manualsTabConfigured || mObj == null) return;
+        try
+        {
+            Control refForm = GetFieldValue(mObj, "_referenceInformationForm") as Control;
+            if (refForm == null)
+            {
+                MethodInfo mi = mObj.GetType().GetMethod("GetReferenceInformationFormForm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (mi != null) refForm = mi.Invoke(mObj, null) as Control;
+            }
+            if (refForm == null) return;
+
+            Control tabPanel = GetFieldValue(refForm, "_tabPanel") as Control;
+            if (tabPanel == null) return;
+
+            // Sub-nav toggle bar
+            Panel subNav = new Panel();
+            subNav.Dock = DockStyle.Top;
+            subNav.Height = 44;
+            subNav.BackColor = Color.FromArgb(240, 244, 248);
+            subNav.Padding = new Padding(12, 6, 12, 6);
+
+            Button btnDtcRef = new Button();
+            btnDtcRef.Text = "📋 DTC & Symptom Documents";
+            btnDtcRef.Size = new Size(230, 30);
+            btnDtcRef.Location = new Point(12, 7);
+            btnDtcRef.FlatStyle = FlatStyle.Flat;
+            btnDtcRef.FlatAppearance.BorderSize = 1;
+            btnDtcRef.FlatAppearance.BorderColor = Color.FromArgb(0, 102, 204);
+            btnDtcRef.BackColor = Color.FromArgb(0, 102, 204);
+            btnDtcRef.ForeColor = Color.White;
+            btnDtcRef.Font = new Font("Segoe UI", 9.25f, FontStyle.Bold);
+            btnDtcRef.Cursor = Cursors.Hand;
+
+            Button btnManuals = new Button();
+            btnManuals.Text = "📖 Workshop Service Manuals & Search";
+            btnManuals.Size = new Size(280, 30);
+            btnManuals.Location = new Point(252, 7);
+            btnManuals.FlatStyle = FlatStyle.Flat;
+            btnManuals.FlatAppearance.BorderSize = 1;
+            btnManuals.FlatAppearance.BorderColor = Color.FromArgb(180, 185, 190);
+            btnManuals.BackColor = Color.FromArgb(232, 236, 240);
+            btnManuals.ForeColor = Color.FromArgb(32, 33, 36);
+            btnManuals.Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
+            btnManuals.Cursor = Cursors.Hand;
+
+            subNav.Controls.Add(btnDtcRef);
+            subNav.Controls.Add(btnManuals);
+
+            // Container for manual explorer
+            Panel manualExplorerPnl = new Panel();
+            manualExplorerPnl.Dock = DockStyle.Fill;
+            manualExplorerPnl.Visible = false;
+
+            // Top Search Bar inside manualExplorerPnl
+            Panel searchBar = new Panel();
+            searchBar.Dock = DockStyle.Top;
+            searchBar.Height = 52;
+            searchBar.BackColor = Color.FromArgb(248, 250, 252);
+            searchBar.Padding = new Padding(12, 10, 12, 10);
+            searchBar.BorderStyle = BorderStyle.FixedSingle;
+
+            Label lblSearch = new Label { Text = "🔍 Search Manuals:", AutoSize = true, Location = new Point(12, 15), Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(0, 48, 87) };
+            TextBox txtSearch = new TextBox { Location = new Point(155, 12), Width = 280, Font = new Font("Segoe UI", 10f) };
+
+            Button btnSearch = new Button { Text = "Search", Location = new Point(445, 11), Width = 80, Height = 29, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 9f, FontStyle.Bold), Cursor = Cursors.Hand };
+            btnSearch.FlatAppearance.BorderSize = 0;
+
+            ComboBox cmbGroup = new ComboBox { Location = new Point(535, 12), Width = 260, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5f) };
+            cmbGroup.Items.Add("All Function Groups (0-9)");
+            cmbGroup.Items.Add("0 - Administration & Special Tools");
+            cmbGroup.Items.Add("1 - Maintenance & Service Material");
+            cmbGroup.Items.Add("2 - Engine & Equipment");
+            cmbGroup.Items.Add("3 - Electrical System");
+            cmbGroup.Items.Add("4 - Power Transmission (Gearbox/Clutch)");
+            cmbGroup.Items.Add("5 - Brakes");
+            cmbGroup.Items.Add("6 - Suspension & Steering");
+            cmbGroup.Items.Add("7 - Springs, Shock Absorbers & Wheels");
+            cmbGroup.Items.Add("8 - Body & Interior");
+            cmbGroup.Items.Add("9 - Miscellaneous");
+            cmbGroup.SelectedIndex = 0;
+
+            // Quick keyword chips
+            string[] quickChips = new string[] { "Timing belt", "Alternator", "Brake pads", "Oil filter", "Clutch", "Fuses" };
+            int chipX = 805;
+            foreach (var chip in quickChips)
+            {
+                Button btnChip = new Button { Text = chip, Location = new Point(chipX, 12), AutoSize = true, Height = 28, BackColor = Color.FromArgb(238, 242, 246), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5f), Cursor = Cursors.Hand };
+                btnChip.FlatAppearance.BorderColor = Color.FromArgb(200, 205, 210);
+                string queryText = chip;
+                btnChip.Click += (sChip, eChip) =>
+                {
+                    txtSearch.Text = queryText;
+                    cmbGroup.SelectedIndex = 0;
+                    btnSearch.PerformClick();
+                };
+                searchBar.Controls.Add(btnChip);
+                chipX += btnChip.PreferredSize.Width + 6;
+            }
+
+            searchBar.Controls.AddRange(new Control[] { lblSearch, txtSearch, btnSearch, cmbGroup });
+            manualExplorerPnl.Controls.Add(searchBar);
+
+            // SplitContainer
+            SplitContainer split = new SplitContainer();
+            split.Dock = DockStyle.Fill;
+            split.SplitterDistance = 420;
+            split.SplitterWidth = 6;
+
+            // Left: List of documents
+            Panel leftPnl = new Panel { Dock = DockStyle.Fill };
+            ListBox lstResults = new ListBox { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.25f), ItemHeight = 24, IntegralHeight = false };
+            Label lblStatus = new Label { Dock = DockStyle.Bottom, Height = 28, Text = "Ready. Type a keyword or select a group to explore 100,000+ repair manuals.", Padding = new Padding(8, 6, 8, 6), BackColor = Color.FromArgb(245, 247, 250), ForeColor = Color.FromArgb(70, 80, 95), Font = new Font("Segoe UI", 8.75f) };
+            leftPnl.Controls.Add(lstResults);
+            leftPnl.Controls.Add(lblStatus);
+            split.Panel1.Controls.Add(leftPnl);
+
+            // Right: WebBrowser
+            WebBrowser wbManual = new WebBrowser { Dock = DockStyle.Fill, ScriptErrorsSuppressed = true };
+            wbManual.Navigating += (sNav, eNav) =>
+            {
+                try
+                {
+                    string url = eNav.Url != null ? eNav.Url.ToString() : "";
+                    if (url.StartsWith("vida-doc:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        eNav.Cancel = true;
+                        string targetId = url.Substring("vida-doc:".Length);
+                        string html = RenderDocumentHtml(targetId, null);
+                        wbManual.DocumentText = html;
+                    }
+                }
+                catch {}
+            };
+            split.Panel2.Controls.Add(wbManual);
+
+            manualExplorerPnl.Controls.Add(split);
+            searchBar.BringToFront();
+
+            // Search execution
+            Action doSearch = () =>
+            {
+                string kw = txtSearch.Text.Trim();
+                int grpIdx = cmbGroup.SelectedIndex;
+
+                lstResults.Items.Clear();
+                lblStatus.Text = "Searching service repository...";
+                Application.DoEvents();
+
+                try
+                {
+                    using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=servicerep_en-US;Integrated Security=True"))
+                    {
+                        conn.Open();
+                        using (var cmd = conn.CreateCommand())
+                        {
+                            string sql = @"
+                                SELECT DISTINCT TOP 250 d.chronicleId, d.title, d.vccNumber, d.version
+                                FROM Document d
+                                WHERE 1=1 ";
+
+                            if (!string.IsNullOrEmpty(kw))
+                            {
+                                sql += " AND (d.title LIKE '%' + @kw + '%' OR d.vccNumber LIKE '%' + @kw + '%') ";
+                                cmd.Parameters.AddWithValue("@kw", kw);
+                            }
+
+                            if (grpIdx > 0)
+                            {
+                                int g = grpIdx - 1;
+                                sql += " AND EXISTS (SELECT 1 FROM TreeItemDocument tid JOIN TreeItem ti ON tid.fkTreeItem = ti.id WHERE tid.projectDocumentTo = d.projectDocumentId AND ti.functionGroup1 = " + g + ") ";
+                            }
+
+                            sql += " ORDER BY d.title";
+                            cmd.CommandText = sql;
+
+                            using (var r = cmd.ExecuteReader())
+                            {
+                                while (r.Read())
+                                {
+                                    lstResults.Items.Add(new ManualDocItem
+                                    {
+                                        Id = r["chronicleId"].ToString().Trim(),
+                                        Title = r["title"].ToString().Trim(),
+                                        Vcc = r["vccNumber"] != DBNull.Value ? r["vccNumber"].ToString().Trim() : "",
+                                        Version = r["version"] != DBNull.Value ? r["version"].ToString().Trim() : ""
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    lblStatus.Text = string.Format("Found {0} document(s) matching '{1}'", lstResults.Items.Count, kw);
+                    if (lstResults.Items.Count > 0) lstResults.SelectedIndex = 0;
+                    else
+                    {
+                        wbManual.DocumentText = "<!DOCTYPE html><html><body style='font-family:Segoe UI, sans-serif; padding:30px; color:#444;'>" +
+                            "<div style='background:#f8fafc; border:1px solid #cbd5e1; border-left:4px solid #005087; padding:20px; border-radius:6px;'>" +
+                            "<h3 style='margin-top:0; color:#003057;'>No documents found</h3>" +
+                            "<p>Try searching for a different keyword or selecting 'All Function Groups'.</p>" +
+                            "</div></body></html>";
+                    }
+                }
+                catch (Exception ex)
+                {
+                    lblStatus.Text = "Search error: " + ex.Message;
+                }
+            };
+
+            btnSearch.Click += (s, e) => doSearch();
+            txtSearch.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { doSearch(); e.Handled = true; e.SuppressKeyPress = true; } };
+            cmbGroup.SelectedIndexChanged += (s, e) => doSearch();
+
+            lstResults.SelectedIndexChanged += (s, e) =>
+            {
+                var item = lstResults.SelectedItem as ManualDocItem;
+                if (item == null) return;
+                try
+                {
+                    string html = RenderDocumentHtml(item.Id, null);
+                    wbManual.DocumentText = html;
+                }
+                catch (Exception exDoc)
+                {
+                    wbManual.DocumentText = "<html><body><h3>Error loading document: " + exDoc.Message + "</h3></body></html>";
+                }
+            };
+
+            // Hook Toggle buttons
+            btnDtcRef.Click += (s, e) =>
+            {
+                manualExplorerPnl.Visible = false;
+                tabPanel.Visible = true;
+                btnDtcRef.BackColor = Color.FromArgb(0, 102, 204);
+                btnDtcRef.ForeColor = Color.White;
+                btnDtcRef.Font = new Font("Segoe UI", 9.25f, FontStyle.Bold);
+                btnManuals.BackColor = Color.FromArgb(232, 236, 240);
+                btnManuals.ForeColor = Color.FromArgb(32, 33, 36);
+                btnManuals.Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
+            };
+
+            btnManuals.Click += (s, e) =>
+            {
+                tabPanel.Visible = false;
+                manualExplorerPnl.Visible = true;
+                btnManuals.BackColor = Color.FromArgb(0, 102, 204);
+                btnManuals.ForeColor = Color.White;
+                btnManuals.Font = new Font("Segoe UI", 9.25f, FontStyle.Bold);
+                btnDtcRef.BackColor = Color.FromArgb(232, 236, 240);
+                btnDtcRef.ForeColor = Color.FromArgb(32, 33, 36);
+                btnDtcRef.Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
+                if (lstResults.Items.Count == 0) doSearch();
+            };
+
+            // Add to ReferenceInformationForm
+            refForm.Controls.Add(manualExplorerPnl);
+            refForm.Controls.Add(subNav);
+            subNav.BringToFront();
+
+            _manualsTabConfigured = true;
+            Console.WriteLine("[Launcher] Successfully embedded Workshop Service Manuals Explorer into ReferenceInformationForm!");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[Launcher] SetupWorkshopManualsTab error: " + ex);
+        }
+    }
+
+    class ManualDocItem
+    {
+        public string Id { get; set; }
+        public string Title { get; set; }
+        public string Vcc { get; set; }
+        public string Version { get; set; }
+        public override string ToString()
+        {
+            return string.Format("{0} [{1}]", Title, Vcc);
+        }
+    }
+
     [STAThread]
 
 
@@ -2423,6 +2704,10 @@ static class Program
 
 
                 if (mi != null) mi.Invoke(mObj, new object[] { null, EventArgs.Empty });
+                if (methodName.IndexOf("referenceInformation", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    SetupWorkshopManualsTab(mObj);
+                }
 
 
 
@@ -3099,27 +3384,48 @@ static class Program
 
 
                             // Wire direct map clicks from DummyIsoView to bypass COM connection point quirks
-                            Action<string> clickAction = (clickedId) => {
-                                Console.WriteLine("[Launcher] Direct Map Click received for ECU: " + clickedId);
-                                try {
-                                    if (onNavClick != null)
-                                        onNavClick.Invoke(vcForm, new object[] { vcForm, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(clickedId, 1) });
-                                    selectEcuById(clickedId);
-                                } catch (Exception exClick) {
-                                    Console.WriteLine("[Launcher] Map click dispatch error: " + exClick.Message);
-                                }
-                            };
-                            try {
-                                Type dummyType = Type.GetType("IsoViewStub.DummyIsoView, DummyIsoView");
-                                if (dummyType == null) {
-                                    Assembly dummyAsm = Assembly.LoadFrom(@"C:\Users\david\git\vida\VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\DummyIsoView.dll");
-                                    if (dummyAsm != null) dummyType = dummyAsm.GetType("IsoViewStub.DummyIsoView");
-                                }
-                                if (dummyType != null) {
-                                    FieldInfo cbField = dummyType.GetField("OnEcuHotspotClicked", BindingFlags.Public | BindingFlags.Static);
-                                    if (cbField != null) cbField.SetValue(null, clickAction);
-                                }
-                            } catch (Exception exW) { Console.WriteLine("[Launcher] Wire hotspot error: " + exW.Message); }
+                            Action<string> clickAction = (clickedId) => {
+
+                                Console.WriteLine("[Launcher] Direct Map Click received for ECU: " + clickedId);
+
+                                try {
+
+                                    if (onNavClick != null)
+
+                                        onNavClick.Invoke(vcForm, new object[] { vcForm, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(clickedId, 1) });
+
+                                    selectEcuById(clickedId);
+
+                                } catch (Exception exClick) {
+
+                                    Console.WriteLine("[Launcher] Map click dispatch error: " + exClick.Message);
+
+                                }
+
+                            };
+
+                            try {
+
+                                Type dummyType = Type.GetType("IsoViewStub.DummyIsoView, DummyIsoView");
+
+                                if (dummyType == null) {
+
+                                    Assembly dummyAsm = Assembly.LoadFrom(@"C:\Users\david\git\vida\VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\DummyIsoView.dll");
+
+                                    if (dummyAsm != null) dummyType = dummyAsm.GetType("IsoViewStub.DummyIsoView");
+
+                                }
+
+                                if (dummyType != null) {
+
+                                    FieldInfo cbField = dummyType.GetField("OnEcuHotspotClicked", BindingFlags.Public | BindingFlags.Static);
+
+                                    if (cbField != null) cbField.SetValue(null, clickAction);
+
+                                }
+
+                            } catch (Exception exW) { Console.WriteLine("[Launcher] Wire hotspot error: " + exW.Message); }
+
 
 
 
