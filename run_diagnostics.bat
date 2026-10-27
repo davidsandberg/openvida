@@ -38,6 +38,13 @@ rem 3. Launch Standalone Diagnostics Application
 set "VIDA_HOME=%~dp0VIDA\"
 set "DIAG_DIR=%~dp0VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics"
 
+taskkill /f /im VidaLauncher.exe >nul 2>&1
+timeout /t 1 /nobreak >nul
+
+if exist "%DIAG_DIR%\VidaLauncher_new.exe" (
+    move /y "%DIAG_DIR%\VidaLauncher_new.exe" "%DIAG_DIR%\VidaLauncher.exe" >nul 2>&1
+)
+
 echo [INFO] Launching Diagnostics GUI...
 start /D "%DIAG_DIR%" "" VidaLauncher.exe
 echo [OK] VIDA Diagnostics is running!

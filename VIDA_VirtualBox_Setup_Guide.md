@@ -80,16 +80,43 @@ DiCE units (especially clone units like green-board or blue-board DiCE) require 
 
 ---
 
-## 4. In-VM Verification & VIDA Profile Selection
+## 4. In-VM Verification, Licensing & Time Sync
 
-1. **Verify Windows Device Driver in VM**:
-   - Inside the Win7 VM, open **Device Manager** (`devmgmt.msc`).
-   - Check under **Universal Serial Bus controllers**. You should see **DiCE Hardware** without any yellow exclamation mark.
-2. **Run DiCE Diagnostic Tool**:
-   - Open **DiCE Diagnostic** (`C:\Program Files\DiCE\Tools\DiCE Diagnostic.exe` or desktop shortcut).
-   - Click **Self Test** / **Test Communication** to test USB, RAM, and CAN transceivers.
-3. **Select DiCE in VIDA**:
-   - Launch VIDA and log in (typically as `admin` or `1`).
-   - Navigate to the **VEHICLE PROFILE** tab.
-   - Under **Communication tool**, select your **DiCE-XXXXXX** unit from the drop-down.
-   - Click **Read Vehicle** to pull the VIN and scan the ECM/CEM network.
+### 1. Fix "Logged in at a later time than current time" & Expired License
+If the VM clock synced to a future date or the license shows expired, open **Command Prompt as Administrator** in Windows 7:
+```cmd
+"%ProgramFiles%\Microsoft SQL Server\100\Tools\Binn\OSQL.EXE" -S localhost\Vida -U sa -P GunnarS3g3 -Q "USE AccessServer; UPDATE Users SET LicenceKey = (SELECT * FROM OPENROWSET(BULK 'C:\VIDA\patch\license', SINGLE_BLOB) AS x);"
+"%ProgramFiles%\Microsoft SQL Server\100\Tools\Binn\OSQL.EXE" -S localhost\Vida -U sa -P GunnarS3g3 -Q "USE AccessServer; UPDATE SERVERCONSISTENCY SET lastLogin = GETDATE();"
+```
+Restart the VIDA Monitor service via the system tray. This applies the 2050 license and synchronizes the recorded login timestamp to the current system time.
+
+### 2. Verify Windows Device Driver in VM
+- Open **Device Manager** (`devmgmt.msc`).
+- Verify **DiCE Hardware** appears without a yellow exclamation mark.
+- If an exclamation mark appears, verify the VM settings under **Ports → USB** use **USB 2.0 (EHCI) Controller**.
+
+### 3. Run DiCE Diagnostic Tool
+- Open **DiCE Diagnostic** (`C:\Program Files\DiCE\Tools\DiCE Diagnostic.exe`).
+- Click **Test Communication Tool** / **Self Test** to verify USB and CAN transceivers.
+
+### 4. Select DiCE in VIDA & Read Vehicle
+- Open VIDA, log in with username **`1`**.
+- Go to **VEHICLE PROFILE** tab.
+- Under **Communication tool**, select your **DiCE-XXXXXX** unit.
+- Ensure the car is in **Position II** with adequate battery voltage (>12V), then click **Read Vehicle**.
+
+---
+
+## 5. Vehicle Communication & Low Battery Troubleshooting (Volvo V70 P3)
+
+If VIDA returns *"Not possible to read out information from the vehicle. Possible causes are: Ignition is not on..."*:
+
+1. **Low Battery Voltage (CEM Power-Save Mode)**:
+   - On Volvo P3 platform cars (V70 2008–2016), when the Central Electronic Module (CEM) detects battery voltage dropping below ~11.8V, it triggers the "Low battery" cluster warning and enters power-save mode, shutting down diagnostic gateway communications.
+   - **Fix**: Connect a battery charger (10A+ recommended) or jump pack to the battery, or start the engine and let it idle during reading.
+2. **Proper Ignition Position II**:
+   - Insert key fob into the dock (if equipped).
+   - Press and hold the **START/STOP** button for **2–3 seconds without pressing the brake pedal**.
+   - Verify that all instrument cluster warning lamps turn on and stay on (Position I only powers the radio/windows).
+3. **Engine Running Workaround**:
+   - For basic vehicle identification, viewing live parameters, and reading/clearing DTC error codes, having the engine idling in Park is completely safe and supplies ~14V alternator power to keep all CAN modules awake.

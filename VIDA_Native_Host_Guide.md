@@ -108,3 +108,52 @@ To start using VIDA Diagnostics on Windows 11:
    - It will verify SQL Server Express and JBoss services are active.
    - It will launch the native VIDA Diagnostics application maximized on your desktop.
 3. Use the Diagnostics interface to read vehicle DTCs, inspect ECU parameters, and view live vehicle data!
+
+---
+
+## 6. Vehicle Communication & Live Readout Resolution
+
+During live vehicle readout over DiCE (OBD-II), several internal architecture obstacles in VIDA 2014D were resolved:
+
+### A. Multi-Threaded Session State Propagation
+- `SessionManager.Instance` maintains a table of 20 background sessions indexed by comm tool name.
+- When background script threads execute (e.g. `DroScriptThread`, `ReadDtcScriptThread`), they look up parameters by comm tool name.
+- Solved by synchronizing all 20 session slots with the vehicle profile (`0b00c8af84add183`), VIN (`YV1BW5251B1189886`), culture (`en-US`), partner group (`1002`), and comm tool (`DiCE-206751` / `DICE = 1`).
+
+### B. Multiple `CurrentCommTool` Instances in IoC Container
+- In VIDA's component architecture, separate `CurrentCommTool` instances are instantiated for `VehicleInformationWF`, `VehicleConnectionProvider`, and `RunScriptService._vehCommProvider`.
+- Without synchronization, `ensureCommToolConnection()` in `VehCom2.DLL` sees `CommToolType = NOCOMM (3)` and aborts with `"Unsupported communication tool"`.
+- Solved by `ConfigureAllCommTools()` recursively synchronizing every `CurrentCommTool` across the entire object tree to `DiCE-206751` and `CommToolType.DICE`.
+
+### C. SQL Server Constraint on Table `DiagSwdlSession.dbo.Dtc`
+- Column `fkEcuInfoId` had a `NOT NULL` constraint without a foreign key, causing SQL Exception 515 when saving DTCs read prior to ECU hardware catalog matching.
+- Solved by `ALTER TABLE dbo.Dtc ALTER COLUMN fkEcuInfoId int NULL;`.
+
+Real vehicle readout was confirmed against vehicle VIN `YV1BW5251B1189886`, successfully interrogating vehicle ECUs over CAN and reading live DTCs (e.g. `P067300`, `P067400` from ECM).
+
+---
+
+## 7. Offline Diagnostics & Multi-Tab Architecture
+
+All diagnostic data (13 DTCs, 60+ ECUs, vehicle profiles) read from the car are permanently stored in local SQL Server database `DiagSwdlSession`. The application fully supports working offline (disconnected from the vehicle):
+
+### A. IsoView ActiveX Elimination
+- Native VIDA controls (`NavImage`) require an ActiveX viewer (`IsoViewX`, CLSID `{865b2280-2b71-11d1-bc01-006097ac382a}`).
+- In modern 64-bit Windows without Internet Explorer or legacy IsoView installers, this threw `COMException: Class not registered (0x80040154)`.
+- Solved by implementing a native .NET COM component [`DummyIsoView.cs`](file:///C:/Users/david/.gemini/antigravity/brain/582883f0-afd8-4231-87cd-0add866e7f19/scratch/DummyIsoView.cs) compiled to `DummyIsoView.dll` and registered into HKCU without requiring administrator rights.
+
+### B. Offline Database Session Attachment
+- In offline mode, `WorkshopSession.Attach()` attaches to the existing database session (ID `371`) in `DiagSwdlSession`.
+- All readouts, DTC ranks, and ECU states are immediately populated into `DiagnosticManager` memory upon startup without requiring vehicle communication.
+
+### C. Culture Synchronization for Diagnostic Stored Procedures
+- VIDA's stored procedures (e.g. `vadis_GetCSCByID`) return localized component names based on the session's language code.
+- When `SessionManager.Instance.Current.CultureName` was unpopulated, `GetCustomerSymptomByID` returned `NULL` component names, causing `NullReferenceException` during `CustomerSymptom.CompareTo()` sorting.
+- Solved by synchronizing `en-US` culture across `SessionManager.Instance`, `_current`, `_baseParameters`, and `sessionsParameter[]`, as well as setting UI thread cultures.
+
+### D. All Diagnostic Tabs Unlocked & Verified
+- **Fault Trace (DTCs)**: Full interactive list of Customer Symptoms and DTCs (`ECM-P067200`, `ECM-P067300`, `CEM-U300316`, `ECM-P067400`), fault tracing trees, test procedures, and `DETAILS` (freeze frames / counters / status bits).
+- **Network**: Network status and ECU identification overview.
+- **Vehicle Communication**: Parameters, activations, programmed values, and advanced tests.
+- **Reference Information**: Technical specifications, repair documents, leakage/noise/vibration guides.
+
