@@ -423,6 +423,97 @@ static class Program
     static Form _mainLauncherForm = null;
     static Form _activeDocForm = null;
     static WebBrowser _activeDocWb = null;
+    static Control _refFormCtrl = null;
+    static Control _vehCommCtrl = null;
+    static Control _activeDtcRefControl = null;
+    static Action<string> _onVehicleCommHotspotClicked = null;
+    static Action<string> _onDtcRefHotspotClicked = null;
+
+    class LauncherBrowserNavigation : Vcc.Vida.DiagSwdl.UI.IBrowserNavigation
+    {
+        private Form _parentForm;
+        public LauncherBrowserNavigation(Form parentForm)
+        {
+            _parentForm = parentForm;
+        }
+
+        public void LoadInformationElement(string ieId, Vcc.Vida.DiagSwdl.UI.InformationElementType type, Vcc.Vida.DiagSwdl.UI.InformationElementSubType subType, int page)
+        {
+            Console.WriteLine("[Launcher] LauncherBrowserNavigation.LoadInformationElement: " + ieId);
+            OpenDoc(ieId);
+        }
+
+        public void LoadIEInNewWindow(string ieId)
+        {
+            Console.WriteLine("[Launcher] LauncherBrowserNavigation.LoadIEInNewWindow: " + ieId);
+            OpenDoc(ieId);
+        }
+
+        private void OpenDoc(string ieId)
+        {
+            if (string.IsNullOrEmpty(ieId)) return;
+            Form target = _parentForm ?? _mainLauncherForm;
+            if (target != null && target.InvokeRequired)
+            {
+                target.BeginInvoke(new Action(() => ShowDocumentWindow(ieId, "Document " + ieId, target)));
+            }
+            else
+            {
+                ShowDocumentWindow(ieId, "Document " + ieId, target);
+            }
+        }
+    }
+
+    static void RegisterDummyIsoViewHotspot()
+    {
+        try
+        {
+            Type dummyType = Type.GetType("IsoViewStub.DummyIsoView, DummyIsoView");
+            if (dummyType == null)
+            {
+                Assembly dummyAsm = Assembly.LoadFrom(@"C:\Users\david\git\vida\VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\DummyIsoView.dll");
+                if (dummyAsm != null) dummyType = dummyAsm.GetType("IsoViewStub.DummyIsoView");
+            }
+            if (dummyType != null)
+            {
+                FieldInfo cbField = dummyType.GetField("OnEcuHotspotClicked", BindingFlags.Public | BindingFlags.Static);
+                if (cbField != null)
+                {
+                    Action<string> globalHotspot = (clickedId) =>
+                    {
+                        Console.WriteLine("[Launcher] Direct Map Click received for ECU: " + clickedId);
+                        try
+                        {
+                            if (_refFormCtrl != null && _refFormCtrl.Visible)
+                            {
+                                if (_onDtcRefHotspotClicked != null)
+                                {
+                                    _onDtcRefHotspotClicked(clickedId);
+                                    return;
+                                }
+                            }
+                            if (_vehCommCtrl != null && _vehCommCtrl.Visible)
+                            {
+                                if (_onVehicleCommHotspotClicked != null)
+                                {
+                                    _onVehicleCommHotspotClicked(clickedId);
+                                    return;
+                                }
+                            }
+                            if (_onDtcRefHotspotClicked != null) _onDtcRefHotspotClicked(clickedId);
+                            if (_onVehicleCommHotspotClicked != null) _onVehicleCommHotspotClicked(clickedId);
+                        }
+                        catch (Exception exH)
+                        {
+                            Console.WriteLine("[Launcher] Global hotspot dispatch error: " + exH.Message);
+                        }
+                    };
+                    cbField.SetValue(null, globalHotspot);
+                }
+            }
+        }
+        catch (Exception exW) { Console.WriteLine("[Launcher] Wire hotspot error: " + exW.Message); }
+    }
 
 
 
@@ -1153,6 +1244,28 @@ static class Program
         }
         catch {}
         return "";
+    }
+
+    static string LookupDocumentIdByDtcOrTitle(string query)
+    {
+        if (string.IsNullOrEmpty(query)) return null;
+        try
+        {
+            using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=servicerep_en-US;Integrated Security=True"))
+            {
+                conn.Open();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT TOP 1 chronicleId FROM Document WHERE title = @q OR title LIKE @like ORDER BY version DESC";
+                    cmd.Parameters.AddWithValue("@q", query);
+                    cmd.Parameters.AddWithValue("@like", "%" + query + "%");
+                    var obj = cmd.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value) return obj.ToString().Trim();
+                }
+            }
+        }
+        catch {}
+        return null;
     }
 
     static string GetImageTag(string filename)
@@ -2118,6 +2231,16 @@ static class Program
             refForm.Controls.Add(subNav);
             subNav.BringToFront();
 
+            if (mObj != null)
+            {
+                PropertyInfo piNav = mObj.GetType().GetProperty("BrowserNavigation", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (piNav != null && piNav.GetValue(mObj, null) == null)
+                {
+                    piNav.SetValue(mObj, new LauncherBrowserNavigation(_mainLauncherForm), null);
+                    Console.WriteLine("[Launcher] Wired BrowserNavigation in SetupWorkshopManualsTab!");
+                }
+            }
+
             Action<Control, string> wireRefInfoControl = (ctrl, ctrlTag) =>
             {
                 if (ctrl == null || ctrl.Tag as string == "wired_clicks") return;
@@ -2127,74 +2250,215 @@ static class Program
                 if (statusTv == null) return;
 
                 TreeView tvEx = GetFieldValue(statusTv, "_treeViewEx") as TreeView;
-                if (tvEx == null) return;
 
-                Action<TreeNode> handleNode = (node) =>
+                Action<TreeNode, bool> handleNode = (node, isDoubleClick) =>
                 {
                     if (node == null) return;
                     object nodeTag = node.Tag;
-                    if (nodeTag == null) return;
 
                     string docId = null;
-                    object ieObj = GetPropValue(nodeTag, "InformationElement");
-                    if (ieObj != null) docId = GetPropValue(ieObj, "IEId") as string;
-                    if (string.IsNullOrEmpty(docId))
+                    if (nodeTag != null)
                     {
-                        object dataObj = GetPropValue(nodeTag, "Data");
-                        if (dataObj != null)
+                        object ieObj = GetPropValue(nodeTag, "InformationElement");
+                        if (ieObj != null) docId = GetPropValue(ieObj, "IEId") as string;
+                        if (string.IsNullOrEmpty(docId))
                         {
-                            object dataIe = GetPropValue(dataObj, "InformationElement");
-                            if (dataIe != null) docId = GetPropValue(dataIe, "IEId") as string;
+                            object dataObj = GetPropValue(nodeTag, "Data");
+                            if (dataObj != null)
+                            {
+                                object dataIe = GetPropValue(dataObj, "InformationElement");
+                                if (dataIe != null) docId = GetPropValue(dataIe, "IEId") as string;
+                            }
+                        }
+                        if (string.IsNullOrEmpty(docId))
+                        {
+                            string rawId = GetPropValue(nodeTag, "ID") as string;
+                            if (!string.IsNullOrEmpty(rawId) && (rawId.StartsWith("0900", StringComparison.OrdinalIgnoreCase) || rawId.StartsWith("0800", StringComparison.OrdinalIgnoreCase)))
+                                docId = rawId;
                         }
                     }
-                    if (string.IsNullOrEmpty(docId))
+
+                    if (string.IsNullOrEmpty(docId) && !string.IsNullOrEmpty(node.Text))
                     {
-                        string rawId = GetPropValue(nodeTag, "ID") as string;
-                        if (!string.IsNullOrEmpty(rawId) && rawId.StartsWith("0900", StringComparison.OrdinalIgnoreCase))
-                            docId = rawId;
+                        System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(node.Text, @"([A-Z]{3,4}-[A-Z0-9]{4,7})");
+                        if (m.Success)
+                        {
+                            string dtcCode = m.Groups[1].Value;
+                            docId = LookupDocumentIdByDtcOrTitle(dtcCode);
+                        }
+                        if (string.IsNullOrEmpty(docId))
+                        {
+                            docId = LookupDocumentIdByDtcOrTitle(node.Text.Trim());
+                        }
                     }
 
                     if (!string.IsNullOrEmpty(docId))
                     {
+                        Console.WriteLine("[Launcher] Opening document for node: " + docId + " (" + node.Text + ")");
                         ShowDocumentWindow(docId, node.Text, _mainLauncherForm);
                         return;
                     }
 
-                    if (node.Nodes.Count == 0)
+                    if (node.Nodes.Count > 0)
+                    {
+                        if (isDoubleClick)
+                        {
+                            if (node.IsExpanded) node.Collapse();
+                            else node.Expand();
+                        }
+                    }
+                    else if (nodeTag != null)
                     {
                         string nodeId = GetPropValue(nodeTag, "ID") as string;
                         if (!string.IsNullOrEmpty(nodeId))
                         {
-                            object wf = GetFieldValue(ctrl, "_dtcFaulttraceWF");
-                            if (wf != null)
+                            try
                             {
-                                MethodInfo miGetTree = wf.GetType().GetMethod("GetRefInfoDtcTree");
-                                if (miGetTree != null)
-                                {
-                                    int numId = 0;
-                                    if (int.TryParse(nodeId, out numId))
-                                    {
-                                        Array items = miGetTree.Invoke(wf, new object[] { numId }) as Array;
-                                        if (items != null && items.Length > 0)
-                                        {
-                                            MethodInfo miDbl = ctrl.GetType().GetMethod("_statusTreeViewControl_OnNodeDoubleClick", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                                            if (miDbl != null) miDbl.Invoke(ctrl, new object[] { node });
-                                        }
-                                    }
-                                }
+                                MethodInfo miDbl = ctrl.GetType().GetMethod("_statusTreeViewControl_OnNodeDoubleClick", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                if (miDbl != null) miDbl.Invoke(ctrl, new object[] { node });
                             }
+                            catch {}
                         }
                     }
                 };
 
-                tvEx.NodeMouseClick += (sTv, eTv) => handleNode(eTv.Node);
-                tvEx.NodeMouseDoubleClick += (sTv, eTv) => handleNode(eTv.Node);
+                var stc = statusTv as Vcc.Vida.DiagSwdl.GuiComponents.StatusTreeViewControl;
+                if (stc != null)
+                {
+                    stc.OnNodeClick += (node) => handleNode(node, false);
+                    stc.OnNodeDoubleClick += (node) => handleNode(node, true);
+                }
+
+                if (tvEx != null)
+                {
+                    tvEx.AfterSelect += (sTv, eTv) => { if (eTv.Node != null) handleNode(eTv.Node, false); };
+                    tvEx.DoubleClick += (sTv, eTv) => { if (tvEx.SelectedNode != null) handleNode(tvEx.SelectedNode, true); };
+                    tvEx.NodeMouseClick += (sTv, eTv) => handleNode(eTv.Node, false);
+                    tvEx.NodeMouseDoubleClick += (sTv, eTv) => handleNode(eTv.Node, true);
+                }
             };
 
             Control cscCtrl = GetFieldValue(refForm, "_customerSymptomsCSCRefInfoControl") as Control;
             Control dtcCtrl = GetFieldValue(refForm, "_customerSymptomsDtcRefInfoControl") as Control;
             wireRefInfoControl(cscCtrl, "csc");
             wireRefInfoControl(dtcCtrl, "dtc");
+
+            _refFormCtrl = refForm;
+            _activeDtcRefControl = dtcCtrl;
+
+            if (dtcCtrl != null && dtcCtrl.Tag as string != "dtc_configured")
+            {
+                dtcCtrl.Tag = "dtc_configured";
+
+                Panel pnlNav = GetFieldValue(dtcCtrl, "_pnlNavigation") as Panel;
+                if (pnlNav != null)
+                {
+                    Panel ecuBar = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Color.FromArgb(240, 244, 248), Padding = new Padding(8, 4, 8, 4) };
+                    Label lblEcuTitle = new Label { Text = "ECU Module:", AutoSize = true, Location = new Point(8, 9), Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(0, 48, 87) };
+                    ComboBox cbDtcEcu = new ComboBox { Location = new Point(105, 6), Width = 350, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5f) };
+
+                    Tuple<string, string>[] dtcEcuList = new Tuple<string, string>[]
+                    {
+                        Tuple.Create("284101", "ECM - Engine Control Module"),
+                        Tuple.Create("437601", "TCM - Transmission Control Module"),
+                        Tuple.Create("372302", "CEM - Central Electronic Module"),
+                        Tuple.Create("593102", "BCM - Brake Control Module"),
+                        Tuple.Create("381101", "DIM - Driver Information Module"),
+                        Tuple.Create("884701", "SRS - Supplemental Restraint System"),
+                        Tuple.Create("871101", "CCM - Climate Control Module"),
+                        Tuple.Create("465901", "DEM - Differential Electronic Module"),
+                        Tuple.Create("645902", "SAS - Steering Angle Sensor"),
+                        Tuple.Create("875401", "CPM - Combustion Pre-heater Module"),
+                        Tuple.Create("551401", "PBM - Parking Brake Module"),
+                        Tuple.Create("831701", "DDM - Driver Door Module"),
+                        Tuple.Create("831703", "PDM - Passenger Door Module"),
+                        Tuple.Create("852601", "PSM - Power Seat Module"),
+                        Tuple.Create("393901", "ICM - Infotainment Control Module"),
+                        Tuple.Create("393204", "IAM - Integrated Audio Module"),
+                        Tuple.Create("393202", "AUD - Audio Module"),
+                        Tuple.Create("366901", "KVM - Keyless Vehicle Module"),
+                        Tuple.Create("366902", "PAM - Parking Assistance Module"),
+                        Tuple.Create("892901", "TRM - Trailer Module"),
+                        Tuple.Create("832901", "POT - Power Operated Tailgate"),
+                        Tuple.Create("352902", "HCM - Headlamp Control Module"),
+                        Tuple.Create("366905", "FSM - Forward Sensing Module"),
+                        Tuple.Create("645903", "PSCM - Power Steering Control Module")
+                    };
+
+                    foreach (var item in dtcEcuList)
+                    {
+                        cbDtcEcu.Items.Add(item.Item2);
+                    }
+
+                    bool updatingDtcEcu = false;
+                    Action<string> selectDtcEcuById = (targetId) =>
+                    {
+                        for (int k = 0; k < dtcEcuList.Length; k++)
+                        {
+                            if (dtcEcuList[k].Item1 == targetId)
+                            {
+                                updatingDtcEcu = true;
+                                cbDtcEcu.SelectedIndex = k;
+                                updatingDtcEcu = false;
+                                break;
+                            }
+                        }
+                    };
+
+                    cbDtcEcu.SelectedIndexChanged += (sEcu, eEcu) =>
+                    {
+                        if (updatingDtcEcu) return;
+                        if (cbDtcEcu.SelectedIndex >= 0 && cbDtcEcu.SelectedIndex < dtcEcuList.Length)
+                        {
+                            string selId = dtcEcuList[cbDtcEcu.SelectedIndex].Item1;
+                            Console.WriteLine("[Launcher] DTC Ref Info: ECU selected " + dtcEcuList[cbDtcEcu.SelectedIndex].Item2 + " (" + selId + ")");
+                            try
+                            {
+                                MethodInfo miNav = dtcCtrl.GetType().GetMethod("_navImage_HotspotClicked", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                if (miNav != null)
+                                {
+                                    miNav.Invoke(dtcCtrl, new object[] { dtcCtrl, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(selId, 1) });
+                                }
+                            }
+                            catch (Exception exNav)
+                            {
+                                Console.WriteLine("[Launcher] DTC _navImage_HotspotClicked error: " + exNav.Message);
+                            }
+                        }
+                    };
+
+                    ecuBar.Controls.AddRange(new Control[] { lblEcuTitle, cbDtcEcu });
+                    pnlNav.Controls.Add(ecuBar);
+                    ecuBar.BringToFront();
+
+                    // Register hotspot handler for DTC control
+                    _onDtcRefHotspotClicked = (clickedId) =>
+                    {
+                        Console.WriteLine("[Launcher] DTC Ref Info hotspot clicked for ECU: " + clickedId);
+                        selectDtcEcuById(clickedId);
+                        try
+                        {
+                            MethodInfo miNav = dtcCtrl.GetType().GetMethod("_navImage_HotspotClicked", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (miNav != null)
+                            {
+                                miNav.Invoke(dtcCtrl, new object[] { dtcCtrl, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(clickedId, 1) });
+                            }
+                        }
+                        catch (Exception exNav)
+                        {
+                            Console.WriteLine("[Launcher] DTC hotspot dispatch error: " + exNav.Message);
+                        }
+                    };
+
+                    // Auto-select ECM initially so Related DTCs are immediately loaded
+                    if (cbDtcEcu.Items.Count > 0)
+                    {
+                        cbDtcEcu.SelectedIndex = 0;
+                    }
+                }
+            }
+
+            RegisterDummyIsoViewHotspot();
 
             _manualsTabConfigured = true;
             Console.WriteLine("[Launcher] Successfully embedded Workshop Service Manuals Explorer into ReferenceInformationForm!");
@@ -3654,48 +3918,18 @@ static class Program
 
 
 
-                            // Wire direct map clicks from DummyIsoView to bypass COM connection point quirks
-                            Action<string> clickAction = (clickedId) => {
-
-                                Console.WriteLine("[Launcher] Direct Map Click received for ECU: " + clickedId);
-
+                                                        _vehCommCtrl = vcForm as Control;
+                            _onVehicleCommHotspotClicked = (clickedId) => {
+                                Console.WriteLine("[Launcher] Vehicle Comm Click received for ECU: " + clickedId);
                                 try {
-
                                     if (onNavClick != null)
-
                                         onNavClick.Invoke(vcForm, new object[] { vcForm, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(clickedId, 1) });
-
                                     selectEcuById(clickedId);
-
                                 } catch (Exception exClick) {
-
-                                    Console.WriteLine("[Launcher] Map click dispatch error: " + exClick.Message);
-
+                                    Console.WriteLine("[Launcher] Vehicle Comm click dispatch error: " + exClick.Message);
                                 }
-
                             };
-
-                            try {
-
-                                Type dummyType = Type.GetType("IsoViewStub.DummyIsoView, DummyIsoView");
-
-                                if (dummyType == null) {
-
-                                    Assembly dummyAsm = Assembly.LoadFrom(@"C:\Users\david\git\vida\VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\DummyIsoView.dll");
-
-                                    if (dummyAsm != null) dummyType = dummyAsm.GetType("IsoViewStub.DummyIsoView");
-
-                                }
-
-                                if (dummyType != null) {
-
-                                    FieldInfo cbField = dummyType.GetField("OnEcuHotspotClicked", BindingFlags.Public | BindingFlags.Static);
-
-                                    if (cbField != null) cbField.SetValue(null, clickAction);
-
-                                }
-
-                            } catch (Exception exW) { Console.WriteLine("[Launcher] Wire hotspot error: " + exW.Message); }
+                            RegisterDummyIsoViewHotspot();
 
 
 
@@ -4762,8 +4996,10 @@ static class Program
 
 
 
-        Action<string, string> showDocument = (docId, title) => ShowDocumentWindow(docId, title, mainForm);
-
+        Action<string, string> showDocument = (docId, title) => ShowDocumentWindow(docId, title, mainForm);
+
+
+
         diag.NavigateIE += (id, type, subType, functionGroup) =>
         {
             Console.WriteLine("[Launcher] NavigateIE: id=" + id + ", type=" + type);
@@ -4791,6 +5027,21 @@ static class Program
 
 
         diag.CommToolName = TargetCommTool;
+
+        Type dmTypeInit = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticManager");
+        if (dmTypeInit != null)
+        {
+            object dmInst = dmTypeInit.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+            if (dmInst != null)
+            {
+                PropertyInfo piNav = dmTypeInit.GetProperty("BrowserNavigation", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (piNav != null)
+                {
+                    piNav.SetValue(dmInst, new LauncherBrowserNavigation(mainForm), null);
+                    Console.WriteLine("[Launcher] Successfully wired LauncherBrowserNavigation into DiagnosticManager.Instance.BrowserNavigation!");
+                }
+            }
+        }
 
         Timer dialogStylerTimer = new Timer();
         dialogStylerTimer.Interval = 100;
