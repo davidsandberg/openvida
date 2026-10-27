@@ -433,6 +433,11 @@ static class Program
         Application.SetCompatibleTextRenderingDefault(false);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
         Application.ThreadException += (s, e) => {
+            if (e.Exception != null && e.Exception.Message.IndexOf("__ComObject", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // Silently swallow Microsoft AxHost managed-control release quirk
+                return;
+            }
             Console.WriteLine("[Launcher] ThreadException (caught safely): " + e.Exception.Message);
         };
         AppDomain.CurrentDomain.UnhandledException += (s, e) => {
