@@ -319,16 +319,26 @@ static class Program
             Console.WriteLine("[Launcher] Failed to install SafeListenerList: " + ex.Message);
         }
 
-        // 4. Setup Windows Forms styling
+        // 4. Setup Windows Forms styling & unhandled exception safeguards
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+        Application.ThreadException += (s, e) => {
+            Console.WriteLine("[Launcher] ThreadException (caught safely): " + e.Exception.Message);
+        };
+        AppDomain.CurrentDomain.UnhandledException += (s, e) => {
+            Console.WriteLine("[Launcher] DomainException (caught safely): " + e.ExceptionObject);
+        };
 
         Form mainForm = new Form();
         mainForm.Text = "Volvo VIDA 2014D - Standalone Diagnostics";
         mainForm.Width = 1366;
         mainForm.Height = 860;
         mainForm.StartPosition = FormStartPosition.CenterScreen;
-        mainForm.WindowState = FormWindowState.Maximized;
+        mainForm.WindowState = FormWindowState.Normal;
+        mainForm.FormClosing += (s, e) => {
+            try { Environment.Exit(0); } catch {}
+        };
 
         // Top Toolbar
         Panel topBar = new Panel();
@@ -498,6 +508,45 @@ static class Program
                         {
                             onNavClick.Invoke(vcForm, new object[] { vcForm, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs("284101", 1) });
                         }
+
+                        // Enable Description button and wire informational popup for selected parameters
+                        FieldInfo rpField = vcForm.GetType().GetField("_readParametersPage", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (rpField != null)
+                        {
+                            object rpPage = rpField.GetValue(vcForm);
+                            if (rpPage != null)
+                            {
+                                FieldInfo tvField = rpPage.GetType().GetField("_treeView", BindingFlags.NonPublic | BindingFlags.Instance);
+                                FieldInfo btnDescField = rpPage.GetType().GetField("_viewDescription", BindingFlags.NonPublic | BindingFlags.Instance);
+                                TreeView tv = tvField != null ? tvField.GetValue(rpPage) as TreeView : null;
+                                Control btnDesc = btnDescField != null ? btnDescField.GetValue(rpPage) as Control : null;
+                                if (tv != null && btnDesc != null && btnDesc.Tag == null)
+                                {
+                                    btnDesc.Tag = "wired";
+                                    tv.AfterSelect += (sTv, eTv) => {
+                                        if (eTv.Node != null) btnDesc.Enabled = true;
+                                    };
+                                    btnDesc.Click += (sDesc, eDesc) => {
+                                        if (tv.SelectedNode != null)
+                                        {
+                                            TreeNode sel = tv.SelectedNode;
+                                            string pName = sel.Text;
+                                            string pCat = sel.Parent != null ? sel.Parent.Text : "General";
+                                            MessageBox.Show(
+                                                "Parameter: " + pName + "\n" +
+                                                "Category: " + pCat + "\n" +
+                                                "Module: Engine Control Module (ECM)\n\n" +
+                                                "Status: Parameter selected for diagnostics.\n" +
+                                                "Live Data: When connected to the car (Ignition Position II), values will continuously update in the Value column.\n\n" +
+                                                "(Click 'ADD TO LIST' to monitor, or 'OPEN GRAPHIC DISPLAY' to plot real-time curves)",
+                                                "Parameter Description - " + pName,
+                                                MessageBoxButtons.OK,
+                                                MessageBoxIcon.Information);
+                                        }
+                                    };
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -508,6 +557,40 @@ static class Program
         Console.WriteLine("[Launcher] Initializing DiagnosticMainForm...");
         var diag = new DiagnosticMainForm();
         diag.Dock = DockStyle.Fill;
+
+        Action<string, string> showDocument = (docId, title) =>
+        {
+            if (string.IsNullOrEmpty(docId)) return;
+            try
+            {
+                Form docForm = new Form();
+                docForm.Text = "VIDA Document: " + (!string.IsNullOrEmpty(title) ? title : docId);
+                docForm.Size = new Size(1000, 750);
+                docForm.StartPosition = FormStartPosition.CenterParent;
+                WebBrowser wb = new WebBrowser();
+                wb.Dock = DockStyle.Fill;
+                wb.ScriptErrorsSuppressed = true;
+                string url = "http://localhost/Vida/getXmlDocument.do?docId=" + docId + "&synchronize=true";
+                wb.Navigate(url);
+                docForm.Controls.Add(wb);
+                docForm.Show(mainForm);
+            }
+            catch (Exception exDoc)
+            {
+                Console.WriteLine("[Launcher] ShowDoc error: " + exDoc.Message);
+            }
+        };
+
+        diag.NavigateIE += (id, type, subType, functionGroup) =>
+        {
+            Console.WriteLine("[Launcher] NavigateIE: id=" + id + ", type=" + type);
+            showDocument(id, "Document " + id);
+        };
+        diag.NavigateIEPopupWindow += (id, type, subType, functionGroup) =>
+        {
+            Console.WriteLine("[Launcher] NavigateIEPopupWindow: id=" + id + ", type=" + type);
+            showDocument(id, "Document " + id);
+        };
 
         diag.RootUrl = "http://localhost/Vida/Diagnostics/";
         diag.LogPath = Path.Combine(vidaPath, @"System\Log\Diagnostics\");
