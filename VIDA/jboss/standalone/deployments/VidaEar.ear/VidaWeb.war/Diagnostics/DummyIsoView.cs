@@ -1,3 +1,4 @@
+using System.Reflection;
 using System;
 using System.IO;
 using System.Net;
@@ -40,27 +41,38 @@ namespace IsoViewStub
         public DummyIsoView()
         {
             this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint | ControlStyles.UserPaint, true);
-            this.SetStyle(ControlStyles.Selectable, false);
             this.BackColor = Color.FromArgb(235, 238, 242);
         }
 
-        protected override void WndProc(ref Message m)
+        private void ClearAxActiveObject()
         {
-            const int WM_MOUSEACTIVATE = 0x0021;
-            const int WM_SETFOCUS = 0x0007;
-            const int WM_KILLFOCUS = 0x0008;
+            try
+            {
+                Control p = this.Parent;
+                while (p != null)
+                {
+                    if (p is AxHost)
+                    {
+                        FieldInfo f = typeof(AxHost).GetField("iOleInPlaceActiveObjectExternal", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (f != null) f.SetValue(p, null);
+                        break;
+                    }
+                    p = p.Parent;
+                }
+            }
+            catch {}
+        }
 
-            if (m.Msg == WM_MOUSEACTIVATE)
-            {
-                m.Result = (IntPtr)3; // MA_NOACTIVATE: pass click but do not activate/focus
-                return;
-            }
-            if (m.Msg == WM_SETFOCUS || m.Msg == WM_KILLFOCUS)
-            {
-                m.Result = IntPtr.Zero;
-                return;
-            }
-            base.WndProc(ref m);
+        protected override void OnGotFocus(EventArgs e)
+        {
+            base.OnGotFocus(e);
+            ClearAxActiveObject();
+        }
+
+        protected override void OnEnter(EventArgs e)
+        {
+            base.OnEnter(e);
+            ClearAxActiveObject();
         }
 
         private Color ParseRgb(string value)
@@ -398,6 +410,8 @@ namespace IsoViewStub
 
         protected override void OnMouseDown(MouseEventArgs e)
         {
+            base.OnMouseDown(e);
+            ClearAxActiveObject();
             EcuNode hit = null;
             HashSet<EcuNode> checkedNodes = new HashSet<EcuNode>();
             foreach (var node in _ecus.Values)
@@ -423,6 +437,7 @@ namespace IsoViewStub
                     HsHit(1, 0, "", "", "");
                 }
             }
+            ClearAxActiveObject();
         }
 
         protected override void OnMouseMove(MouseEventArgs e)

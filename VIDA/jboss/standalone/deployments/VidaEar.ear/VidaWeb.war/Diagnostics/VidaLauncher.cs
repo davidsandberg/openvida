@@ -656,13 +656,25 @@ static class Program
                         {
                             vcCtrl.Tag = "sim_active";
                             var simTimer = new System.Windows.Forms.Timer();
-                            simTimer.Interval = 1000;
+                            simTimer.Interval = 500;
                             var rnd = new Random();
                             var simStates = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
 
                             simTimer.Tick += (sSim, eSim) => {
                                 try
                                 {
+                                    // Stop Volvo's failing background timer so it doesn't clear parameter cells
+                                    FieldInfo tField = wf.GetType().GetField("_parameterReadTimer", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (tField != null)
+                                    {
+                                        object tmr = tField.GetValue(wf);
+                                        if (tmr != null)
+                                        {
+                                            MethodInfo stopM = tmr.GetType().GetMethod("Stop");
+                                            if (stopM != null) stopM.Invoke(tmr, null);
+                                        }
+                                    }
+
                                     PropertyInfo piToRead = wf.GetType().GetProperty("ParametersToRead");
                                     if (piToRead == null) return;
                                     ICollection toRead = piToRead.GetValue(wf, null) as ICollection;
