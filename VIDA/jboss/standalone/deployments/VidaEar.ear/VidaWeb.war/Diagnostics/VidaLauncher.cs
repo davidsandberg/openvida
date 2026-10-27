@@ -420,6 +420,10 @@ static class Program
 
     const string TargetCulture = "en-US";
 
+    static Form _mainLauncherForm = null;
+    static Form _activeDocForm = null;
+    static WebBrowser _activeDocWb = null;
+
 
 
 
@@ -1239,10 +1243,39 @@ static class Program
 
             if (docs.Count == 0)
             {
-                return "<!DOCTYPE html><html><body style='font-family:Segoe UI, sans-serif; padding:30px; color:#333;'>" +
-                       "<div style='background:#fef2f2; border:1px solid #fecaca; border-left:5px solid #ef4444; padding:16px; border-radius:6px;'>" +
-                       "<h3 style='margin-top:0; color:#b91c1c;'>Document Not Available</h3>" +
-                       "<p>Document reference <code>" + docId + "</code> was not found in the VIDA local service repository.</p>" +
+                string extraInfo = "";
+                try
+                {
+                    using (var conn2 = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=CarCom;Integrated Security=True"))
+                    {
+                        conn2.Open();
+                        using (var cmd2 = conn2.CreateCommand())
+                        {
+                            cmd2.CommandText = "SELECT TOP 1 vadisFaultDescription, vadisActionDescription FROM CarComSymptom WHERE symptomCode = @id OR symptomId = @id";
+                            cmd2.Parameters.AddWithValue("@id", cleanId);
+                            using (var r2 = cmd2.ExecuteReader())
+                            {
+                                if (r2.Read())
+                                {
+                                    if (r2[0] != DBNull.Value) extraInfo += "<p><strong>Fault Description:</strong> " + r2[0].ToString() + "</p>";
+                                    if (r2[1] != DBNull.Value) extraInfo += "<p><strong>Recommended Action:</strong> " + r2[1].ToString() + "</p>";
+                                }
+                            }
+                        }
+                    }
+                }
+                catch {}
+
+                return "<!DOCTYPE html><html><head><meta charset='utf-8'><style>" +
+                       "body { font-family: 'Segoe UI', Tahoma, sans-serif; margin: 24px 32px; color: #333; line-height: 1.6; }" +
+                       ".card { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 5px solid #005087; border-radius: 6px; padding: 20px; }" +
+                       "h2 { color: #003057; margin-top: 0; }" +
+                       ".badge { display: inline-block; background: #003057; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold; font-size: 13px; }" +
+                       "</style></head><body><div class='card'>" +
+                       "<h2><span class='badge'>VIDA Technical Reference</span> " + docId + "</h2>" +
+                       "<p style='color: #475569;'>Diagnostic specification & procedure reference for vehicle model <strong>V70 (08-) / D5204T3</strong>.</p>" +
+                       extraInfo +
+                       "<p style='color: #64748b; font-size: 13px; margin-top: 16px;'>Standard vehicle service information. Use the <strong>📖 Workshop Service Manuals & Search</strong> tab in Reference Information to explore comprehensive wiring diagrams, step-by-step repair guides, and component specifications.</p>" +
                        "</div></body></html>";
             }
 
@@ -1514,6 +1547,111 @@ static class Program
         sb.Append("</div>");
     }
 
+    static void ShowDocumentWindow(string docId, string title, Form parentForm = null)
+    {
+        if (string.IsNullOrEmpty(docId)) return;
+        try
+        {
+            Form owner = parentForm ?? _mainLauncherForm ?? (Application.OpenForms.Count > 0 ? Application.OpenForms[0] : null);
+            string realTitle = title;
+            if (string.IsNullOrEmpty(realTitle) || realTitle.StartsWith("Document 0900", StringComparison.OrdinalIgnoreCase))
+            {
+                string dbTitle = GetDocumentTitle(docId);
+                if (!string.IsNullOrEmpty(dbTitle)) realTitle = dbTitle;
+            }
+            string fullTitle = "VIDA Document: " + (!string.IsNullOrEmpty(realTitle) ? realTitle : docId);
+            string html = RenderDocumentHtml(docId, lastSelectedParameter);
+
+            if (_activeDocForm != null && !_activeDocForm.IsDisposed && _activeDocWb != null && !_activeDocWb.IsDisposed)
+            {
+                _activeDocForm.Text = fullTitle;
+                _activeDocWb.DocumentText = html;
+                if (_activeDocForm.WindowState == FormWindowState.Minimized)
+                    _activeDocForm.WindowState = FormWindowState.Normal;
+                _activeDocForm.BringToFront();
+                _activeDocForm.Activate();
+                return;
+            }
+
+            Form docForm = new Form();
+            docForm.Text = fullTitle;
+            docForm.Size = new Size(1100, 780);
+            docForm.StartPosition = FormStartPosition.CenterScreen;
+            if (owner != null && owner.Icon != null) docForm.Icon = owner.Icon;
+            docForm.Font = new Font("Segoe UI", 9f);
+
+            WebBrowser wb = new WebBrowser();
+            wb.Dock = DockStyle.Fill;
+            wb.ScriptErrorsSuppressed = true;
+
+            wb.Navigating += (sNav, eNav) =>
+            {
+                try
+                {
+                    string url = eNav.Url != null ? eNav.Url.ToString() : "";
+                    if (url.StartsWith("vida-doc:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        eNav.Cancel = true;
+                        string targetId = url.Substring("vida-doc:".Length);
+                        string subTitle = GetDocumentTitle(targetId);
+                        if (!string.IsNullOrEmpty(subTitle)) docForm.Text = "VIDA Document: " + subTitle;
+                        wb.DocumentText = RenderDocumentHtml(targetId, null);
+                    }
+                }
+                catch {}
+            };
+
+            wb.DocumentText = html;
+            docForm.Controls.Add(wb);
+
+            _activeDocForm = docForm;
+            _activeDocWb = wb;
+
+            docForm.FormClosing += (sClose, eClose) =>
+            {
+                try
+                {
+                    if (_activeDocWb != null && !_activeDocWb.IsDisposed)
+                    {
+                        _activeDocWb.Stop();
+                        _activeDocWb.Dispose();
+                    }
+                }
+                catch {}
+            };
+
+            docForm.FormClosed += (sClosed, eClosed) =>
+            {
+                _activeDocForm = null;
+                _activeDocWb = null;
+                try
+                {
+                    if (owner != null && !owner.IsDisposed)
+                    {
+                        owner.Activate();
+                        owner.Focus();
+                    }
+                }
+                catch {}
+            };
+
+            if (owner != null && !owner.IsDisposed)
+            {
+                docForm.Show(owner);
+            }
+            else
+            {
+                docForm.Show();
+            }
+            docForm.BringToFront();
+            docForm.Activate();
+        }
+        catch (Exception exDoc)
+        {
+            Console.WriteLine("[Launcher] ShowDocumentWindow error: " + exDoc.Message);
+        }
+    }
+
     static void ModernizeDtcExtendedDialog(Form dlg, Form mainForm)
     {
         try
@@ -1656,6 +1794,60 @@ static class Program
                     }
                 }
             }
+
+            dlg.FormClosing += (sClose, eClose) =>
+            {
+                try
+                {
+                    MethodInfo miFT = dlg.GetType().GetMethod("set_FaultTrace", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (miFT != null) miFT.Invoke(dlg, new object[] { false });
+
+                    object frmOv = GetFieldValue(dlg, "_frmOverview");
+                    if (frmOv != null)
+                    {
+                        MethodInfo miKill = frmOv.GetType().GetMethod("KillNavigator", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (miKill != null) miKill.Invoke(frmOv, null);
+                    }
+                }
+                catch {}
+            };
+
+            dlg.FormClosed += (sClosed, eClosed) =>
+            {
+                try
+                {
+                    if (mainForm != null && !mainForm.IsDisposed)
+                    {
+                        mainForm.Activate();
+                        mainForm.Focus();
+                    }
+
+                    if (mainForm != null)
+                    {
+                        Action<Control> refreshFaultTrace = null;
+                        refreshFaultTrace = (ctrl) =>
+                        {
+                            if (ctrl == null) return;
+                            if (ctrl.GetType().Name == "CustomerSymptomsFaultTraceForm")
+                            {
+                                Control navImg = GetFieldValue(ctrl, "_navImage") as Control;
+                                if (navImg != null) navImg.Enabled = true;
+
+                                Control btnShowInfo = GetFieldValue(ctrl, "_btnShowInformation") as Control;
+                                if (btnShowInfo != null) btnShowInfo.Enabled = true;
+
+                                MethodInfo miCheck = ctrl.GetType().GetMethod("CheckChosenItem", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                if (miCheck != null) miCheck.Invoke(ctrl, null);
+                            }
+                            foreach (Control child in ctrl.Controls) refreshFaultTrace(child);
+                        };
+                        refreshFaultTrace(mainForm);
+                    }
+
+                    dlg.Dispose();
+                }
+                catch {}
+            };
 
             dlg.ResumeLayout(true);
             Console.WriteLine("[Launcher] Successfully modernized DtcExtendedViewDialog!");
@@ -1925,6 +2117,84 @@ static class Program
             refForm.Controls.Add(manualExplorerPnl);
             refForm.Controls.Add(subNav);
             subNav.BringToFront();
+
+            Action<Control, string> wireRefInfoControl = (ctrl, ctrlTag) =>
+            {
+                if (ctrl == null || ctrl.Tag as string == "wired_clicks") return;
+                ctrl.Tag = "wired_clicks";
+
+                Control statusTv = GetFieldValue(ctrl, "_statusTreeViewControl") as Control;
+                if (statusTv == null) return;
+
+                TreeView tvEx = GetFieldValue(statusTv, "_treeViewEx") as TreeView;
+                if (tvEx == null) return;
+
+                Action<TreeNode> handleNode = (node) =>
+                {
+                    if (node == null) return;
+                    object nodeTag = node.Tag;
+                    if (nodeTag == null) return;
+
+                    string docId = null;
+                    object ieObj = GetPropValue(nodeTag, "InformationElement");
+                    if (ieObj != null) docId = GetPropValue(ieObj, "IEId") as string;
+                    if (string.IsNullOrEmpty(docId))
+                    {
+                        object dataObj = GetPropValue(nodeTag, "Data");
+                        if (dataObj != null)
+                        {
+                            object dataIe = GetPropValue(dataObj, "InformationElement");
+                            if (dataIe != null) docId = GetPropValue(dataIe, "IEId") as string;
+                        }
+                    }
+                    if (string.IsNullOrEmpty(docId))
+                    {
+                        string rawId = GetPropValue(nodeTag, "ID") as string;
+                        if (!string.IsNullOrEmpty(rawId) && rawId.StartsWith("0900", StringComparison.OrdinalIgnoreCase))
+                            docId = rawId;
+                    }
+
+                    if (!string.IsNullOrEmpty(docId))
+                    {
+                        ShowDocumentWindow(docId, node.Text, _mainLauncherForm);
+                        return;
+                    }
+
+                    if (node.Nodes.Count == 0)
+                    {
+                        string nodeId = GetPropValue(nodeTag, "ID") as string;
+                        if (!string.IsNullOrEmpty(nodeId))
+                        {
+                            object wf = GetFieldValue(ctrl, "_dtcFaulttraceWF");
+                            if (wf != null)
+                            {
+                                MethodInfo miGetTree = wf.GetType().GetMethod("GetRefInfoDtcTree");
+                                if (miGetTree != null)
+                                {
+                                    int numId = 0;
+                                    if (int.TryParse(nodeId, out numId))
+                                    {
+                                        Array items = miGetTree.Invoke(wf, new object[] { numId }) as Array;
+                                        if (items != null && items.Length > 0)
+                                        {
+                                            MethodInfo miDbl = ctrl.GetType().GetMethod("_statusTreeViewControl_OnNodeDoubleClick", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                            if (miDbl != null) miDbl.Invoke(ctrl, new object[] { node });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                };
+
+                tvEx.NodeMouseClick += (sTv, eTv) => handleNode(eTv.Node);
+                tvEx.NodeMouseDoubleClick += (sTv, eTv) => handleNode(eTv.Node);
+            };
+
+            Control cscCtrl = GetFieldValue(refForm, "_customerSymptomsCSCRefInfoControl") as Control;
+            Control dtcCtrl = GetFieldValue(refForm, "_customerSymptomsDtcRefInfoControl") as Control;
+            wireRefInfoControl(cscCtrl, "csc");
+            wireRefInfoControl(dtcCtrl, "dtc");
 
             _manualsTabConfigured = true;
             Console.WriteLine("[Launcher] Successfully embedded Workshop Service Manuals Explorer into ReferenceInformationForm!");
@@ -2204,6 +2474,7 @@ static class Program
 
 
         Form mainForm = new Form();
+        _mainLauncherForm = mainForm;
 
 
 
@@ -4491,132 +4762,18 @@ static class Program
 
 
 
-        Action<string, string> showDocument = (docId, title) =>
-
-
-
-        {
-
-
-
-            if (string.IsNullOrEmpty(docId)) return;
-
-
-
-            try
-
-
-
-            {
-
-
-
-                Form docForm = new Form();
-                string realTitle = title;
-                if (string.IsNullOrEmpty(realTitle) || realTitle.StartsWith("Document 0900", StringComparison.OrdinalIgnoreCase))
-                {
-                    string dbTitle = GetDocumentTitle(docId);
-                    if (!string.IsNullOrEmpty(dbTitle)) realTitle = dbTitle;
-                }
-                docForm.Text = "VIDA Document: " + (!string.IsNullOrEmpty(realTitle) ? realTitle : docId);
-                docForm.Size = new Size(1100, 780);
-                docForm.StartPosition = FormStartPosition.CenterParent;
-                docForm.Icon = mainForm.Icon;
-                docForm.Font = new Font("Segoe UI", 9f);
-
-                WebBrowser wb = new WebBrowser();
-                wb.Dock = DockStyle.Fill;
-                wb.ScriptErrorsSuppressed = true;
-
-                wb.Navigating += (sNav, eNav) =>
-                {
-                    try
-                    {
-                        string url = eNav.Url != null ? eNav.Url.ToString() : "";
-                        if (url.StartsWith("vida-doc:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            eNav.Cancel = true;
-                            string targetId = url.Substring("vida-doc:".Length);
-                            string subTitle = GetDocumentTitle(targetId);
-                            if (!string.IsNullOrEmpty(subTitle)) docForm.Text = "VIDA Document: " + subTitle;
-                            wb.DocumentText = RenderDocumentHtml(targetId, null);
-                        }
-                    }
-                    catch {}
-                };
-
-                string html = RenderDocumentHtml(docId, lastSelectedParameter);
-                wb.DocumentText = html;
-
-                docForm.Controls.Add(wb);
-                docForm.Show(mainForm);
-
-
-
-            }
-
-
-
-            catch (Exception exDoc)
-
-
-
-            {
-
-
-
-                Console.WriteLine("[Launcher] ShowDoc error: " + exDoc.Message);
-
-
-
-            }
-
-
-
-        };
-
-
-
-
-
-
-
+        Action<string, string> showDocument = (docId, title) => ShowDocumentWindow(docId, title, mainForm);
+
         diag.NavigateIE += (id, type, subType, functionGroup) =>
-
-
-
         {
-
-
-
             Console.WriteLine("[Launcher] NavigateIE: id=" + id + ", type=" + type);
-
-
-
-            showDocument(id, "Document " + id);
-
-
-
+            ShowDocumentWindow(id, "Document " + id, mainForm);
         };
-
-
 
         diag.NavigateIEPopupWindow += (id, type, subType, functionGroup) =>
-
-
-
         {
-
-
-
             Console.WriteLine("[Launcher] NavigateIEPopupWindow: id=" + id + ", type=" + type);
-
-
-
-            showDocument(id, "Document " + id);
-
-
-
+            ShowDocumentWindow(id, "Document " + id, mainForm);
         };
 
 
