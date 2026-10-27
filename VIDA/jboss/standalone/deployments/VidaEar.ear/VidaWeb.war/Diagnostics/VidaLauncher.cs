@@ -1112,18 +1112,36 @@ static class Program
         return p != null ? p.GetValue(obj, null) : null;
     }
 
+    static string CleanDocId(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return "";
+        string clean = id.Trim();
+        if (clean.Length > 5 && clean[2] == '-') clean = clean.Substring(5);
+        if (clean.Contains("#")) clean = clean.Substring(0, clean.IndexOf("#"));
+        return clean.Trim();
+    }
+
     static string GetDocumentTitle(string docId)
     {
         if (string.IsNullOrEmpty(docId)) return "";
         try
         {
+            string cleanId = CleanDocId(docId);
             using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=servicerep_en-US;Integrated Security=True"))
             {
                 conn.Open();
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT TOP 1 title FROM Document WHERE chronicleId = @id OR nevisId = @id";
-                    cmd.Parameters.AddWithValue("@id", docId);
+                    cmd.CommandText = "SELECT TOP 1 title FROM Document WHERE chronicleId = @id OR nevisId = @id OR projectDocumentId = @id ORDER BY version DESC";
+                    cmd.Parameters.AddWithValue("@id", cleanId);
+                    var obj = cmd.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value) return obj.ToString().Trim();
+                }
+
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT TOP 1 title FROM TreeItem WHERE chronicleId = @id OR NevisId = @id";
+                    cmd.Parameters.AddWithValue("@id", cleanId);
                     var obj = cmd.ExecuteScalar();
                     if (obj != null && obj != DBNull.Value) return obj.ToString().Trim();
                 }
@@ -1165,27 +1183,61 @@ static class Program
     {
         try
         {
-            byte[] bytes = null;
-            string dbTitle = "";
+            string cleanId = CleanDocId(docId);
+            var docs = new System.Collections.Generic.List<Tuple<string, byte[]>>();
+
             using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=servicerep_en-US;Integrated Security=True"))
             {
                 conn.Open();
+
+                // Try 1: Direct in Document
                 using (var cmd = conn.CreateCommand())
                 {
-                    cmd.CommandText = "SELECT TOP 1 title, XmlContent FROM Document WHERE chronicleId = @id OR nevisId = @id";
-                    cmd.Parameters.AddWithValue("@id", docId);
+                    cmd.CommandText = "SELECT TOP 1 title, XmlContent FROM Document WHERE chronicleId = @id OR nevisId = @id OR projectDocumentId = @id ORDER BY version DESC";
+                    cmd.Parameters.AddWithValue("@id", cleanId);
                     using (var r = cmd.ExecuteReader())
                     {
-                        if (r.Read())
+                        if (r.Read() && r[1] != DBNull.Value)
                         {
-                            dbTitle = r[0] != DBNull.Value ? r[0].ToString().Trim() : "";
-                            if (r[1] != DBNull.Value) bytes = (byte[])r[1];
+                            docs.Add(Tuple.Create(r[0] != DBNull.Value ? r[0].ToString().Trim() : "", (byte[])r[1]));
+                        }
+                    }
+                }
+
+                // Try 2: Via TreeItem
+                if (docs.Count == 0)
+                {
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"
+                            SELECT d.projectDocumentId, d.title, d.XmlContent, d.version
+                            FROM TreeItem ti
+                            JOIN TreeItemDocument tid ON ti.id = tid.fkTreeItem
+                            JOIN Document d ON tid.projectDocumentTo = d.projectDocumentId
+                            WHERE ti.chronicleId = @id OR ti.NevisId = @id
+                            ORDER BY d.id, d.version DESC";
+                        cmd.Parameters.AddWithValue("@id", cleanId);
+                        using (var r = cmd.ExecuteReader())
+                        {
+                            var seenPds = new System.Collections.Generic.HashSet<string>();
+                            while (r.Read())
+                            {
+                                string pd = r[0].ToString().Trim();
+                                if (!seenPds.Contains(pd))
+                                {
+                                    seenPds.Add(pd);
+                                    if (r[2] != DBNull.Value)
+                                    {
+                                        docs.Add(Tuple.Create(r[1] != DBNull.Value ? r[1].ToString().Trim() : "", (byte[])r[2]));
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
-            if (bytes == null)
+            if (docs.Count == 0)
             {
                 return "<!DOCTYPE html><html><body style='font-family:Segoe UI, sans-serif; padding:30px; color:#333;'>" +
                        "<div style='background:#fef2f2; border:1px solid #fecaca; border-left:5px solid #ef4444; padding:16px; border-radius:6px;'>" +
@@ -1194,31 +1246,16 @@ static class Program
                        "</div></body></html>";
             }
 
-            string xmlContent = "";
-            using (var ms = new System.IO.MemoryStream(bytes))
-            using (var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Read))
-            {
-                foreach (var entry in zip.Entries)
-                {
-                    using (var r = new System.IO.StreamReader(entry.Open(), System.Text.Encoding.UTF8))
-                    {
-                        xmlContent = r.ReadToEnd();
-                        break;
-                    }
-                }
-            }
-
-            var doc = System.Xml.Linq.XDocument.Parse(xmlContent);
             var sb = new System.Text.StringBuilder();
             sb.Append("<!DOCTYPE html><html><head><meta charset='utf-8'>");
             sb.Append("<style>");
             sb.Append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 24px 32px; line-height: 1.6; color: #222; background: #fff; }");
             sb.Append(".header-bar { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #003057; padding-bottom: 10px; margin-bottom: 20px; }");
-            sb.Append("h1 { color: #003057; font-size: 21px; margin: 0; font-weight: 600; }");
-            sb.Append(".btn-print { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 12px; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer; text-decoration: none; }");
-            sb.Append(".btn-print:hover { background: #e2e8f0; color: #0f172a; }");
-            sb.Append("h2 { color: #005087; margin-top: 26px; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; font-weight: 600; }");
-            sb.Append(".step-box { margin: 14px 0 20px 0; padding: 14px 18px; border-left: 4px solid #005087; background: #f8fafc; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }");
+            sb.Append("h1 { color: #003057; font-size: 20px; margin: 0; font-weight: 600; }");
+            sb.Append("h2 { color: #005087; margin-top: 24px; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; font-weight: 600; }");
+            sb.Append("h3 { color: #1e293b; margin-top: 18px; font-size: 14.5px; font-weight: 600; }");
+            sb.Append(".section-box { margin: 16px 0 24px 0; padding: 18px 22px; border-left: 4px solid #005087; background: #f8fafc; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }");
+            sb.Append(".step-box { margin: 14px 0 20px 0; padding: 14px 18px; border-left: 4px solid #0284c7; background: #ffffff; border: 1px solid #e2e8f0; border-left-width: 4px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }");
             sb.Append(".highlight { background: #fffde7 !important; border-left: 5px solid #f59e0b !important; box-shadow: 0 0 12px rgba(245, 158, 11, 0.25); }");
             sb.Append(".step-title { font-weight: 600; font-size: 15px; color: #003057; margin-bottom: 8px; }");
             sb.Append(".hint { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; margin: 14px 0; border-radius: 4px; color: #1e3a8a; }");
@@ -1226,93 +1263,52 @@ static class Program
             sb.Append(".caution { background: #fff7ed; border-left: 4px solid #ea580c; padding: 12px 16px; margin: 14px 0; border-radius: 4px; color: #9a3412; font-weight: 500; }");
             sb.Append(".warning { background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; margin: 14px 0; border-radius: 4px; color: #991b1b; font-weight: 500; }");
             sb.Append(".question-box { background: #f0fdf4; border: 1px solid #86efac; border-left: 4px solid #22c55e; padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-weight: 500; color: #14532d; }");
+            sb.Append(".btn-print { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 12px; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer; text-decoration: none; }");
+            sb.Append(".btn-print:hover { background: #e2e8f0; color: #0f172a; }");
             sb.Append("p { margin: 6px 0; font-size: 13.5px; }");
             sb.Append("ul { margin: 6px 0 12px 24px; padding: 0; font-size: 13.5px; }");
             sb.Append("li { margin: 4px 0; }");
             sb.Append("table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13px; }");
             sb.Append("th, td { border: 1px solid #cbd5e1; padding: 8px 12px; text-align: left; }");
             sb.Append("th { background: #f1f5f9; font-weight: 600; color: #1e293b; }");
+            sb.Append(".badge-sec { display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 600; text-transform: uppercase; border-radius: 3px; background: #e0f2fe; color: #0369a1; margin-bottom: 8px; }");
+            sb.Append(".doc-link { color: #0284c7; text-decoration: underline; cursor: pointer; font-weight: 500; }");
+            sb.Append(".doc-link:hover { color: #0369a1; }");
             sb.Append(".doc-img { max-width: 95%; height: auto; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }");
             sb.Append("@media print { .btn-print { display: none; } body { margin: 10px; } }");
             sb.Append("</style></head><body>");
 
-            var mainTitle = doc.Root.Element("title");
-            string docTitle = mainTitle != null ? mainTitle.Value.Trim() : dbTitle;
-            if (string.IsNullOrEmpty(docTitle)) docTitle = "Document " + docId;
-
-            sb.Append("<div class='header-bar'>");
-            sb.AppendFormat("<h1>{0}</h1>", docTitle);
-            sb.Append("<button class='btn-print' onclick='window.print();'>Print</button>");
-            sb.Append("</div>");
-
-            foreach (var hint in doc.Descendants("hint"))
-            {
-                if (hint.Parent != null && hint.Parent.Name != "servinfosub" && hint.Parent.Name != "procedure") continue;
-                sb.Append("<div class='hint'>");
-                foreach (var p in hint.Descendants("ptxt")) sb.AppendFormat("<p>{0}</p>", p.Value.Trim());
-                sb.Append("</div>");
-            }
-
             bool foundTarget = false;
-
-            var testgrps = new System.Collections.Generic.List<System.Xml.Linq.XElement>(doc.Descendants("testgrp"));
-            if (testgrps.Count > 0)
+            int docIdx = 0;
+            foreach (var docPair in docs)
             {
-                foreach (var testgrp in testgrps)
+                docIdx++;
+                string xmlContent = "";
+                using (var ms = new System.IO.MemoryStream(docPair.Item2))
+                using (var zip = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Read))
                 {
-                    var title = testgrp.Element("title");
-                    string titleText = title != null ? title.Value.Trim() : "";
-                    sb.Append("<div class='step-box'>");
-                    if (!string.IsNullOrEmpty(titleText)) sb.AppendFormat("<div class='step-title'>{0}</div>", titleText);
-                    RenderXmlChildren(testgrp, sb);
-                    sb.Append("</div>");
-                }
-            }
-
-            var stepgrps = new System.Collections.Generic.List<System.Xml.Linq.XElement>(doc.Descendants("stepgrp"));
-            if (stepgrps.Count > 0)
-            {
-                foreach (var grp in stepgrps)
-                {
-                    var grpTitle = grp.Element("title");
-                    if (grpTitle != null && !string.IsNullOrEmpty(grpTitle.Value.Trim()))
+                    foreach (var entry in zip.Entries)
                     {
-                        sb.AppendFormat("<h2>{0}</h2>", grpTitle.Value.Trim());
-                    }
-
-                    foreach (var child in grp.Elements())
-                    {
-                        if (child.Name == "note") RenderNote(child, sb);
-                        else if (child.Name == "caution") RenderCaution(child, sb);
-                        else if (child.Name == "warning") RenderWarning(child, sb);
-                    }
-
-                    foreach (var step in grp.Elements("procstep"))
-                    {
-                        var title = step.Element("title");
-                        string titleText = title != null ? title.Value.Trim() : "";
-                        bool isMatch = !string.IsNullOrEmpty(highlight) && titleText.IndexOf(highlight, StringComparison.OrdinalIgnoreCase) >= 0;
-
-                        string targetAttr = "";
-                        if (isMatch && !foundTarget)
+                        using (var r = new System.IO.StreamReader(entry.Open(), System.Text.Encoding.UTF8))
                         {
-                            targetAttr = " id='target'";
-                            foundTarget = true;
+                            xmlContent = r.ReadToEnd();
+                            break;
                         }
-
-                        sb.AppendFormat("<div class='step-box{0}'{1}>", isMatch ? " highlight" : "", targetAttr);
-                        if (!string.IsNullOrEmpty(titleText)) sb.AppendFormat("<div class='step-title'>{0}</div>", titleText);
-
-                        RenderXmlChildren(step, sb);
-                        sb.Append("</div>");
                     }
                 }
-            }
 
-            if (testgrps.Count == 0 && stepgrps.Count == 0)
-            {
-                sb.Append("<div class='step-box'>");
-                RenderXmlChildren(doc.Root, sb);
+                var doc = System.Xml.Linq.XDocument.Parse(xmlContent);
+                var mainTitle = doc.Root.Element("title");
+                string docTitle = mainTitle != null ? mainTitle.Value.Trim() : docPair.Item1;
+                if (string.IsNullOrEmpty(docTitle)) docTitle = "Document " + cleanId;
+
+                sb.Append("<div class='header-bar'>");
+                sb.AppendFormat("<h1>{0}</h1>", docTitle);
+                if (docIdx == 1) sb.Append("<button class='btn-print' onclick='window.print();'>Print</button>");
+                sb.Append("</div>");
+
+                sb.Append("<div class='section-box'>");
+                RenderXmlRecursive(doc.Root, sb, highlight, ref foundTarget);
                 sb.Append("</div>");
             }
 
@@ -1330,72 +1326,167 @@ static class Program
         }
     }
 
-    static void RenderXmlChildren(System.Xml.Linq.XElement parent, System.Text.StringBuilder sb)
+    static void RenderXmlRecursive(System.Xml.Linq.XElement el, System.Text.StringBuilder sb, string highlight, ref bool foundTarget)
     {
-        foreach (var el in parent.Elements())
+        string name = el.Name.LocalName;
+        if (name == "title" && el.Parent != null && el.Parent.Name.LocalName == "servinfosub") return;
+
+        if (name == "condition")
         {
-            string name = el.Name.LocalName;
-            if (name == "title") continue;
-            else if (name == "ptxt" || name == "para")
+            string condType = (string)el.Attribute("type") ?? "";
+            if (condType == "condition") sb.Append("<div class='badge-sec'>Condition / Description</div>");
+            else if (condType == "substitution") sb.Append("<div class='badge-sec'>Substitution Value</div>");
+            else if (condType == "symptom") sb.Append("<div class='badge-sec'>Fault Symptom(s)</div>");
+            foreach (var child in el.Elements()) RenderXmlRecursive(child, sb, highlight, ref foundTarget);
+        }
+        else if (name == "ps")
+        {
+            sb.Append("<div class='badge-sec'>Possible Source(s)</div>");
+            foreach (var child in el.Elements()) RenderXmlRecursive(child, sb, highlight, ref foundTarget);
+        }
+        else if (name == "testgrp")
+        {
+            var title = el.Element("title");
+            string stepTitle = title != null ? title.Value.Trim() : "";
+            sb.Append("<div class='step-box'>");
+            if (!string.IsNullOrEmpty(stepTitle)) sb.AppendFormat("<div class='step-title'>{0}</div>", stepTitle);
+            foreach (var child in el.Elements())
+            {
+                if (child.Name.LocalName == "title") continue;
+                RenderXmlRecursive(child, sb, highlight, ref foundTarget);
+            }
+            sb.Append("</div>");
+        }
+        else if (name == "stepgrp")
+        {
+            var title = el.Element("title");
+            if (title != null && !string.IsNullOrEmpty(title.Value.Trim()))
+            {
+                sb.AppendFormat("<h2>{0}</h2>", title.Value.Trim());
+            }
+            foreach (var child in el.Elements())
+            {
+                if (child.Name.LocalName == "title") continue;
+                RenderXmlRecursive(child, sb, highlight, ref foundTarget);
+            }
+        }
+        else if (name == "procstep")
+        {
+            var title = el.Element("title");
+            string stepTitle = title != null ? title.Value.Trim() : "";
+            bool isMatch = !string.IsNullOrEmpty(highlight) && stepTitle.IndexOf(highlight, StringComparison.OrdinalIgnoreCase) >= 0;
+
+            string targetAttr = "";
+            if (isMatch && !foundTarget)
+            {
+                targetAttr = " id='target'";
+                foundTarget = true;
+            }
+
+            sb.AppendFormat("<div class='step-box{0}'{1}>", isMatch ? " highlight" : "", targetAttr);
+            if (!string.IsNullOrEmpty(stepTitle)) sb.AppendFormat("<div class='step-title'>{0}</div>", stepTitle);
+            foreach (var child in el.Elements())
+            {
+                if (child.Name.LocalName == "title") continue;
+                RenderXmlRecursive(child, sb, highlight, ref foundTarget);
+            }
+            sb.Append("</div>");
+        }
+        else if (name == "ptxt" || name == "para")
+        {
+            var xrefs = new System.Collections.Generic.List<System.Xml.Linq.XElement>(el.Descendants("xref"));
+            if (xrefs.Count > 0)
+            {
+                foreach (var xr in xrefs) RenderXref(xr, sb);
+            }
+            else
             {
                 string txt = el.Value.Trim();
                 if (!string.IsNullOrEmpty(txt)) sb.AppendFormat("<p>{0}</p>", txt);
             }
-            else if (name == "note") RenderNote(el, sb);
-            else if (name == "caution") RenderCaution(el, sb);
-            else if (name == "warning") RenderWarning(el, sb);
-            else if (name == "hint")
+        }
+        else if (name == "xref")
+        {
+            RenderXref(el, sb);
+        }
+        else if (name == "note") RenderNote(el, sb);
+        else if (name == "caution") RenderCaution(el, sb);
+        else if (name == "warning") RenderWarning(el, sb);
+        else if (name == "hint")
+        {
+            sb.Append("<div class='hint'><strong>Hint:</strong> ");
+            foreach (var p in el.Descendants("ptxt")) sb.Append(p.Value.Trim() + " ");
+            sb.Append("</div>");
+        }
+        else if (name == "question")
+        {
+            sb.AppendFormat("<div class='question-box'><strong>Action / Question:</strong> {0}</div>", el.Value.Trim());
+        }
+        else if (name == "graphic" || name == "grate")
+        {
+            foreach (var href in el.Descendants("href"))
             {
-                sb.Append("<div class='hint'><strong>Hint:</strong> ");
-                foreach (var p in el.Descendants("ptxt")) sb.Append(p.Value.Trim() + " ");
-                sb.Append("</div>");
-            }
-            else if (name == "question")
-            {
-                sb.AppendFormat("<div class='question-box'><strong>Question / Action:</strong> {0}</div>", el.Value.Trim());
-            }
-            else if (name == "graphic" || name == "grate")
-            {
-                var href = el.Descendants("href").GetEnumerator();
-                if (href.MoveNext() && href.Current != null && !string.IsNullOrEmpty(href.Current.Value))
+                if (!string.IsNullOrEmpty(href.Value))
                 {
-                    string imgTag = GetImageTag(href.Current.Value.Trim());
+                    string imgTag = GetImageTag(href.Value.Trim());
                     if (!string.IsNullOrEmpty(imgTag)) sb.Append(imgTag);
                 }
-                var graphtext = el.Element("graphtext");
-                if (graphtext != null) RenderXmlChildren(graphtext, sb);
             }
-            else if (name == "list1" || name == "list2")
+            var graphtext = el.Element("graphtext");
+            if (graphtext != null) RenderXmlRecursive(graphtext, sb, highlight, ref foundTarget);
+        }
+        else if (name == "list1" || name == "list2")
+        {
+            var listTitle = el.Element("title");
+            if (listTitle != null) sb.AppendFormat("<h3>{0}</h3>", listTitle.Value.Trim());
+            sb.Append("<ul>");
+            foreach (var item in el.Elements("item"))
             {
-                var listTitle = el.Element("title");
-                if (listTitle != null) sb.AppendFormat("<h3 style='margin-bottom:4px;'>{0}</h3>", listTitle.Value.Trim());
-                sb.Append("<ul>");
-                foreach (var item in el.Elements("item"))
+                sb.Append("<li>");
+                var xrefs = new System.Collections.Generic.List<System.Xml.Linq.XElement>(item.Descendants("xref"));
+                if (xrefs.Count > 0)
                 {
-                    sb.Append("<li>");
+                    foreach (var xr in xrefs) RenderXref(xr, sb);
+                }
+                else
+                {
                     foreach (var p in item.Descendants("ptxt")) sb.Append(p.Value.Trim() + " ");
-                    sb.Append("</li>");
                 }
-                sb.Append("</ul>");
+                sb.Append("</li>");
             }
-            else if (name == "table1" || name == "table")
+            sb.Append("</ul>");
+        }
+        else if (name == "table1" || name == "table")
+        {
+            sb.Append("<table>");
+            foreach (var row in el.Descendants("row"))
             {
-                sb.Append("<table>");
-                foreach (var row in el.Descendants("row"))
+                sb.Append("<tr>");
+                foreach (var entry in row.Elements("entry"))
                 {
-                    sb.Append("<tr>");
-                    foreach (var entry in row.Elements("entry"))
-                    {
-                        sb.AppendFormat("<td>{0}</td>", entry.Value.Trim());
-                    }
-                    sb.Append("</tr>");
+                    sb.AppendFormat("<td>{0}</td>", entry.Value.Trim());
                 }
-                sb.Append("</table>");
+                sb.Append("</tr>");
             }
-            else if (name == "node" || name == "test1" || name == "test2" || name == "procedure")
+            sb.Append("</table>");
+        }
+        else
+        {
+            foreach (var child in el.Elements())
             {
-                RenderXmlChildren(el, sb);
+                RenderXmlRecursive(child, sb, highlight, ref foundTarget);
             }
+        }
+    }
+
+    static void RenderXref(System.Xml.Linq.XElement xref, System.Text.StringBuilder sb)
+    {
+        foreach (var href in xref.Descendants("href"))
+        {
+            string linkTitle = (string)href.Attribute("title") ?? "";
+            string target = href.Value != null ? href.Value.Trim() : "";
+            if (string.IsNullOrEmpty(linkTitle)) linkTitle = target;
+            sb.AppendFormat("<div style='margin:4px 0;'><a class='doc-link' href='vida-doc:{0}'>🔗 {1}</a></div>", target, linkTitle);
         }
     }
 
@@ -1518,6 +1609,23 @@ static class Program
                 if (wb != null)
                 {
                     wb.ScriptErrorsSuppressed = true;
+
+                    // Support in-document link navigation
+                    wb.Navigating += (sNav, eNav) =>
+                    {
+                        try
+                        {
+                            string url = eNav.Url != null ? eNav.Url.ToString() : "";
+                            if (url.StartsWith("vida-doc:", StringComparison.OrdinalIgnoreCase))
+                            {
+                                eNav.Cancel = true;
+                                string targetId = url.Substring("vida-doc:".Length);
+                                wb.DocumentText = RenderDocumentHtml(targetId, null);
+                            }
+                        }
+                        catch {}
+                    };
+
                     if (!string.IsNullOrEmpty(ieId))
                     {
                         string html = RenderDocumentHtml(ieId, null);
@@ -4113,6 +4221,23 @@ static class Program
                 WebBrowser wb = new WebBrowser();
                 wb.Dock = DockStyle.Fill;
                 wb.ScriptErrorsSuppressed = true;
+
+                wb.Navigating += (sNav, eNav) =>
+                {
+                    try
+                    {
+                        string url = eNav.Url != null ? eNav.Url.ToString() : "";
+                        if (url.StartsWith("vida-doc:", StringComparison.OrdinalIgnoreCase))
+                        {
+                            eNav.Cancel = true;
+                            string targetId = url.Substring("vida-doc:".Length);
+                            string subTitle = GetDocumentTitle(targetId);
+                            if (!string.IsNullOrEmpty(subTitle)) docForm.Text = "VIDA Document: " + subTitle;
+                            wb.DocumentText = RenderDocumentHtml(targetId, null);
+                        }
+                    }
+                    catch {}
+                };
 
                 string html = RenderDocumentHtml(docId, lastSelectedParameter);
                 wb.DocumentText = html;
