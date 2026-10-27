@@ -396,7 +396,8 @@ namespace IsoViewStub
             {
                 if (hit != null)
                 {
-                    HsHit(1, 0, hit.Id, "", "");
+                    string id = hit.Id != null && hit.Id.StartsWith("_") ? hit.Id.Substring(1) : hit.Id;
+                    HsHit(1, 0, id, "", "");
                 }
                 else
                 {

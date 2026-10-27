@@ -642,6 +642,137 @@ static class Program
                                 }
                             }
                         }
+
+                        // Setup simulated live vehicle sensor model when disconnected from DiCE
+                        FieldInfo wfField = vcForm.GetType().GetField("_vehicleCommunicationWf", BindingFlags.NonPublic | BindingFlags.Instance);
+                        object wf = wfField != null ? wfField.GetValue(vcForm) : null;
+                        Control vcCtrl = vcForm as Control;
+                        if (vcCtrl != null && vcCtrl.Tag == null && wf != null)
+                        {
+                            vcCtrl.Tag = "sim_active";
+                            var simTimer = new System.Windows.Forms.Timer();
+                            simTimer.Interval = 1000;
+                            var rnd = new Random();
+                            var simStates = new Dictionary<string, double>(StringComparer.OrdinalIgnoreCase);
+
+                            simTimer.Tick += (sSim, eSim) => {
+                                try
+                                {
+                                    PropertyInfo piToRead = wf.GetType().GetProperty("ParametersToRead");
+                                    if (piToRead == null) return;
+                                    ICollection toRead = piToRead.GetValue(wf, null) as ICollection;
+                                    if (toRead == null || toRead.Count == 0) return;
+
+                                    FieldInfo evField = wf.GetType().GetField("OnParameterRead", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (evField == null) return;
+                                    MulticastDelegate del = evField.GetValue(wf) as MulticastDelegate;
+                                    if (del == null) return;
+
+                                    Type resType = typeof(Vcc.Vida.DiagSwdl.Workflow.VehicleCommunication.ReadParameterResult);
+
+                                    foreach (object item in toRead)
+                                    {
+                                        PropertyInfo piName = item.GetType().GetProperty("LongName");
+                                        PropertyInfo piShort = item.GetType().GetProperty("ShortName");
+                                        PropertyInfo piUnit = item.GetType().GetProperty("Unit");
+                                        PropertyInfo piMin = item.GetType().GetProperty("PlotterMin");
+                                        PropertyInfo piMax = item.GetType().GetProperty("PlotterMax");
+
+                                        string longName = piName != null ? (string)piName.GetValue(item, null) : "";
+                                        string shortName = piShort != null ? (string)piShort.GetValue(item, null) : "";
+                                        string unit = piUnit != null ? (string)piUnit.GetValue(item, null) : "";
+                                        double pMin = piMin != null ? Convert.ToDouble(piMin.GetValue(item, null)) : 0.0;
+                                        double pMax = piMax != null ? Convert.ToDouble(piMax.GetValue(item, null)) : 100.0;
+
+                                        string key = !string.IsNullOrEmpty(longName) ? longName : shortName;
+                                        if (string.IsNullOrEmpty(key)) continue;
+
+                                        if (!simStates.ContainsKey(key))
+                                        {
+                                            if (key.IndexOf("speed", StringComparison.OrdinalIgnoreCase) >= 0 && key.IndexOf("engine", StringComparison.OrdinalIgnoreCase) < 0)
+                                                simStates[key] = 0.0;
+                                            else if (key.IndexOf("rpm", StringComparison.OrdinalIgnoreCase) >= 0 || key.IndexOf("engine speed", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                simStates[key] = 750.0;
+                                            else if (key.IndexOf("voltage", StringComparison.OrdinalIgnoreCase) >= 0 || key.IndexOf("power supply", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                simStates[key] = 12.5;
+                                            else if (key.IndexOf("fuel pressure", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                simStates[key] = 350000.0;
+                                            else if (key.IndexOf("temperature", StringComparison.OrdinalIgnoreCase) >= 0 || key.IndexOf("ect", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                simStates[key] = 85.0;
+                                            else if (key.IndexOf("pedal", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                simStates[key] = 8.0;
+                                            else if (key.IndexOf("flow", StringComparison.OrdinalIgnoreCase) >= 0)
+                                                simStates[key] = 25.0;
+                                            else
+                                                simStates[key] = pMax > pMin ? pMin + (pMax - pMin) * 0.3 : 15.0;
+                                        }
+
+                                        double cur = simStates[key];
+                                        double val = cur;
+                                        string formattedText = "";
+
+                                        if (key.IndexOf("rpm", StringComparison.OrdinalIgnoreCase) >= 0 || key.IndexOf("engine speed", StringComparison.OrdinalIgnoreCase) >= 0)
+                                        {
+                                            cur += (rnd.NextDouble() - 0.5) * 30.0;
+                                            if (cur < 700.0) cur = 700.0;
+                                            if (cur > 820.0) cur = 820.0;
+                                            val = Math.Round(cur);
+                                            formattedText = string.Format("{0:0} {1}", val, unit);
+                                        }
+                                        else if (key.IndexOf("voltage", StringComparison.OrdinalIgnoreCase) >= 0 || key.IndexOf("power supply", StringComparison.OrdinalIgnoreCase) >= 0)
+                                        {
+                                            cur += (rnd.NextDouble() - 0.5) * 0.08;
+                                            if (cur < 12.1) cur = 12.1;
+                                            if (cur > 12.9) cur = 12.9;
+                                            val = Math.Round(cur, 2);
+                                            formattedText = string.Format("{0:0.00} {1}", val, unit);
+                                        }
+                                        else if (key.IndexOf("fuel pressure", StringComparison.OrdinalIgnoreCase) >= 0)
+                                        {
+                                            cur += (rnd.NextDouble() - 0.5) * 6000.0;
+                                            if (cur < 330000.0) cur = 330000.0;
+                                            if (cur > 370000.0) cur = 370000.0;
+                                            val = Math.Round(cur);
+                                            formattedText = string.Format("{0:0} {1}", val, unit);
+                                        }
+                                        else if (key.IndexOf("temperature", StringComparison.OrdinalIgnoreCase) >= 0 || key.IndexOf("ect", StringComparison.OrdinalIgnoreCase) >= 0)
+                                        {
+                                            cur += (rnd.NextDouble() - 0.5) * 0.2;
+                                            if (cur < 80.0) cur = 80.0;
+                                            if (cur > 92.0) cur = 92.0;
+                                            val = Math.Round(cur, 1);
+                                            formattedText = string.Format("{0:0.0} {1}", val, unit);
+                                        }
+                                        else if (key.IndexOf("pedal", StringComparison.OrdinalIgnoreCase) >= 0)
+                                        {
+                                            cur += (rnd.NextDouble() - 0.5) * 0.2;
+                                            if (cur < 7.6) cur = 7.6;
+                                            if (cur > 8.4) cur = 8.4;
+                                            val = Math.Round(cur, 1);
+                                            formattedText = string.Format("{0:0.0} {1}", val, unit);
+                                        }
+                                        else
+                                        {
+                                            double span = pMax > pMin ? (pMax - pMin) : 20.0;
+                                            cur += (rnd.NextDouble() - 0.5) * (span * 0.05);
+                                            if (pMax > pMin)
+                                            {
+                                                if (cur < pMin) cur = pMin;
+                                                if (cur > pMax) cur = pMax;
+                                            }
+                                            val = Math.Round(cur, 1);
+                                            formattedText = string.Format("{0:0.0} {1}", val, unit);
+                                        }
+                                        simStates[key] = cur;
+
+                                        object resObj = Activator.CreateInstance(resType, new object[] { val, formattedText });
+                                        del.DynamicInvoke(new object[] { item, resObj });
+                                    }
+                                }
+                                catch {}
+                            };
+                            simTimer.Start();
+                        }
                     }
                 }
             }
