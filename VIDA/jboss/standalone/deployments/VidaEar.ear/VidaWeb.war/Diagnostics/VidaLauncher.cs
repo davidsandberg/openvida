@@ -428,6 +428,7 @@ static class Program
     static Control _activeDtcRefControl = null;
     static Action<string> _onVehicleCommHotspotClicked = null;
     static Action<string> _onDtcRefHotspotClicked = null;
+    static object _cachedVehicleProfile = null;
 
     class LauncherBrowserNavigation : Vcc.Vida.DiagSwdl.UI.IBrowserNavigation
     {
@@ -854,6 +855,9 @@ static class Program
 
 
         SetFieldOrProp(s, "Profile", vehProfile);
+        SetFieldOrProp(s, "VehicleProfileObject", vehProfile);
+        SetFieldOrProp(s, "vehicleProfileObject", vehProfile);
+        SetFieldOrProp(s, "_vehicleProfileObject", vehProfile);
 
 
 
@@ -1971,6 +1975,148 @@ static class Program
         }
     }
 
+    static void LoadDtcsFromDbDirectly(Control statusTv, string ecuTypeId, string profileId)
+    {
+        if (statusTv == null) return;
+        TreeView tvEx = GetFieldValue(statusTv, "_treeViewEx") as TreeView;
+        if (tvEx == null) return;
+
+        int ecuTypeNum;
+        if (!int.TryParse(ecuTypeId, out ecuTypeNum)) return;
+
+        try
+        {
+            int variantId = 0;
+            using (var cc = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=CarCom;Integrated Security=True"))
+            {
+                cc.Open();
+                using (var cmd = new System.Data.SqlClient.SqlCommand("vadis_GetDefaultEcuVariants", cc))
+                {
+                    cmd.CommandType = System.Data.CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@profileId", profileId);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        while (r.Read())
+                        {
+                            if (Convert.ToInt32(r[0]) == ecuTypeNum)
+                            {
+                                variantId = Convert.ToInt32(r[2]);
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (variantId == 0) return;
+
+                string symptomIds = "";
+                using (var cmd2 = new System.Data.SqlClient.SqlCommand("vadis_GetDtcSymptomsForEcu", cc))
+                {
+                    cmd2.CommandType = System.Data.CommandType.StoredProcedure;
+                    cmd2.Parameters.AddWithValue("@ecuId", variantId);
+                    using (var r2 = cmd2.ExecuteReader())
+                    {
+                        while (r2.Read())
+                        {
+                            if (symptomIds.Length > 0) symptomIds += ",";
+                            symptomIds += r2[0].ToString();
+                        }
+                    }
+                }
+                if (string.IsNullOrEmpty(symptomIds)) return;
+
+                using (var rep = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=DiagSwdlRepository;Integrated Security=True"))
+                {
+                    rep.Open();
+                    using (var cmd3 = new System.Data.SqlClient.SqlCommand("GetDtcIEs", rep))
+                    {
+                        cmd3.CommandType = System.Data.CommandType.StoredProcedure;
+                        cmd3.Parameters.AddWithValue("@languageCode", "en-US");
+                        cmd3.Parameters.AddWithValue("@symptomIds", symptomIds);
+                        cmd3.Parameters.AddWithValue("@profileList", profileId);
+                        using (var r3 = cmd3.ExecuteReader())
+                        {
+                            tvEx.BeginUpdate();
+                            tvEx.Nodes.Clear();
+                            while (r3.Read())
+                            {
+                                string dispText = r3["DisplayText"].ToString();
+                                string ieId = r3["ieId"] != DBNull.Value ? r3["ieId"].ToString() : "";
+                                TreeNode dtcNode = new TreeNode(dispText);
+                                var treeIe = new Vcc.Vida.DiagSwdl.ValueObjects.Symptoms.TreeIEVO();
+                                treeIe.IEId = ieId;
+                                treeIe.Title = dispText;
+                                var nodeItem = new Vcc.Vida.DiagSwdl.UI.Components.NodeItem();
+                                nodeItem.InformationElement = treeIe;
+                                nodeItem.Text = dispText;
+                                nodeItem.ID = r3["symptomId"].ToString();
+                                nodeItem.Status = Vcc.Vida.DiagSwdl.GuiComponents.TreeNodeStatus.Document;
+                                dtcNode.Tag = nodeItem;
+                                tvEx.Nodes.Add(dtcNode);
+                            }
+                            tvEx.EndUpdate();
+                            Console.WriteLine("[Launcher] Direct loader populated " + tvEx.Nodes.Count + " DTCs into tree for ECU " + ecuTypeId);
+                        }
+                    }
+                }
+            }
+
+            try
+            {
+                MethodInfo miSetIcons = statusTv.GetType().GetMethod("SetStatusIcons", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (miSetIcons != null) miSetIcons.Invoke(statusTv, null);
+                MethodInfo miRef = statusTv.GetType().GetMethod("RefreshNodes", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (miRef != null) miRef.Invoke(statusTv, null);
+            }
+            catch {}
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[Launcher] Direct DTC loader error: " + ex.Message);
+        }
+    }
+
+    static Panel _diagnosticsMainPanel = null;
+    static Panel _manualExplorerPnl = null;
+    static Button _btnTabManuals = null;
+
+    static string GetGroupName(string key)
+    {
+        switch (key)
+        {
+            case "0": return "0 - Administration & Special Tools";
+            case "1": return "1 - Maintenance & Service Material";
+            case "2": return "2 - Engine & Equipment";
+            case "3": return "3 - Electrical System";
+            case "4": return "4 - Power Transmission (Gearbox/Clutch)";
+            case "5": return "5 - Brakes";
+            case "6": return "6 - Suspension & Steering";
+            case "7": return "7 - Springs, Shock Absorbers & Wheels";
+            case "8": return "8 - Body & Interior";
+            case "9": return "9 - Miscellaneous";
+            default: return "Other Documents";
+        }
+    }
+
+    static string LookupDocumentIdBySymptomId(int symptomId)
+    {
+        try
+        {
+            using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=DiagSwdlRepository;Integrated Security=True"))
+            {
+                conn.Open();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT TOP 1 fkIE FROM SymptomIEMap WHERE fkSymptom = @sId AND fkIE IS NOT NULL AND fkIE <> ''";
+                    cmd.Parameters.AddWithValue("@sId", symptomId);
+                    var obj = cmd.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value) return obj.ToString().Trim();
+                }
+            }
+        }
+        catch {}
+        return null;
+    }
+
     static bool _manualsTabConfigured = false;
     static void SetupWorkshopManualsTab(object mObj)
     {
@@ -1988,39 +2134,9 @@ static class Program
             Control tabPanel = GetFieldValue(refForm, "_tabPanel") as Control;
             if (tabPanel == null) return;
 
-            // Sub-nav toggle bar
-            Panel subNav = new Panel();
-            subNav.Dock = DockStyle.Top;
-            subNav.Height = 44;
-            subNav.BackColor = Color.FromArgb(240, 244, 248);
-            subNav.Padding = new Padding(12, 6, 12, 6);
-
-            Button btnDtcRef = new Button();
-            btnDtcRef.Text = "📋 DTC & Symptom Documents";
-            btnDtcRef.Size = new Size(230, 30);
-            btnDtcRef.Location = new Point(12, 7);
-            btnDtcRef.FlatStyle = FlatStyle.Flat;
-            btnDtcRef.FlatAppearance.BorderSize = 1;
-            btnDtcRef.FlatAppearance.BorderColor = Color.FromArgb(0, 102, 204);
-            btnDtcRef.BackColor = Color.FromArgb(0, 102, 204);
-            btnDtcRef.ForeColor = Color.White;
-            btnDtcRef.Font = new Font("Segoe UI", 9.25f, FontStyle.Bold);
-            btnDtcRef.Cursor = Cursors.Hand;
-
-            Button btnManuals = new Button();
-            btnManuals.Text = "📖 Workshop Service Manuals & Search";
-            btnManuals.Size = new Size(280, 30);
-            btnManuals.Location = new Point(252, 7);
-            btnManuals.FlatStyle = FlatStyle.Flat;
-            btnManuals.FlatAppearance.BorderSize = 1;
-            btnManuals.FlatAppearance.BorderColor = Color.FromArgb(180, 185, 190);
-            btnManuals.BackColor = Color.FromArgb(232, 236, 240);
-            btnManuals.ForeColor = Color.FromArgb(32, 33, 36);
-            btnManuals.Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
-            btnManuals.Cursor = Cursors.Hand;
-
-            subNav.Controls.Add(btnDtcRef);
-            subNav.Controls.Add(btnManuals);
+            Control tabCtrl = GetFieldValue(refForm, "_tab") as Control;
+            Control cscCtrl = GetFieldValue(refForm, "_customerSymptomsCSCRefInfoControl") as Control;
+            Control dtcCtrl = GetFieldValue(refForm, "_customerSymptomsDtcRefInfoControl") as Control;
 
             // Container for manual explorer
             Panel manualExplorerPnl = new Panel();
@@ -2055,44 +2171,180 @@ static class Program
             cmbGroup.Items.Add("9 - Miscellaneous");
             cmbGroup.SelectedIndex = 0;
 
-            // Quick keyword chips
-            string[] quickChips = new string[] { "Timing belt", "Alternator", "Brake pads", "Oil filter", "Clutch", "Fuses" };
-            int chipX = 805;
-            foreach (var chip in quickChips)
+            Label lblStatus = new Label { Text = "Enter query or pick a group...", AutoSize = true, Location = new Point(810, 16), Font = new Font("Segoe UI", 9f, FontStyle.Italic), ForeColor = Color.FromArgb(100, 110, 120) };
+
+            searchBar.Controls.Add(lblSearch);
+            searchBar.Controls.Add(txtSearch);
+            searchBar.Controls.Add(btnSearch);
+            searchBar.Controls.Add(cmbGroup);
+            searchBar.Controls.Add(lblStatus);
+
+            // Splitter layout for manuals: Left = Category Tree & Results, Right = Document Viewer
+            SplitContainer splitManuals = new SplitContainer();
+            splitManuals.Dock = DockStyle.Fill;
+            splitManuals.Orientation = Orientation.Vertical;
+            splitManuals.SplitterDistance = 380;
+            splitManuals.SplitterWidth = 5;
+
+            // Left side: Results TreeView
+            TreeView tvManuals = new TreeView();
+            tvManuals.Dock = DockStyle.Fill;
+            tvManuals.Font = new Font("Segoe UI", 9.5f);
+            tvManuals.ShowLines = true;
+            tvManuals.ShowPlusMinus = true;
+            tvManuals.ShowRootLines = true;
+            tvManuals.BorderStyle = BorderStyle.None;
+
+            // Right side: Document Preview Browser
+            WebBrowser wbManuals = new WebBrowser();
+            wbManuals.Dock = DockStyle.Fill;
+            wbManuals.ScriptErrorsSuppressed = true;
+
+            splitManuals.Panel1.Controls.Add(tvManuals);
+            splitManuals.Panel2.Controls.Add(wbManuals);
+
+            manualExplorerPnl.Controls.Add(splitManuals);
+            manualExplorerPnl.Controls.Add(searchBar);
+            splitManuals.BringToFront();
+
+            _manualExplorerPnl = manualExplorerPnl;
+            if (_diagnosticsMainPanel != null)
             {
-                Button btnChip = new Button { Text = chip, Location = new Point(chipX, 12), AutoSize = true, Height = 28, BackColor = Color.FromArgb(238, 242, 246), FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 8.5f), Cursor = Cursors.Hand };
-                btnChip.FlatAppearance.BorderColor = Color.FromArgb(200, 205, 210);
-                string queryText = chip;
-                btnChip.Click += (sChip, eChip) =>
-                {
-                    txtSearch.Text = queryText;
-                    cmbGroup.SelectedIndex = 0;
-                    btnSearch.PerformClick();
-                };
-                searchBar.Controls.Add(btnChip);
-                chipX += btnChip.PreferredSize.Width + 6;
+                _manualExplorerPnl.Dock = DockStyle.Fill;
+                _diagnosticsMainPanel.Controls.Add(_manualExplorerPnl);
+                _manualExplorerPnl.Visible = false;
             }
 
-            searchBar.Controls.AddRange(new Control[] { lblSearch, txtSearch, btnSearch, cmbGroup });
-            manualExplorerPnl.Controls.Add(searchBar);
+            Action<string, string> doSearchManuals = (term, grpFilter) =>
+            {
+                lblStatus.Text = "Searching...";
+                tvManuals.Nodes.Clear();
+                try
+                {
+                    using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=servicerep_en-US;Integrated Security=True"))
+                    {
+                        conn.Open();
+                        using (var cmd = conn.CreateCommand())
+                        {
+                            string sql = "SELECT TOP 100 chronicleId, title, vccNumber, version FROM Document WHERE 1=1";
+                            if (!string.IsNullOrEmpty(term))
+                            {
+                                sql += " AND (title LIKE @term OR vccNumber LIKE @term OR chronicleId LIKE @term)";
+                                cmd.Parameters.AddWithValue("@term", "%" + term.Trim() + "%");
+                            }
+                            if (!string.IsNullOrEmpty(grpFilter) && grpFilter != "All")
+                            {
+                                sql += " AND (vccNumber LIKE @grp1 OR vccNumber LIKE @grp2)";
+                                cmd.Parameters.AddWithValue("@grp1", "VCC-0" + grpFilter + "%");
+                                cmd.Parameters.AddWithValue("@grp2", "VCC-" + grpFilter + "%");
+                            }
+                            sql += " ORDER BY title ASC";
+                            cmd.CommandText = sql;
 
-            // SplitContainer
-            SplitContainer split = new SplitContainer();
-            split.Dock = DockStyle.Fill;
-            split.SplitterDistance = 420;
-            split.SplitterWidth = 6;
+                            var docs = new List<ManualDocItem>();
+                            using (var r = cmd.ExecuteReader())
+                            {
+                                while (r.Read())
+                                {
+                                    docs.Add(new ManualDocItem
+                                    {
+                                        Id = r["chronicleId"].ToString(),
+                                        Title = r["title"].ToString(),
+                                        Vcc = r["vccNumber"] != DBNull.Value ? r["vccNumber"].ToString() : "",
+                                        Version = r["version"] != DBNull.Value ? r["version"].ToString() : ""
+                                    });
+                                }
+                            }
 
-            // Left: List of documents
-            Panel leftPnl = new Panel { Dock = DockStyle.Fill };
-            ListBox lstResults = new ListBox { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.25f), ItemHeight = 24, IntegralHeight = false };
-            Label lblStatus = new Label { Dock = DockStyle.Bottom, Height = 28, Text = "Ready. Type a keyword or select a group to explore 100,000+ repair manuals.", Padding = new Padding(8, 6, 8, 6), BackColor = Color.FromArgb(245, 247, 250), ForeColor = Color.FromArgb(70, 80, 95), Font = new Font("Segoe UI", 8.75f) };
-            leftPnl.Controls.Add(lstResults);
-            leftPnl.Controls.Add(lblStatus);
-            split.Panel1.Controls.Add(leftPnl);
+                            var grouped = new SortedDictionary<string, List<ManualDocItem>>();
+                            foreach (var d in docs)
+                            {
+                                string k = "Other";
+                                if (!string.IsNullOrEmpty(d.Vcc))
+                                {
+                                    if (d.Vcc.StartsWith("VCC-0") && d.Vcc.Length > 5) k = d.Vcc.Substring(5, 1);
+                                    else if (d.Vcc.StartsWith("VCC-") && d.Vcc.Length > 4) k = d.Vcc.Substring(4, 1);
+                                }
+                                if (!grouped.ContainsKey(k)) grouped[k] = new List<ManualDocItem>();
+                                grouped[k].Add(d);
+                            }
+                            foreach (var kvp in grouped)
+                            {
+                                string grpName = GetGroupName(kvp.Key);
+                                TreeNode grpNode = new TreeNode(grpName);
+                                foreach (var d in kvp.Value)
+                                {
+                                    TreeNode docNode = new TreeNode(d.ToString());
+                                    docNode.Tag = d.Id;
+                                    grpNode.Nodes.Add(docNode);
+                                }
+                                tvManuals.Nodes.Add(grpNode);
+                                grpNode.Expand();
+                            }
+                            lblStatus.Text = string.Format("Found {0} documents", docs.Count);
+                        }
+                    }
+                }
+                catch (Exception exSrch)
+                {
+                    lblStatus.Text = "Search error: " + exSrch.Message;
+                }
+            };
 
-            // Right: WebBrowser
-            WebBrowser wbManual = new WebBrowser { Dock = DockStyle.Fill, ScriptErrorsSuppressed = true };
-            wbManual.Navigating += (sNav, eNav) =>
+            btnSearch.Click += (s, e) =>
+            {
+                string grpSel = cmbGroup.SelectedIndex > 0 ? (cmbGroup.SelectedIndex - 1).ToString() : "All";
+                doSearchManuals(txtSearch.Text, grpSel);
+            };
+
+            txtSearch.KeyDown += (s, e) =>
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    e.SuppressKeyPress = true;
+                    string grpSel = cmbGroup.SelectedIndex > 0 ? (cmbGroup.SelectedIndex - 1).ToString() : "All";
+                    doSearchManuals(txtSearch.Text, grpSel);
+                }
+            };
+
+            cmbGroup.SelectedIndexChanged += (s, e) =>
+            {
+                string grpSel = cmbGroup.SelectedIndex > 0 ? (cmbGroup.SelectedIndex - 1).ToString() : "All";
+                doSearchManuals(txtSearch.Text, grpSel);
+            };
+
+            Action<string> loadManualDoc = (docId) =>
+            {
+                if (string.IsNullOrEmpty(docId)) return;
+                try
+                {
+                    string html = RenderDocumentHtml(docId, null);
+                    wbManuals.DocumentText = html;
+                }
+                catch (Exception exDoc)
+                {
+                    wbManuals.DocumentText = "<html><body><h3>Error loading document:</h3><p>" + exDoc.Message + "</p></body></html>";
+                }
+            };
+
+            tvManuals.AfterSelect += (s, e) =>
+            {
+                if (e.Node != null && e.Node.Tag != null)
+                {
+                    loadManualDoc(e.Node.Tag.ToString());
+                }
+            };
+
+            tvManuals.NodeMouseDoubleClick += (s, e) =>
+            {
+                if (e.Node != null && e.Node.Tag != null)
+                {
+                    string docId = e.Node.Tag.ToString();
+                    ShowDocumentWindow(docId, e.Node.Text, _mainLauncherForm);
+                }
+            };
+
+            wbManuals.Navigating += (sNav, eNav) =>
             {
                 try
                 {
@@ -2101,155 +2353,14 @@ static class Program
                     {
                         eNav.Cancel = true;
                         string targetId = url.Substring("vida-doc:".Length);
-                        string html = RenderDocumentHtml(targetId, null);
-                        wbManual.DocumentText = html;
+                        loadManualDoc(targetId);
                     }
                 }
                 catch {}
             };
-            split.Panel2.Controls.Add(wbManual);
 
-            manualExplorerPnl.Controls.Add(split);
-            searchBar.BringToFront();
-
-            // Search execution
-            Action doSearch = () =>
-            {
-                string kw = txtSearch.Text.Trim();
-                int grpIdx = cmbGroup.SelectedIndex;
-
-                lstResults.Items.Clear();
-                lblStatus.Text = "Searching service repository...";
-                Application.DoEvents();
-
-                try
-                {
-                    using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=servicerep_en-US;Integrated Security=True"))
-                    {
-                        conn.Open();
-                        using (var cmd = conn.CreateCommand())
-                        {
-                            string sql = @"
-                                SELECT DISTINCT TOP 250 d.chronicleId, d.title, d.vccNumber, d.version
-                                FROM Document d
-                                WHERE 1=1 ";
-
-                            if (!string.IsNullOrEmpty(kw))
-                            {
-                                sql += " AND (d.title LIKE '%' + @kw + '%' OR d.vccNumber LIKE '%' + @kw + '%') ";
-                                cmd.Parameters.AddWithValue("@kw", kw);
-                            }
-
-                            if (grpIdx > 0)
-                            {
-                                int g = grpIdx - 1;
-                                sql += " AND EXISTS (SELECT 1 FROM TreeItemDocument tid JOIN TreeItem ti ON tid.fkTreeItem = ti.id WHERE tid.projectDocumentTo = d.projectDocumentId AND ti.functionGroup1 = " + g + ") ";
-                            }
-
-                            sql += " ORDER BY d.title";
-                            cmd.CommandText = sql;
-
-                            using (var r = cmd.ExecuteReader())
-                            {
-                                while (r.Read())
-                                {
-                                    lstResults.Items.Add(new ManualDocItem
-                                    {
-                                        Id = r["chronicleId"].ToString().Trim(),
-                                        Title = r["title"].ToString().Trim(),
-                                        Vcc = r["vccNumber"] != DBNull.Value ? r["vccNumber"].ToString().Trim() : "",
-                                        Version = r["version"] != DBNull.Value ? r["version"].ToString().Trim() : ""
-                                    });
-                                }
-                            }
-                        }
-                    }
-                    lblStatus.Text = string.Format("Found {0} document(s) matching '{1}'", lstResults.Items.Count, kw);
-                    if (lstResults.Items.Count > 0) lstResults.SelectedIndex = 0;
-                    else
-                    {
-                        wbManual.DocumentText = "<!DOCTYPE html><html><body style='font-family:Segoe UI, sans-serif; padding:30px; color:#444;'>" +
-                            "<div style='background:#f8fafc; border:1px solid #cbd5e1; border-left:4px solid #005087; padding:20px; border-radius:6px;'>" +
-                            "<h3 style='margin-top:0; color:#003057;'>No documents found</h3>" +
-                            "<p>Try searching for a different keyword or selecting 'All Function Groups'.</p>" +
-                            "</div></body></html>";
-                    }
-                }
-                catch (Exception ex)
-                {
-                    lblStatus.Text = "Search error: " + ex.Message;
-                }
-            };
-
-            btnSearch.Click += (s, e) => doSearch();
-            txtSearch.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { doSearch(); e.Handled = true; e.SuppressKeyPress = true; } };
-            cmbGroup.SelectedIndexChanged += (s, e) => doSearch();
-
-            lstResults.SelectedIndexChanged += (s, e) =>
-            {
-                var item = lstResults.SelectedItem as ManualDocItem;
-                if (item == null) return;
-                try
-                {
-                    string html = RenderDocumentHtml(item.Id, null);
-                    wbManual.DocumentText = html;
-                }
-                catch (Exception exDoc)
-                {
-                    wbManual.DocumentText = "<html><body><h3>Error loading document: " + exDoc.Message + "</h3></body></html>";
-                }
-            };
-
-            Control tabCtrl = GetFieldValue(refForm, "_tab") as Control;
-            Control cscCtrl = GetFieldValue(refForm, "_customerSymptomsCSCRefInfoControl") as Control;
-            Control dtcCtrl = GetFieldValue(refForm, "_customerSymptomsDtcRefInfoControl") as Control;
-
-            // Hook Toggle buttons with complete visibility toggling to prevent car graphic bleed-through
-            Action showManualsView = () =>
-            {
-                if (tabCtrl != null) tabCtrl.Visible = false;
-                if (tabPanel != null) tabPanel.Visible = false;
-                if (dtcCtrl != null) dtcCtrl.Visible = false;
-                if (cscCtrl != null) cscCtrl.Visible = false;
-                manualExplorerPnl.Visible = true;
-                manualExplorerPnl.BringToFront();
-                subNav.BringToFront();
-
-                btnManuals.BackColor = Color.FromArgb(0, 102, 204);
-                btnManuals.ForeColor = Color.White;
-                btnManuals.Font = new Font("Segoe UI", 9.25f, FontStyle.Bold);
-                btnDtcRef.BackColor = Color.FromArgb(232, 236, 240);
-                btnDtcRef.ForeColor = Color.FromArgb(32, 33, 36);
-                btnDtcRef.Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
-                if (lstResults.Items.Count == 0) doSearch();
-            };
-
-            Action showDtcRefView = () =>
-            {
-                manualExplorerPnl.Visible = false;
-                if (tabCtrl != null) tabCtrl.Visible = true;
-                if (tabPanel != null) tabPanel.Visible = true;
-                if (dtcCtrl != null) dtcCtrl.Visible = true;
-                if (cscCtrl != null) cscCtrl.Visible = true;
-                tabPanel.BringToFront();
-                if (tabCtrl != null) tabCtrl.BringToFront();
-                subNav.BringToFront();
-
-                btnDtcRef.BackColor = Color.FromArgb(0, 102, 204);
-                btnDtcRef.ForeColor = Color.White;
-                btnDtcRef.Font = new Font("Segoe UI", 9.25f, FontStyle.Bold);
-                btnManuals.BackColor = Color.FromArgb(232, 236, 240);
-                btnManuals.ForeColor = Color.FromArgb(32, 33, 36);
-                btnManuals.Font = new Font("Segoe UI", 9.25f, FontStyle.Regular);
-            };
-
-            btnDtcRef.Click += (s, e) => showDtcRefView();
-            btnManuals.Click += (s, e) => showManualsView();
-
-            // Add to ReferenceInformationForm
-            refForm.Controls.Add(manualExplorerPnl);
-            refForm.Controls.Add(subNav);
-            subNav.BringToFront();
+            // Initial load of service manuals
+            doSearchManuals("", "2");
 
             if (mObj != null)
             {
@@ -2261,10 +2372,12 @@ static class Program
                 }
             }
 
+            HashSet<TreeNode> expandedNodes = new HashSet<TreeNode>();
+
             Action<Control, string> wireRefInfoControl = (ctrl, ctrlTag) =>
             {
-                if (ctrl == null || ctrl.Tag as string == "wired_clicks_v2") return;
-                ctrl.Tag = "wired_clicks_v2";
+                if (ctrl == null || ctrl.Tag as string == "wired_clicks_v4") return;
+                ctrl.Tag = "wired_clicks_v4";
 
                 Control statusTv = GetFieldValue(ctrl, "_statusTreeViewControl") as Control;
                 if (statusTv == null) return;
@@ -2276,9 +2389,8 @@ static class Program
                     if (node == null) return;
 
                     // 1. NON-LEAF NODES (branches / categories with child nodes):
-                    if (node.Nodes.Count > 0)
+                    if (node.Nodes != null && node.Nodes.Count > 0)
                     {
-                        // Non-leaf categories must NEVER open documents!
                         if (isDoubleClick)
                         {
                             if (node.IsExpanded) node.Collapse();
@@ -2287,21 +2399,27 @@ static class Program
                         return;
                     }
 
-                    // 2. CSC expandable branch nodes whose children have not been loaded yet:
+                    // 2. CSC expandable root category nodes whose children have not been loaded yet:
                     object nodeTag = node.Tag;
                     string nodeId = nodeTag != null ? GetPropValue(nodeTag, "ID") as string : null;
                     object ieObj = nodeTag != null ? GetPropValue(nodeTag, "InformationElement") : null;
 
-                    int numSymptomId;
-                    if (ieObj == null && !string.IsNullOrEmpty(nodeId) && int.TryParse(nodeId, out numSymptomId))
+                    int numSymptomId = 0;
+                    bool isNumericId = !string.IsNullOrEmpty(nodeId) && int.TryParse(nodeId, out numSymptomId);
+
+                    if (isNumericId && numSymptomId < 10000 && ieObj == null && !expandedNodes.Contains(node))
                     {
-                        // Unexpanded CSC symptom folder: let VIDA populate sub-symptoms
+                        expandedNodes.Add(node);
                         try
                         {
-                            MethodInfo miClick = ctrl.GetType().GetMethod("_statusTreeViewControl_OnNodeClick", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                            if (miClick != null) miClick.Invoke(ctrl, new object[] { node });
+                            MethodInfo miDbl = ctrl.GetType().GetMethod("_statusTreeViewControl_OnNodeDoubleClick", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (miDbl != null) miDbl.Invoke(ctrl, new object[] { node });
+                            node.Expand();
                         }
-                        catch {}
+                        catch (Exception exPop)
+                        {
+                            Console.WriteLine("[Launcher] CSC populate error: " + exPop.Message);
+                        }
                         return;
                     }
 
@@ -2313,14 +2431,24 @@ static class Program
                     }
 
                     string docId = null;
-                    if (ieObj != null) docId = GetPropValue(ieObj, "IEId") as string;
+                    if (ieObj != null)
+                    {
+                        docId = GetPropValue(ieObj, "IEId") as string;
+                        if (string.IsNullOrEmpty(docId)) docId = GetPropValue(ieObj, "IeId") as string;
+                        if (string.IsNullOrEmpty(docId)) docId = GetPropValue(ieObj, "Id") as string;
+                    }
                     if (string.IsNullOrEmpty(docId) && nodeTag != null)
                     {
                         object dataObj = GetPropValue(nodeTag, "Data");
                         if (dataObj != null)
                         {
                             object dataIe = GetPropValue(dataObj, "InformationElement");
-                            if (dataIe != null) docId = GetPropValue(dataIe, "IEId") as string;
+                            if (dataIe != null)
+                            {
+                                docId = GetPropValue(dataIe, "IEId") as string;
+                                if (string.IsNullOrEmpty(docId)) docId = GetPropValue(dataIe, "IeId") as string;
+                                if (string.IsNullOrEmpty(docId)) docId = GetPropValue(dataIe, "Id") as string;
+                            }
                         }
                     }
                     if (string.IsNullOrEmpty(docId) && !string.IsNullOrEmpty(nodeId))
@@ -2328,7 +2456,10 @@ static class Program
                         if (nodeId.StartsWith("0900", StringComparison.OrdinalIgnoreCase) || nodeId.StartsWith("0800", StringComparison.OrdinalIgnoreCase))
                             docId = nodeId;
                     }
-
+                    if (string.IsNullOrEmpty(docId) && isNumericId)
+                    {
+                        docId = LookupDocumentIdBySymptomId(numSymptomId);
+                    }
                     if (string.IsNullOrEmpty(docId) && !string.IsNullOrEmpty(node.Text))
                     {
                         System.Text.RegularExpressions.Match m = System.Text.RegularExpressions.Regex.Match(node.Text, @"([A-Z]{3,4}-[A-Z0-9]{4,7})");
@@ -2337,25 +2468,39 @@ static class Program
                             string dtcCode = m.Groups[1].Value;
                             docId = LookupDocumentIdByDtcOrTitle(dtcCode);
                         }
+                        if (string.IsNullOrEmpty(docId))
+                        {
+                            docId = LookupDocumentIdByDtcOrTitle(node.Text);
+                        }
                     }
 
+                    Console.WriteLine("[Launcher] Double-clicked leaf document: " + (docId ?? "null") + " (" + node.Text + ")");
                     if (!string.IsNullOrEmpty(docId))
                     {
-                        Console.WriteLine("[Launcher] Double-clicked leaf document: " + docId + " (" + node.Text + ")");
                         ShowDocumentWindow(docId, node.Text, _mainLauncherForm);
+                    }
+                    else
+                    {
+                        Console.WriteLine("[Launcher] Could not resolve document for: " + node.Text);
                     }
                 };
 
                 var stc = statusTv as Vcc.Vida.DiagSwdl.GuiComponents.StatusTreeViewControl;
                 if (stc != null)
                 {
+                    // Clear any throwing default delegates on OnNodeDoubleClick
+                    try
+                    {
+                        FieldInfo fiDbl = stc.GetType().GetField("OnNodeDoubleClick", BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public);
+                        if (fiDbl != null) fiDbl.SetValue(stc, null);
+                    }
+                    catch {}
                     stc.OnNodeClick += (node) => handleNode(node, false);
                     stc.OnNodeDoubleClick += (node) => handleNode(node, true);
                 }
 
                 if (tvEx != null)
                 {
-                    tvEx.DoubleClick += (sTv, eTv) => { if (tvEx.SelectedNode != null) handleNode(tvEx.SelectedNode, true); };
                     tvEx.NodeMouseDoubleClick += (sTv, eTv) => handleNode(eTv.Node, true);
                 }
             };
@@ -2366,11 +2511,35 @@ static class Program
             _refFormCtrl = refForm;
             _activeDtcRefControl = dtcCtrl;
 
-            if (dtcCtrl != null && dtcCtrl.Tag as string != "dtc_configured_v2")
+            // Ensure cached VehicleProfile is populated into ReferenceInformationForm and its controllers
+            if (_cachedVehicleProfile != null)
             {
-                dtcCtrl.Tag = "dtc_configured_v2";
+                object refWs = GetFieldValue(refForm, "_workshopSession");
+                if (refWs != null)
+                {
+                    SetFieldOrProp(refWs, "VehicleProfileObject", _cachedVehicleProfile);
+                    SetFieldOrProp(refWs, "_vehicleProfileObject", _cachedVehicleProfile);
+                }
+                if (dtcCtrl != null)
+                {
+                    object ws = GetFieldValue(dtcCtrl, "_workshopSession");
+                    if (ws != null) { SetFieldOrProp(ws, "VehicleProfileObject", _cachedVehicleProfile); SetFieldOrProp(ws, "_vehicleProfileObject", _cachedVehicleProfile); }
+                    object wf = GetFieldValue(dtcCtrl, "_dtcFaulttraceWF");
+                    if (wf != null) { object wfWs = GetFieldValue(wf, "_workshopSession"); if (wfWs != null) { SetFieldOrProp(wfWs, "VehicleProfileObject", _cachedVehicleProfile); SetFieldOrProp(wfWs, "_vehicleProfileObject", _cachedVehicleProfile); } }
+                }
+                if (cscCtrl != null)
+                {
+                    object ws = GetFieldValue(cscCtrl, "_workshopSession");
+                    if (ws != null) { SetFieldOrProp(ws, "VehicleProfileObject", _cachedVehicleProfile); SetFieldOrProp(ws, "_vehicleProfileObject", _cachedVehicleProfile); }
+                    object wf = GetFieldValue(cscCtrl, "_dtcFaulttraceWF");
+                    if (wf != null) { object wfWs = GetFieldValue(wf, "_workshopSession"); if (wfWs != null) { SetFieldOrProp(wfWs, "VehicleProfileObject", _cachedVehicleProfile); SetFieldOrProp(wfWs, "_vehicleProfileObject", _cachedVehicleProfile); } }
+                }
+            }
 
-                // Cleanly place ECU selector on dtcCtrl without disrupting _navImage layout
+            if (dtcCtrl != null && dtcCtrl.Tag as string != "dtc_configured_v4")
+            {
+                dtcCtrl.Tag = "dtc_configured_v4";
+
                 Label lblEcuTitle = new Label { Text = "ECU Module:", AutoSize = true, Location = new Point(400, 68), Font = new Font("Segoe UI", 9.5f, FontStyle.Bold), ForeColor = Color.FromArgb(0, 48, 87) };
                 ComboBox cbDtcEcu = new ComboBox { Location = new Point(495, 65), Width = 280, DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5f) };
 
@@ -2407,6 +2576,48 @@ static class Program
                     cbDtcEcu.Items.Add(item.Item2);
                 }
 
+                Action<string, string> loadDtcForEcu = (ecuTypeId, ecuName) =>
+                {
+                    if (dtcCtrl == null) return;
+                    Console.WriteLine("[Launcher] DTC Ref Info: Loading ECU " + ecuName + " (" + ecuTypeId + ")");
+
+                    if (_cachedVehicleProfile != null)
+                    {
+                        object ws = GetFieldValue(dtcCtrl, "_workshopSession");
+                        if (ws != null) { SetFieldOrProp(ws, "VehicleProfileObject", _cachedVehicleProfile); SetFieldOrProp(ws, "_vehicleProfileObject", _cachedVehicleProfile); }
+                        object wf = GetFieldValue(dtcCtrl, "_dtcFaulttraceWF");
+                        if (wf != null) { object wfWs = GetFieldValue(wf, "_workshopSession"); if (wfWs != null) { SetFieldOrProp(wfWs, "VehicleProfileObject", _cachedVehicleProfile); SetFieldOrProp(wfWs, "_vehicleProfileObject", _cachedVehicleProfile); } }
+                    }
+
+                    bool loaded = false;
+                    try
+                    {
+                        MethodInfo miNav = dtcCtrl.GetType().GetMethod("_navImage_HotspotClicked", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (miNav != null)
+                        {
+                            var navArgs = new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(ecuTypeId, 1);
+                            miNav.Invoke(dtcCtrl, new object[] { dtcCtrl, navArgs });
+                        }
+                    }
+                    catch (Exception exNav)
+                    {
+                        Console.WriteLine("[Launcher] DTC _navImage_HotspotClicked: " + exNav.Message);
+                    }
+
+                    Control statusTv = GetFieldValue(dtcCtrl, "_statusTreeViewControl") as Control;
+                    TreeView tvEx = statusTv != null ? GetFieldValue(statusTv, "_treeViewEx") as TreeView : null;
+                    if (tvEx != null && tvEx.Nodes.Count > 0)
+                    {
+                        loaded = true;
+                        Console.WriteLine("[Launcher] Volvo WF populated " + tvEx.Nodes.Count + " nodes for ECU " + ecuTypeId);
+                    }
+
+                    if (!loaded && statusTv != null)
+                    {
+                        LoadDtcsFromDbDirectly(statusTv, ecuTypeId, TargetProfile);
+                    }
+                };
+
                 bool updatingDtcEcu = false;
                 Action<string> selectDtcEcuById = (targetId) =>
                 {
@@ -2417,6 +2628,7 @@ static class Program
                             updatingDtcEcu = true;
                             cbDtcEcu.SelectedIndex = k;
                             updatingDtcEcu = false;
+                            loadDtcForEcu(targetId, dtcEcuList[k].Item2);
                             break;
                         }
                     }
@@ -2428,19 +2640,8 @@ static class Program
                     if (cbDtcEcu.SelectedIndex >= 0 && cbDtcEcu.SelectedIndex < dtcEcuList.Length)
                     {
                         string selId = dtcEcuList[cbDtcEcu.SelectedIndex].Item1;
-                        Console.WriteLine("[Launcher] DTC Ref Info: ECU selected " + dtcEcuList[cbDtcEcu.SelectedIndex].Item2 + " (" + selId + ")");
-                        try
-                        {
-                            MethodInfo miNav = dtcCtrl.GetType().GetMethod("_navImage_HotspotClicked", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                            if (miNav != null)
-                            {
-                                miNav.Invoke(dtcCtrl, new object[] { dtcCtrl, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(selId, 1) });
-                            }
-                        }
-                        catch (Exception exNav)
-                        {
-                            Console.WriteLine("[Launcher] DTC _navImage_HotspotClicked error: " + exNav.Message);
-                        }
+                        string selName = dtcEcuList[cbDtcEcu.SelectedIndex].Item2;
+                        loadDtcForEcu(selId, selName);
                     }
                 };
 
@@ -2449,24 +2650,56 @@ static class Program
                 lblEcuTitle.BringToFront();
                 cbDtcEcu.BringToFront();
 
-                // Register hotspot handler for DTC control
                 _onDtcRefHotspotClicked = (clickedId) =>
                 {
                     Console.WriteLine("[Launcher] DTC Ref Info hotspot clicked for ECU: " + clickedId);
                     selectDtcEcuById(clickedId);
-                    try
-                    {
-                        MethodInfo miNav = dtcCtrl.GetType().GetMethod("_navImage_HotspotClicked", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                        if (miNav != null)
-                        {
-                            miNav.Invoke(dtcCtrl, new object[] { dtcCtrl, new Vcc.Vida.DiagSwdl.UI.Components.NavImageEventArgs(clickedId, 1) });
-                        }
-                    }
-                    catch (Exception exNav)
-                    {
-                        Console.WriteLine("[Launcher] DTC hotspot dispatch error: " + exNav.Message);
-                    }
                 };
+
+                // Hook tab switching to auto-load DTCs when DTC tab becomes active
+                if (tabCtrl != null)
+                {
+                    Control dtcTab = GetFieldValue(refForm, "_dtcBasedRefInfoTab") as Control;
+                    var ftc = tabCtrl as Vcc.Vida.DiagSwdl.GuiComponents.FlatTabControl;
+                    if (ftc != null)
+                    {
+                        ftc.SelectedTabChanged += (newPage, oldPage) =>
+                        {
+                            try
+                            {
+                                if (newPage == dtcTab)
+                                {
+                                    Console.WriteLine("[Launcher] Switched to DTC Reference Information Tab");
+                                    if (cbDtcEcu.SelectedIndex < 0) cbDtcEcu.SelectedIndex = 0;
+                                    else
+                                    {
+                                        string selId = dtcEcuList[cbDtcEcu.SelectedIndex].Item1;
+                                        string selName = dtcEcuList[cbDtcEcu.SelectedIndex].Item2;
+                                        loadDtcForEcu(selId, selName);
+                                    }
+                                }
+                            }
+                            catch {}
+                        };
+                    }
+                    else if (tabCtrl is TabControl)
+                    {
+                        ((TabControl)tabCtrl).SelectedIndexChanged += (sTab, eTab) =>
+                        {
+                            try
+                            {
+                                if (cbDtcEcu.SelectedIndex < 0) cbDtcEcu.SelectedIndex = 0;
+                                else
+                                {
+                                    string selId = dtcEcuList[cbDtcEcu.SelectedIndex].Item1;
+                                    string selName = dtcEcuList[cbDtcEcu.SelectedIndex].Item2;
+                                    loadDtcForEcu(selId, selName);
+                                }
+                            }
+                            catch {}
+                        };
+                    }
+                }
 
                 // Auto-select ECM initially so Related DTCs are immediately loaded
                 if (cbDtcEcu.Items.Count > 0)
@@ -2476,6 +2709,8 @@ static class Program
             }
 
             RegisterDummyIsoViewHotspot();
+            _manualsTabConfigured = true;
+RegisterDummyIsoViewHotspot();
             _manualsTabConfigured = true;
             Console.WriteLine("[Launcher] Successfully embedded Workshop Service Manuals Explorer into ReferenceInformationForm!");
         }
@@ -3128,13 +3363,17 @@ static class Program
 
         topBar.Controls.Add(btnTabRefInfo);
 
+        Button btnTabManuals = new Button();
+        btnTabManuals.Text = "📚 SERVICE MANUALS";
+        btnTabManuals.SetBounds(795, 38, 175, 30);
+        btnTabManuals.FlatStyle = FlatStyle.Flat;
+        btnTabManuals.FlatAppearance.BorderSize = 1;
+        btnTabManuals.FlatAppearance.BorderColor = Color.FromArgb(180, 185, 190);
+        btnTabManuals.Cursor = Cursors.Hand;
+        topBar.Controls.Add(btnTabManuals);
+        _btnTabManuals = btnTabManuals;
 
-
-
-
-
-
-        Button[] tabButtons = new Button[] { btnTabVehProfile, btnTabFaultTrace, btnTabNetwork, btnTabVehComm, btnTabRefInfo };
+        Button[] tabButtons = new Button[] { btnTabVehProfile, btnTabFaultTrace, btnTabNetwork, btnTabVehComm, btnTabRefInfo, btnTabManuals };
 
 
 
@@ -3294,11 +3533,11 @@ static class Program
 
 
 
-        btnTabVehProfile.Click += (s, e) => { switchTab("_vehicleInfoButton_Click"); setActiveTabButton(btnTabVehProfile); };
+        btnTabVehProfile.Click += (s, e) => { if (_manualExplorerPnl != null) _manualExplorerPnl.Visible = false; switchTab("_vehicleInfoButton_Click"); setActiveTabButton(btnTabVehProfile); };
 
 
 
-        btnTabFaultTrace.Click += (s, e) => {
+        btnTabFaultTrace.Click += (s, e) => { if (_manualExplorerPnl != null) _manualExplorerPnl.Visible = false;
 
 
 
@@ -3402,11 +3641,11 @@ static class Program
 
 
 
-        btnTabNetwork.Click += (s, e) => { switchTab("_networkStatusButton_Click"); setActiveTabButton(btnTabNetwork); };
+        btnTabNetwork.Click += (s, e) => { if (_manualExplorerPnl != null) _manualExplorerPnl.Visible = false; switchTab("_networkStatusButton_Click"); setActiveTabButton(btnTabNetwork); };
 
 
 
-        btnTabVehComm.Click += (s, e) => {
+        btnTabVehComm.Click += (s, e) => { if (_manualExplorerPnl != null) _manualExplorerPnl.Visible = false;
 
 
 
@@ -4988,7 +5227,41 @@ static class Program
 
 
 
-        btnTabRefInfo.Click += (s, e) => { switchTab("_referenceInformationButton_Click"); setActiveTabButton(btnTabRefInfo); };
+        btnTabRefInfo.Click += (s, e) => {
+            if (_manualExplorerPnl != null) _manualExplorerPnl.Visible = false;
+            switchTab("_referenceInformationButton_Click");
+            setActiveTabButton(btnTabRefInfo);
+        };
+
+        btnTabManuals.Click += (s, e) => {
+            try
+            {
+                Type mType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticManager");
+                object mObj = mType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+                if (!_manualsTabConfigured)
+                {
+                    SetupWorkshopManualsTab(mObj);
+                }
+                if (_manualExplorerPnl != null && mObj != null)
+                {
+                    Control workArea = GetFieldValue(mObj, "_workAreaPanel") as Control;
+                    if (workArea != null)
+                    {
+                        workArea.Controls.Clear();
+                        _manualExplorerPnl.Dock = DockStyle.Fill;
+                        workArea.Controls.Add(_manualExplorerPnl);
+                        _manualExplorerPnl.Visible = true;
+                        _manualExplorerPnl.BringToFront();
+                        Console.WriteLine("[Launcher] Placed _manualExplorerPnl into _workAreaPanel successfully!");
+                    }
+                }
+            }
+            catch (Exception exMan)
+            {
+                Console.WriteLine("[Launcher] Error opening Service Manuals: " + exMan);
+            }
+            setActiveTabButton(btnTabManuals);
+        };
 
 
 
@@ -5001,6 +5274,7 @@ static class Program
 
 
         var diag = new DiagnosticMainForm();
+        _diagnosticsMainPanel = diag.GetType().GetField("_mainPanel", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(diag) as Panel;
 
 
 
@@ -5201,6 +5475,7 @@ static class Program
 
 
         vehProfile = Activator.CreateInstance(vpType, new object[] { TargetProfile });
+        _cachedVehicleProfile = vehProfile;
 
 
 
@@ -7870,26 +8145,55 @@ static class Program
 
 
 
-                        case 5:
+                                                case 5:
+                            captureTab("Reference Info CSC", "launcher_test_refinfo.png");
+                            captureTab("Reference Info CSC", "launcher_test_refinfo_csc.png");
+                            Console.WriteLine("[Launcher] Step 5 complete. Switching to DTC-based Reference Information...");
+                            try
+                            {
+                                if (_refFormCtrl != null)
+                                {
+                                    var tabCtrl = GetFieldValue(_refFormCtrl, "_tab");
+                                    var ftc = tabCtrl as Vcc.Vida.DiagSwdl.GuiComponents.FlatTabControl;
+                                    if (ftc != null)
+                                    {
+                                        Control dtcTab = GetFieldValue(_refFormCtrl, "_dtcBasedRefInfoTab") as Control;
+                                        if (dtcTab is Vcc.Vida.DiagSwdl.GuiComponents.FlatTabPage)
+                                        {
+                                            ftc.SelectedTab = (Vcc.Vida.DiagSwdl.GuiComponents.FlatTabPage)dtcTab;
+                                            Console.WriteLine("[Launcher] Successfully selected DTC Reference tab!");
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception exTab)
+                            {
+                                Console.WriteLine("[Launcher] Error switching to DTC tab in test: " + exTab.Message);
+                            }
+                            break;
 
+                        case 6:
+                            captureTab("Reference Info DTC", "launcher_test_refinfo_dtc.png");
+                            Console.WriteLine("[Launcher] Step 6 complete. Switching to Service Manuals tab...");
+                            try
+                            {
+                                if (_btnTabManuals != null)
+                                {
+                                    _btnTabManuals.PerformClick();
+                                    Console.WriteLine("[Launcher] Clicked Service Manuals button!");
+                                }
+                            }
+                            catch (Exception exMan)
+                            {
+                                Console.WriteLine("[Launcher] Error opening Service Manuals tab: " + exMan.Message);
+                            }
+                            break;
 
-
-                            captureTab("Reference Info", "launcher_test_refinfo.png");
-
-
-
+                        case 7:
+                            captureTab("Workshop Service Manuals", "launcher_test_manuals.png");
                             seqTimer.Stop();
-
-
-
-                            Console.WriteLine("[Launcher] All tabs captured successfully! Exiting test...");
-
-
-
+                            Console.WriteLine("[Launcher] All tabs, Reference Info, and Service Manuals captured successfully! Exiting test...");
                             Application.Exit();
-
-
-
                             break;
 
 
