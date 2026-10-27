@@ -2403,6 +2403,8 @@ static class Program
                     object nodeTag = node.Tag;
                     string nodeId = nodeTag != null ? GetPropValue(nodeTag, "ID") as string : null;
                     object ieObj = nodeTag != null ? GetPropValue(nodeTag, "InformationElement") : null;
+                    object statusObj = nodeTag != null ? GetPropValue(nodeTag, "Status") : null;
+                    int nodeStatus = statusObj != null ? Convert.ToInt32(statusObj) : -1;
 
                     int numSymptomId = 0;
                     bool isNumericId = !string.IsNullOrEmpty(nodeId) && int.TryParse(nodeId, out numSymptomId);
@@ -2423,6 +2425,22 @@ static class Program
                         return;
                     }
 
+                    // Ignore category folder headers that have no items (e.g. no DTCs or procedures for this symptom)
+                    bool isKnownCategoryTitle = !string.IsNullOrEmpty(node.Text) && (
+                        node.Text == "Diagnostic Trouble Codes and Associated Procedures"
+                        || node.Text == "Symptom Related Diagnostic Procedures"
+                        || node.Text == "Symptom Verifications"
+                        || node.Text.StartsWith("6.") || node.Text.StartsWith("7.")
+                    );
+                    if (isKnownCategoryTitle || (nodeStatus != 4 && ieObj == null && !isNumericId))
+                    {
+                        if (isDoubleClick)
+                        {
+                            Console.WriteLine("[Launcher] Category folder clicked with no sub-items: " + node.Text);
+                        }
+                        return;
+                    }
+
                     // 3. ACTUAL LEAF NODES (documents / DTCs):
                     // Documents must ONLY open on DOUBLE-CLICK! Single click is navigation only.
                     if (!isDoubleClick)
@@ -2436,6 +2454,8 @@ static class Program
                         docId = GetPropValue(ieObj, "IEId") as string;
                         if (string.IsNullOrEmpty(docId)) docId = GetPropValue(ieObj, "IeId") as string;
                         if (string.IsNullOrEmpty(docId)) docId = GetPropValue(ieObj, "Id") as string;
+                        if (string.IsNullOrEmpty(docId)) docId = GetFieldValue(ieObj, "_ieId") as string;
+                        if (string.IsNullOrEmpty(docId)) docId = GetFieldValue(ieObj, "ieId") as string;
                     }
                     if (string.IsNullOrEmpty(docId) && nodeTag != null)
                     {
@@ -2448,6 +2468,8 @@ static class Program
                                 docId = GetPropValue(dataIe, "IEId") as string;
                                 if (string.IsNullOrEmpty(docId)) docId = GetPropValue(dataIe, "IeId") as string;
                                 if (string.IsNullOrEmpty(docId)) docId = GetPropValue(dataIe, "Id") as string;
+                                if (string.IsNullOrEmpty(docId)) docId = GetFieldValue(dataIe, "_ieId") as string;
+                                if (string.IsNullOrEmpty(docId)) docId = GetFieldValue(dataIe, "ieId") as string;
                             }
                         }
                     }
