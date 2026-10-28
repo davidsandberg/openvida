@@ -35,6 +35,8 @@ using System.Data;
 using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
+using Microsoft.Web.WebView2.WinForms;
+using Microsoft.Web.WebView2.Core;
 
 
 
@@ -4898,6 +4900,7 @@ static Panel _diagnosticsMainPanel = null;
     static WiringDiagramsTabControl _wiringDiagramsPnl = null;
     static Button _btnTabWiring = null;
     static bool _wiringTabConfigured = false;
+    static Microsoft.Web.WebView2.WinForms.WebView2 _ewdWebView = null;
 
 
 
@@ -7810,15 +7813,15 @@ RegisterDummyIsoViewHotspot();
             ComboBox cboPub = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Location = new Point(328, 13), Width = 260, Font = new Font("Segoe UI", 9.0f) };
             headerPnl.Controls.Add(cboPub);
 
-            Button btnOpenPdf = new Button { Text = "📖 Open PDF Book", Location = new Point(598, 12), Width = 150, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand };
+            Button btnOpenPdf = new Button { Text = "📖 Schematics (PDF)", Location = new Point(598, 12), Width = 150, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand };
             btnOpenPdf.FlatAppearance.BorderSize = 0;
             headerPnl.Controls.Add(btnOpenPdf);
 
-            Button btnOpenLop = new Button { Text = "Component Locations (LOP)", Location = new Point(756, 12), Width = 165, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(43, 87, 154), ForeColor = Color.White, Cursor = Cursors.Hand };
+            Button btnOpenLop = new Button { Text = "📍 Component Locations", Location = new Point(756, 12), Width = 170, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(43, 87, 154), ForeColor = Color.White, Cursor = Cursors.Hand };
             btnOpenLop.FlatAppearance.BorderSize = 0;
             headerPnl.Controls.Add(btnOpenLop);
 
-            Button btnBrowser = new Button { Text = "🌐 External Browser", Location = new Point(929, 12), Width = 145, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(225, 230, 236), ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
+            Button btnBrowser = new Button { Text = "🌐 External Window", Location = new Point(934, 12), Width = 145, Height = 28, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(225, 230, 236), ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
             btnBrowser.FlatAppearance.BorderSize = 1;
             btnBrowser.FlatAppearance.BorderColor = Color.FromArgb(190, 195, 202);
             headerPnl.Controls.Add(btnBrowser);
@@ -7844,6 +7847,26 @@ RegisterDummyIsoViewHotspot();
             TextBox txtSearch = new TextBox { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.5f) };
             pnlSearch.Controls.Add(txtSearch);
             splitMain.Panel1.Controls.Add(pnlSearch);
+
+            // Bottom detail panel
+            Panel pnlDetail = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Padding = new Padding(6, 6, 6, 6) };
+            Button btnFindPdf = new Button { Text = "Locate in PDF", Dock = DockStyle.Right, Width = 105, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand };
+            btnFindPdf.FlatAppearance.BorderSize = 0;
+            pnlDetail.Controls.Add(btnFindPdf);
+
+            Panel spcDetail = new Panel { Dock = DockStyle.Right, Width = 6 };
+            pnlDetail.Controls.Add(spcDetail);
+
+            Button btnCopyCode = new Button { Text = "Copy ID", Dock = DockStyle.Right, Width = 75, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 243, 246), ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
+            btnCopyCode.FlatAppearance.BorderColor = Color.FromArgb(180, 185, 190);
+            pnlDetail.Controls.Add(btnCopyCode);
+
+            Label lblSelComp = new Label { Text = "Select a component above to view details", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 40, 50) };
+            pnlDetail.Controls.Add(lblSelComp);
+            lblSelComp.BringToFront();
+
+            splitMain.Panel1.Controls.Add(pnlDetail);
+            pnlDetail.BringToFront();
 
             DataGridView dgvComponents = new DataGridView();
             dgvComponents.Dock = DockStyle.Fill;
@@ -7875,56 +7898,29 @@ RegisterDummyIsoViewHotspot();
             colDesc.DefaultCellStyle.ForeColor = Color.FromArgb(30, 40, 50);
             dgvComponents.Columns.Add(colDesc);
 
-            // Bottom detail panel
-            Panel pnlDetail = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Padding = new Padding(6, 6, 6, 6) };
-            Button btnFindPdf = new Button { Text = "Locate in PDF", Dock = DockStyle.Right, Width = 105, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand };
-            btnFindPdf.FlatAppearance.BorderSize = 0;
-            pnlDetail.Controls.Add(btnFindPdf);
-
-            Panel spcDetail = new Panel { Dock = DockStyle.Right, Width = 6 };
-            pnlDetail.Controls.Add(spcDetail);
-
-            Button btnCopyCode = new Button { Text = "Copy ID", Dock = DockStyle.Right, Width = 75, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 243, 246), ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
-            btnCopyCode.FlatAppearance.BorderColor = Color.FromArgb(180, 185, 190);
-            pnlDetail.Controls.Add(btnCopyCode);
-
-            Label lblSelComp = new Label { Text = "Select a component above to view details", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 40, 50) };
-            pnlDetail.Controls.Add(lblSelComp);
-            lblSelComp.BringToFront();
-
-            splitMain.Panel1.Controls.Add(pnlDetail);
-            pnlDetail.BringToFront();
-
             splitMain.Panel1.Controls.Add(dgvComponents);
             dgvComponents.BringToFront();
 
-            // Panel2: Right Panel (Embedded Browser & Navigation Bar)
+            // Panel2: Right Panel (Embedded Modern Edge WebView2 & Navigation Bar)
             Panel pnlWebNav = new Panel { Dock = DockStyle.Top, Height = 36, BackColor = Color.FromArgb(245, 247, 250), BorderStyle = BorderStyle.FixedSingle, Padding = new Padding(4) };
 
-            Button btnBack = new Button { Text = "◀ Back", Dock = DockStyle.Left, Width = 68, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
-            btnBack.FlatAppearance.BorderColor = Color.FromArgb(200, 205, 210);
-            pnlWebNav.Controls.Add(btnBack);
+            Button btnNavSchematics = new Button { Text = "📖 Wiring Schematics PDF", Dock = DockStyle.Left, Width = 175, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand };
+            btnNavSchematics.FlatAppearance.BorderSize = 0;
+            pnlWebNav.Controls.Add(btnNavSchematics);
 
-            Panel spcNav1 = new Panel { Dock = DockStyle.Left, Width = 4 };
+            Panel spcNav1 = new Panel { Dock = DockStyle.Left, Width = 6 };
             pnlWebNav.Controls.Add(spcNav1);
 
-            Button btnFwd = new Button { Text = "▶ Forward", Dock = DockStyle.Left, Width = 80, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
-            btnFwd.FlatAppearance.BorderColor = Color.FromArgb(200, 205, 210);
-            pnlWebNav.Controls.Add(btnFwd);
+            Button btnNavLop = new Button { Text = "📍 Component Locations (LOP)", Dock = DockStyle.Left, Width = 195, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 243, 246), ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
+            btnNavLop.FlatAppearance.BorderColor = Color.FromArgb(200, 205, 210);
+            pnlWebNav.Controls.Add(btnNavLop);
 
-            Panel spcNav2 = new Panel { Dock = DockStyle.Left, Width = 4 };
+            Panel spcNav2 = new Panel { Dock = DockStyle.Left, Width = 6 };
             pnlWebNav.Controls.Add(spcNav2);
 
-            Button btnHome = new Button { Text = "🏠 Book Home", Dock = DockStyle.Left, Width = 100, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
-            btnHome.FlatAppearance.BorderColor = Color.FromArgb(200, 205, 210);
-            pnlWebNav.Controls.Add(btnHome);
-
-            Panel spcNav3 = new Panel { Dock = DockStyle.Left, Width = 4 };
-            pnlWebNav.Controls.Add(spcNav3);
-
-            Button btnReload = new Button { Text = "🔄 Reload", Dock = DockStyle.Left, Width = 80, FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
-            btnReload.FlatAppearance.BorderColor = Color.FromArgb(200, 205, 210);
-            pnlWebNav.Controls.Add(btnReload);
+            Button btnNavIndex = new Button { Text = "⚡ Interactive Index", Dock = DockStyle.Left, Width = 140, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 243, 246), ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
+            btnNavIndex.FlatAppearance.BorderColor = Color.FromArgb(200, 205, 210);
+            pnlWebNav.Controls.Add(btnNavIndex);
 
             Label lblWebUrl = new Label { Text = "", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleRight, Padding = new Padding(0, 0, 8, 0), Font = new Font("Segoe UI", 8.5f, FontStyle.Italic), ForeColor = Color.FromArgb(100, 110, 120) };
             pnlWebNav.Controls.Add(lblWebUrl);
@@ -7934,15 +7930,11 @@ RegisterDummyIsoViewHotspot();
             pnlWebNav.Dock = DockStyle.Top;
             pnlWebNav.BringToFront();
 
-            WebBrowser browser = new WebBrowser();
-            browser.Dock = DockStyle.Fill;
-            browser.ScriptErrorsSuppressed = true;
-            splitMain.Panel2.Controls.Add(browser);
-            browser.SendToBack();
-
-            btnBack.Click += (s, e) => { if (browser.CanGoBack) browser.GoBack(); };
-            btnFwd.Click += (s, e) => { if (browser.CanGoForward) browser.GoForward(); };
-            btnReload.Click += (s, e) => { browser.Refresh(); };
+            Microsoft.Web.WebView2.WinForms.WebView2 wvPdf = new Microsoft.Web.WebView2.WinForms.WebView2();
+            wvPdf.Dock = DockStyle.Fill;
+            splitMain.Panel2.Controls.Add(wvPdf);
+            wvPdf.SendToBack();
+            _ewdWebView = wvPdf;
 
             // Catalog Parsing
             Dictionary<string, List<EwdPublicationItem>> catalog = new Dictionary<string, List<EwdPublicationItem>>(StringComparer.OrdinalIgnoreCase);
@@ -8002,7 +7994,22 @@ RegisterDummyIsoViewHotspot();
             string curLopPdfPath = "";
             string curWebUrl = "";
 
-            Action<EwdPublicationItem> loadPub = (pub) => {
+            Action updateNavStyles = () => {
+                string currentUri = (wvPdf.Source != null) ? wvPdf.Source.ToString().ToLowerInvariant() : "";
+                bool isLop = currentUri.Contains("lop.pdf");
+                bool isHtml = currentUri.EndsWith(".html") || currentUri.EndsWith(".htm");
+
+                btnNavSchematics.BackColor = (!isLop && !isHtml) ? Color.FromArgb(0, 102, 204) : Color.FromArgb(240, 243, 246);
+                btnNavSchematics.ForeColor = (!isLop && !isHtml) ? Color.White : Color.FromArgb(40, 50, 60);
+
+                btnNavLop.BackColor = isLop ? Color.FromArgb(43, 87, 154) : Color.FromArgb(240, 243, 246);
+                btnNavLop.ForeColor = isLop ? Color.White : Color.FromArgb(40, 50, 60);
+
+                btnNavIndex.BackColor = isHtml ? Color.FromArgb(0, 102, 204) : Color.FromArgb(240, 243, 246);
+                btnNavIndex.ForeColor = isHtml ? Color.White : Color.FromArgb(40, 50, 60);
+            };
+
+            Action<EwdPublicationItem> loadPub = async (pub) => {
                 if (pub == null) return;
                 try
                 {
@@ -8030,12 +8037,20 @@ RegisterDummyIsoViewHotspot();
                     lblCount.Text = dtComponents.Rows.Count + " components";
                     txtSearch.Text = "";
 
-                    // Navigate browser
-                    string localHtml = Path.Combine(ewdRoot, pub.Path.Replace('/', '\\'));
-                    if (File.Exists(localHtml))
+                    // Initialize WebView2 and navigate directly to the PDF schematic book!
+                    if (wvPdf.CoreWebView2 == null)
                     {
-                        browser.Navigate(curWebUrl);
+                        await wvPdf.EnsureCoreWebView2Async(null);
                     }
+                    if (File.Exists(curPdfPath))
+                    {
+                        wvPdf.Source = new Uri(curPdfPath);
+                    }
+                    else
+                    {
+                        wvPdf.Source = new Uri(curWebUrl);
+                    }
+                    updateNavStyles();
                 }
                 catch (Exception exLoad)
                 {
@@ -8043,8 +8058,28 @@ RegisterDummyIsoViewHotspot();
                 }
             };
 
-            btnHome.Click += (s, e) => {
-                if (!string.IsNullOrEmpty(curWebUrl)) browser.Navigate(curWebUrl);
+            btnNavSchematics.Click += (s, e) => {
+                if (File.Exists(curPdfPath))
+                {
+                    wvPdf.Source = new Uri(curPdfPath);
+                    updateNavStyles();
+                }
+            };
+
+            btnNavLop.Click += (s, e) => {
+                if (File.Exists(curLopPdfPath))
+                {
+                    wvPdf.Source = new Uri(curLopPdfPath);
+                    updateNavStyles();
+                }
+            };
+
+            btnNavIndex.Click += (s, e) => {
+                if (!string.IsNullOrEmpty(curWebUrl))
+                {
+                    wvPdf.Source = new Uri(curWebUrl);
+                    updateNavStyles();
+                }
             };
 
             cboModel.SelectedIndexChanged += (s, e) => {
@@ -8114,46 +8149,42 @@ RegisterDummyIsoViewHotspot();
                 if (dgvComponents.CurrentRow != null)
                 {
                     string code = Convert.ToString(dgvComponents.CurrentRow.Cells[0].Value);
-                    if (!string.IsNullOrEmpty(code)) Clipboard.SetText(code);
+                    if (!string.IsNullOrEmpty(code))
+                    {
+                        Clipboard.SetText(code);
+                        lblSelComp.Text = "Copied to clipboard: " + code + " (Press Ctrl+F in diagram to jump)";
+                    }
                 }
                 if (File.Exists(curPdfPath))
                 {
-                    Process.Start(new ProcessStartInfo(curPdfPath) { UseShellExecute = true });
-                }
-                else if (File.Exists(curLopPdfPath))
-                {
-                    Process.Start(new ProcessStartInfo(curLopPdfPath) { UseShellExecute = true });
-                }
-                else
-                {
-                    MessageBox.Show("PDF not found: " + curPdfPath, "Wiring Diagrams", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    wvPdf.Source = new Uri(curPdfPath);
+                    updateNavStyles();
+                    wvPdf.Focus();
                 }
             };
 
             btnOpenPdf.Click += (s, e) => {
                 if (File.Exists(curPdfPath))
                 {
-                    Process.Start(new ProcessStartInfo(curPdfPath) { UseShellExecute = true });
-                }
-                else
-                {
-                    MessageBox.Show("PDF file not found:\n" + curPdfPath, "Wiring Diagrams", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    wvPdf.Source = new Uri(curPdfPath);
+                    updateNavStyles();
                 }
             };
 
             btnOpenLop.Click += (s, e) => {
                 if (File.Exists(curLopPdfPath))
                 {
-                    Process.Start(new ProcessStartInfo(curLopPdfPath) { UseShellExecute = true });
-                }
-                else
-                {
-                    MessageBox.Show("Component Locations PDF not found:\n" + curLopPdfPath, "Wiring Diagrams", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    wvPdf.Source = new Uri(curLopPdfPath);
+                    updateNavStyles();
                 }
             };
 
             btnBrowser.Click += (s, e) => {
-                if (!string.IsNullOrEmpty(curWebUrl))
+                if (File.Exists(curPdfPath))
+                {
+                    Process.Start(new ProcessStartInfo(curPdfPath) { UseShellExecute = true });
+                }
+                else if (!string.IsNullOrEmpty(curWebUrl))
                 {
                     Process.Start(new ProcessStartInfo(curWebUrl) { UseShellExecute = true });
                 }
@@ -8163,7 +8194,7 @@ RegisterDummyIsoViewHotspot();
             // Default select V70 (08-)
             cboModel.SelectedIndex = 0;
             _wiringTabConfigured = true;
-            Console.WriteLine("[Launcher] Electronic Wiring Diagrams (EWD) tab initialized successfully!");
+            Console.WriteLine("[Launcher] Electronic Wiring Diagrams (EWD) tab initialized successfully with native WebView2 PDF viewer!");
         }
         catch (Exception ex)
         {
@@ -14191,6 +14222,52 @@ RegisterDummyIsoViewHotspot();
                     break;
                 case 9:
                     captureTab("Wiring Diagrams", "launcher_test_ewd.png");
+                    try
+                    {
+                        if (_ewdWebView != null && _ewdWebView.CoreWebView2 != null)
+                        {
+                            string ssPath = Path.Combine(vidaPath, @"..\launcher_test_ewd.png");
+                            if (File.Exists(ssPath))
+                            {
+                                byte[] ssBytes = File.ReadAllBytes(ssPath);
+                                byte[] dummyLock = null;
+                                using (MemoryStream inMs = new MemoryStream(ssBytes))
+                                using (Bitmap baseBmp = (Bitmap)Image.FromStream(inMs))
+                                {
+                                    using (Bitmap ewdBmp = new Bitmap(baseBmp))
+                                    {
+                                        using (MemoryStream ms = new MemoryStream())
+                                        {
+                                            var capTask = _ewdWebView.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, ms);
+                                            DateTime startCap = DateTime.Now;
+                                            while (!capTask.IsCompleted && (DateTime.Now - startCap).TotalSeconds < 4)
+                                            {
+                                                Application.DoEvents();
+                                                System.Threading.Thread.Sleep(20);
+                                            }
+                                            if (capTask.IsCompleted && !capTask.IsFaulted)
+                                            {
+                                                ms.Position = 0;
+                                                using (Bitmap wvBmp = new Bitmap(ms))
+                                                {
+                                                    using (Graphics g = Graphics.FromImage(ewdBmp))
+                                                    {
+                                                        Point pt = _ewdWebView.PointToScreen(Point.Empty);
+                                                        Point rel = mainForm.PointToClient(pt);
+                                                        g.DrawImage(wvBmp, rel.X, rel.Y, _ewdWebView.Width, _ewdWebView.Height);
+                                                    }
+                                                }
+                                                ewdBmp.Save(ssPath + ".tmp", ImageFormat.Png);
+                                                File.Copy(ssPath + ".tmp", ssPath, true);
+                                                File.Delete(ssPath + ".tmp");
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception exCap) { Console.WriteLine("[Launcher] EWD WebView composite warning: " + exCap.Message); }
                     Console.WriteLine("[Launcher] Step 9 complete. Testing round-trip: Wiring Diagrams -> Reference Info...");
                     btnTabRefInfo.PerformClick();
                     break;
