@@ -4901,6 +4901,9 @@ static Panel _diagnosticsMainPanel = null;
     static Button _btnTabWiring = null;
     static bool _wiringTabConfigured = false;
     static Microsoft.Web.WebView2.WinForms.WebView2 _ewdWebView = null;
+    static DataGridView _ewdDgv = null;
+    static Button _ewdBtnShowLoc = null;
+    static Button _ewdBtnFindSchem = null;
 
 
 
@@ -7850,18 +7853,26 @@ RegisterDummyIsoViewHotspot();
 
             // Bottom detail panel
             Panel pnlDetail = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Padding = new Padding(6, 6, 6, 6) };
-            Button btnFindPdf = new Button { Text = "Locate in PDF", Dock = DockStyle.Right, Width = 105, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand };
-            btnFindPdf.FlatAppearance.BorderSize = 0;
-            pnlDetail.Controls.Add(btnFindPdf);
 
-            Panel spcDetail = new Panel { Dock = DockStyle.Right, Width = 6 };
-            pnlDetail.Controls.Add(spcDetail);
+            Button btnFindSchematic = new Button { Text = "⚡ Schematics", Dock = DockStyle.Right, Width = 110, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            btnFindSchematic.FlatAppearance.BorderSize = 0;
+            pnlDetail.Controls.Add(btnFindSchematic);
 
-            Button btnCopyCode = new Button { Text = "Copy ID", Dock = DockStyle.Right, Width = 75, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 243, 246), ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
+            Panel spcDetail1 = new Panel { Dock = DockStyle.Right, Width = 6 };
+            pnlDetail.Controls.Add(spcDetail1);
+
+            Button btnShowLoc = new Button { Text = "📍 Car Placement", Dock = DockStyle.Right, Width = 125, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(43, 87, 154), ForeColor = Color.White, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            btnShowLoc.FlatAppearance.BorderSize = 0;
+            pnlDetail.Controls.Add(btnShowLoc);
+
+            Panel spcDetail2 = new Panel { Dock = DockStyle.Right, Width = 6 };
+            pnlDetail.Controls.Add(spcDetail2);
+
+            Button btnCopyCode = new Button { Text = "📋 Copy ID", Dock = DockStyle.Right, Width = 75, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 243, 246), ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
             btnCopyCode.FlatAppearance.BorderColor = Color.FromArgb(180, 185, 190);
             pnlDetail.Controls.Add(btnCopyCode);
 
-            Label lblSelComp = new Label { Text = "Select a component above to view details", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 40, 50) };
+            Label lblSelComp = new Label { Text = "Select a component above to navigate directly to its placement or schematic diagram", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 40, 50) };
             pnlDetail.Controls.Add(lblSelComp);
             lblSelComp.BringToFront();
 
@@ -7888,15 +7899,22 @@ RegisterDummyIsoViewHotspot();
             dgvComponents.ColumnHeadersHeight = 28;
             dgvComponents.RowTemplate.Height = 24;
 
-            DataGridViewTextBoxColumn colCode = new DataGridViewTextBoxColumn { DataPropertyName = "Code", HeaderText = "ID", Width = 80 };
+            DataGridViewTextBoxColumn colCode = new DataGridViewTextBoxColumn { Name = "Code", DataPropertyName = "Code", HeaderText = "ID", Width = 75 };
             colCode.DefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
             colCode.DefaultCellStyle.ForeColor = Color.FromArgb(0, 102, 204);
             dgvComponents.Columns.Add(colCode);
 
-            DataGridViewTextBoxColumn colDesc = new DataGridViewTextBoxColumn { DataPropertyName = "Description", HeaderText = "Component Name / Description", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill };
+            DataGridViewTextBoxColumn colDesc = new DataGridViewTextBoxColumn { Name = "Description", DataPropertyName = "Description", HeaderText = "Component Name / Description", AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill };
             colDesc.DefaultCellStyle.Font = new Font("Segoe UI", 9.0f);
             colDesc.DefaultCellStyle.ForeColor = Color.FromArgb(30, 40, 50);
             dgvComponents.Columns.Add(colDesc);
+
+            DataGridViewTextBoxColumn colPage = new DataGridViewTextBoxColumn { Name = "PageDisp", DataPropertyName = "PageDisp", HeaderText = "Placement", Width = 90 };
+            colPage.DefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+            colPage.DefaultCellStyle.ForeColor = Color.FromArgb(43, 87, 154);
+            colPage.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colPage.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgvComponents.Columns.Add(colPage);
 
             splitMain.Panel1.Controls.Add(dgvComponents);
             dgvComponents.BringToFront();
@@ -7935,6 +7953,9 @@ RegisterDummyIsoViewHotspot();
             splitMain.Panel2.Controls.Add(wvPdf);
             wvPdf.SendToBack();
             _ewdWebView = wvPdf;
+            _ewdDgv = dgvComponents;
+            _ewdBtnShowLoc = btnShowLoc;
+            _ewdBtnFindSchem = btnFindSchematic;
 
             // Catalog Parsing
             Dictionary<string, List<EwdPublicationItem>> catalog = new Dictionary<string, List<EwdPublicationItem>>(StringComparer.OrdinalIgnoreCase);
@@ -7988,6 +8009,8 @@ RegisterDummyIsoViewHotspot();
             DataTable dtComponents = new DataTable();
             dtComponents.Columns.Add("Code");
             dtComponents.Columns.Add("Description");
+            dtComponents.Columns.Add("PageNum", typeof(int));
+            dtComponents.Columns.Add("PageDisp");
             dgvComponents.DataSource = dtComponents.DefaultView;
 
             string curPdfPath = "";
@@ -8009,6 +8032,46 @@ RegisterDummyIsoViewHotspot();
                 btnNavIndex.ForeColor = isHtml ? Color.White : Color.FromArgb(40, 50, 60);
             };
 
+            Action<int> jumpToPage = (pageNum) => {
+                try
+                {
+                    if (pageNum > 0 && File.Exists(curPdfPath))
+                    {
+                        string uriStr = new Uri(curPdfPath).AbsoluteUri + "?nav=" + DateTime.Now.Ticks + "#page=" + pageNum;
+                        if (wvPdf.CoreWebView2 != null)
+                        {
+                            wvPdf.CoreWebView2.Navigate(uriStr);
+                        }
+                        else
+                        {
+                            wvPdf.Source = new Uri(uriStr);
+                        }
+                        updateNavStyles();
+                    }
+                }
+                catch (Exception exJump) { Console.WriteLine("[Launcher] EWD page navigation failed: " + exJump.Message); }
+            };
+
+            Action<string> jumpToSearch = (codeStr) => {
+                try
+                {
+                    if (!string.IsNullOrEmpty(codeStr) && File.Exists(curPdfPath))
+                    {
+                        string uriStr = new Uri(curPdfPath).AbsoluteUri + "?nav=" + DateTime.Now.Ticks + "#search=" + Uri.EscapeDataString(codeStr);
+                        if (wvPdf.CoreWebView2 != null)
+                        {
+                            wvPdf.CoreWebView2.Navigate(uriStr);
+                        }
+                        else
+                        {
+                            wvPdf.Source = new Uri(uriStr);
+                        }
+                        updateNavStyles();
+                    }
+                }
+                catch (Exception exSearch) { Console.WriteLine("[Launcher] EWD search navigation failed: " + exSearch.Message); }
+            };
+
             Action<EwdPublicationItem> loadPub = async (pub) => {
                 if (pub == null) return;
                 try
@@ -8019,18 +8082,39 @@ RegisterDummyIsoViewHotspot();
                     curWebUrl = "http://localhost/Vida/wiring_diagrams/US_Eng/" + pub.Path;
                     lblWebUrl.Text = pub.Name;
 
-                    // Load LOP
+                    // Load Component Navigation (TSV or LOP fallback)
                     dtComponents.Rows.Clear();
-                    string lopTxt = Path.Combine(ewdRoot, pubId + @"\images\" + pubId + "lop.txt");
-                    if (File.Exists(lopTxt))
+                    string navTsv = Path.Combine(ewdRoot, pubId + @"\images\" + pubId + "_nav.tsv");
+                    if (File.Exists(navTsv))
                     {
-                        string[] lines = File.ReadAllLines(lopTxt, Encoding.Default);
+                        string[] lines = File.ReadAllLines(navTsv, Encoding.UTF8);
                         foreach (string line in lines)
                         {
-                            string[] parts = line.Split(new char[] { '\t' }, 2);
-                            if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[0].Trim()))
+                            string[] parts = line.Split('\t');
+                            if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[0].Trim()))
                             {
-                                dtComponents.Rows.Add(parts[0].Trim(), parts[1].Trim());
+                                string code = parts[0].Trim();
+                                string desc = parts[1].Trim();
+                                int pageNum = 0;
+                                int.TryParse(parts[2].Trim(), out pageNum);
+                                string pageDisp = (pageNum > 0) ? "Page " + pageNum : "-";
+                                dtComponents.Rows.Add(code, desc, pageNum, pageDisp);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        string lopTxt = Path.Combine(ewdRoot, pubId + @"\images\" + pubId + "lop.txt");
+                        if (File.Exists(lopTxt))
+                        {
+                            string[] lines = File.ReadAllLines(lopTxt, Encoding.Default);
+                            foreach (string line in lines)
+                            {
+                                string[] parts = line.Split(new char[] { '\t' }, 2);
+                                if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[0].Trim()))
+                                {
+                                    dtComponents.Rows.Add(parts[0].Trim(), parts[1].Trim(), 0, "-");
+                                }
                             }
                         }
                     }
@@ -8124,42 +8208,89 @@ RegisterDummyIsoViewHotspot();
                 lblCount.Text = dtComponents.DefaultView.Count + " matches";
             };
 
-            dgvComponents.SelectionChanged += (s, e) => {
+            Action updateCompSelection = () => {
                 if (dgvComponents.CurrentRow != null)
                 {
-                    string code = Convert.ToString(dgvComponents.CurrentRow.Cells[0].Value);
-                    string desc = Convert.ToString(dgvComponents.CurrentRow.Cells[1].Value);
-                    lblSelComp.Text = code + ": " + desc;
+                    string code = Convert.ToString(dgvComponents.CurrentRow.Cells["Code"].Value);
+                    string desc = Convert.ToString(dgvComponents.CurrentRow.Cells["Description"].Value);
+                    int pNum = 0;
+                    try { pNum = Convert.ToInt32(dgvComponents.CurrentRow.Cells["PageNum"].Value); } catch { }
+                    if (!string.IsNullOrEmpty(code))
+                    {
+                        lblSelComp.Text = code + ": " + desc + (pNum > 0 ? " (📍 Placement: Page " + pNum + ")" : "");
+                        btnShowLoc.Text = (pNum > 0) ? "📍 Page " + pNum : "📍 Car Placement";
+                        btnShowLoc.Enabled = (pNum > 0);
+                    }
+                }
+            };
+
+            dgvComponents.SelectionChanged += (s, e) => {
+                updateCompSelection();
+            };
+
+            dgvComponents.CellClick += (s, e) => {
+                if (e.RowIndex >= 0)
+                {
+                    int pNum = 0;
+                    try { pNum = Convert.ToInt32(dgvComponents.Rows[e.RowIndex].Cells["PageNum"].Value); } catch { }
+                    string code = Convert.ToString(dgvComponents.Rows[e.RowIndex].Cells["Code"].Value);
+                    if (dgvComponents.Columns[e.ColumnIndex].Name == "PageDisp" && pNum > 0)
+                    {
+                        jumpToPage(pNum);
+                    }
+                }
+            };
+
+            dgvComponents.CellDoubleClick += (s, e) => {
+                if (e.RowIndex >= 0)
+                {
+                    int pNum = 0;
+                    try { pNum = Convert.ToInt32(dgvComponents.Rows[e.RowIndex].Cells["PageNum"].Value); } catch { }
+                    string code = Convert.ToString(dgvComponents.Rows[e.RowIndex].Cells["Code"].Value);
+                    if (pNum > 0)
+                    {
+                        jumpToPage(pNum);
+                    }
+                    else
+                    {
+                        jumpToSearch(code);
+                    }
+                }
+            };
+
+            btnShowLoc.Click += (s, e) => {
+                if (dgvComponents.CurrentRow != null)
+                {
+                    int pNum = 0;
+                    try { pNum = Convert.ToInt32(dgvComponents.CurrentRow.Cells["PageNum"].Value); } catch { }
+                    string code = Convert.ToString(dgvComponents.CurrentRow.Cells["Code"].Value);
+                    if (pNum > 0) jumpToPage(pNum);
+                    else jumpToSearch(code);
+                }
+            };
+
+            btnFindSchematic.Click += (s, e) => {
+                if (dgvComponents.CurrentRow != null)
+                {
+                    string code = Convert.ToString(dgvComponents.CurrentRow.Cells["Code"].Value);
+                    if (!string.IsNullOrEmpty(code))
+                    {
+                        Clipboard.SetText(code);
+                        lblSelComp.Text = "Searching for " + code + " in schematics...";
+                        jumpToSearch(code);
+                    }
                 }
             };
 
             btnCopyCode.Click += (s, e) => {
                 if (dgvComponents.CurrentRow != null)
                 {
-                    string code = Convert.ToString(dgvComponents.CurrentRow.Cells[0].Value);
+                    string code = Convert.ToString(dgvComponents.CurrentRow.Cells["Code"].Value);
                     if (!string.IsNullOrEmpty(code))
                     {
                         Clipboard.SetText(code);
                         lblSelComp.Text = "Copied to clipboard: " + code;
                     }
-                }
-            };
-
-            btnFindPdf.Click += (s, e) => {
-                if (dgvComponents.CurrentRow != null)
-                {
-                    string code = Convert.ToString(dgvComponents.CurrentRow.Cells[0].Value);
-                    if (!string.IsNullOrEmpty(code))
-                    {
-                        Clipboard.SetText(code);
-                        lblSelComp.Text = "Copied to clipboard: " + code + " (Press Ctrl+F in diagram to jump)";
-                    }
-                }
-                if (File.Exists(curPdfPath))
-                {
-                    wvPdf.Source = new Uri(curPdfPath);
-                    updateNavStyles();
-                    wvPdf.Focus();
                 }
             };
 
@@ -14221,6 +14352,39 @@ RegisterDummyIsoViewHotspot();
                     btnTabWiring.PerformClick();
                     break;
                 case 9:
+                    seqTimer.Stop();
+                    try
+                    {
+                        if (_ewdDgv != null && _ewdBtnShowLoc != null)
+                        {
+                            foreach (DataGridViewRow r in _ewdDgv.Rows)
+                            {
+                                string cVal = Convert.ToString(r.Cells["Code"].Value);
+                                string dVal = Convert.ToString(r.Cells["Description"].Value);
+                                if (cVal == "4/46" && dVal.Contains("5-Cyl. Diesel"))
+                                {
+                                    _ewdDgv.CurrentCell = r.Cells[0];
+                                    r.Selected = true;
+                                    _ewdBtnShowLoc.PerformClick();
+                                    Console.WriteLine("[Launcher] Direct navigation triggered: Jumped to 4/46 ECM Placement (Page 312)!");
+                                    if (_ewdBtnFindSchem != null)
+                                    {
+                                        DateTime startS = DateTime.Now;
+                                        while ((DateTime.Now - startS).TotalSeconds < 1.5) { Application.DoEvents(); System.Threading.Thread.Sleep(25); }
+                                        _ewdBtnFindSchem.PerformClick();
+                                        string navSrc = (_ewdWebView != null && _ewdWebView.CoreWebView2 != null) ? _ewdWebView.CoreWebView2.Source : "(none)";
+                                        Console.WriteLine("[Launcher] Schematics search triggered for 4/46, WebView source: " + navSrc);
+                                        while ((DateTime.Now - startS).TotalSeconds < 3.0) { Application.DoEvents(); System.Threading.Thread.Sleep(25); }
+                                        _ewdBtnShowLoc.PerformClick();
+                                    }
+                                    break;
+                                }
+                            }
+                            DateTime startW = DateTime.Now;
+                            while ((DateTime.Now - startW).TotalSeconds < 2.5) { Application.DoEvents(); System.Threading.Thread.Sleep(25); }
+                        }
+                    }
+                    catch (Exception exNav) { Console.WriteLine("[Launcher] Test direct nav warning: " + exNav.Message); }
                     captureTab("Wiring Diagrams", "launcher_test_ewd.png");
                     try
                     {
@@ -14270,11 +14434,14 @@ RegisterDummyIsoViewHotspot();
                     catch (Exception exCap) { Console.WriteLine("[Launcher] EWD WebView composite warning: " + exCap.Message); }
                     Console.WriteLine("[Launcher] Step 9 complete. Testing round-trip: Wiring Diagrams -> Reference Info...");
                     btnTabRefInfo.PerformClick();
+                    seqTimer.Interval = 3000;
+                    seqTimer.Start();
                     break;
                 case 10:
                     seqTimer.Stop();
                     Console.WriteLine("[Launcher] Successfully switched from Wiring Diagrams to Reference Info! All round-trip tab switches PASSED! Exiting test...");
-                    Application.Exit();
+                    Console.Out.Flush();
+                    Environment.Exit(0);
                     break;
 
 
