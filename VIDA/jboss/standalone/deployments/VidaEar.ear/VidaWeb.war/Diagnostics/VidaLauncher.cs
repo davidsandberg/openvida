@@ -11188,6 +11188,64 @@ RegisterDummyIsoViewHotspot();
                                     btnRem.Visible = true;
                                 }
 
+                                // Wire Automatic Range Recalculation for Plotter / Graph View
+                                try
+                                {
+                                    FieldInfo pdField = rpPage.GetType().GetField("_plotterDialog", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    object pd = pdField != null ? pdField.GetValue(rpPage) : null;
+                                    Form pdForm = pd as Form;
+                                    if (pdForm != null && pdForm.Tag == null)
+                                    {
+                                        pdForm.Tag = "wired_autorange";
+                                        FieldInfo pField = pd.GetType().GetField("_plotter", BindingFlags.NonPublic | BindingFlags.Instance);
+                                        Control plotterCtrl = pField != null ? pField.GetValue(pd) as Control : null;
+
+                                        Action performAutoRangeSafe = () =>
+                                        {
+                                            try
+                                            {
+                                                if (plotterCtrl != null)
+                                                {
+                                                    FieldInfo icField = plotterCtrl.GetType().GetField("_inputChannels", BindingFlags.NonPublic | BindingFlags.Instance);
+                                                    IList channels = icField != null ? icField.GetValue(plotterCtrl) as IList : null;
+                                                    if (channels != null && channels.Count > 0)
+                                                    {
+                                                        foreach (object ch in channels)
+                                                        {
+                                                            PropertyInfo piAuto = ch.GetType().GetProperty("AutoScale");
+                                                            if (piAuto != null) piAuto.SetValue(ch, true, null);
+                                                        }
+                                                    }
+                                                    MethodInfo miAuto = plotterCtrl.GetType().GetMethod("PerformAutoRange", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                                    if (miAuto != null) miAuto.Invoke(plotterCtrl, null);
+                                                    plotterCtrl.Invalidate();
+                                                }
+                                            }
+                                            catch {}
+                                        };
+
+                                        pdForm.VisibleChanged += (sV, eV) => {
+                                            if (pdForm.Visible) performAutoRangeSafe();
+                                        };
+
+                                        Timer autoRangeTimer = new Timer();
+                                        autoRangeTimer.Interval = 1500;
+                                        autoRangeTimer.Tick += (sT, eT) => {
+                                            if (pdForm.Visible)
+                                            {
+                                                performAutoRangeSafe();
+                                            }
+                                        };
+                                        autoRangeTimer.Start();
+                                        Console.WriteLine("[Launcher] Automatic graph range recalculation active");
+                                    }
+                                }
+                                catch (Exception exPlot)
+                                {
+                                    Console.WriteLine("[Launcher] Error wiring graph auto-range: " + exPlot.Message);
+                                }
+
+
 
 
 
