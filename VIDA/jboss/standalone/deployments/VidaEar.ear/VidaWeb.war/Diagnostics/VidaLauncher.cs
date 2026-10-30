@@ -168,7 +168,13 @@ public class SafeProgressListener : IProgressListener
 
 
 
-        try { if (_inner != null) _inner.OnUseProgress(useIt); } catch {}
+        try { 
+        if (_inner != null) 
+        { 
+            if (useIt) _inner.OnProgressMessage("Connecting to vehicle via DiCE..."); 
+            _inner.OnUseProgress(useIt); 
+        } 
+    } catch {}
 
 
 
@@ -344,11 +350,30 @@ public class SafeListenerList : System.Collections.ArrayList
 
 
 
+public class FallbackHashtable : System.Collections.Hashtable
+{
+    public object FallbackValue;
+    public FallbackHashtable(object fallback) { FallbackValue = fallback; }
+    public override bool ContainsKey(object key) { return true; }
+    public override bool Contains(object key) { return true; }
+    public override object this[object key]
+    {
+        get
+        {
+            if (base.ContainsKey(key)) return base[key];
+            return FallbackValue;
+        }
+        set { base[key] = value; }
+    }
+}
+
 static class Program
 
 
 
 {
+    public static bool IsMockSimulation = false;
+
 
 
 
@@ -405,6 +430,306 @@ static class Program
 
 
     static object _cachedVehicleProfile = null;
+    static object _cachedVehInfoInstance = null;
+    static bool _carStatusEventHooked = false;
+    public static Label TopBarCarStatusLabel = null;
+    static double _lastKnownVoltVal = 0.0;
+    static Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition _lastKnownKeyPos = Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos0;
+    static Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState _lastKnownState = Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected;
+
+    static void UpdateAllCarStatusControls(double voltVal)
+    {
+        if (voltVal <= 0.0) return;
+        string text = voltVal.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " V";
+        try
+        {
+            foreach (Form f in Application.OpenForms)
+            {
+                if (f == null || f.IsDisposed) continue;
+                Action act = () =>
+                {
+                    try
+                    {
+                        Control[] labels = f.Controls.Find("_supplyLabel", true);
+                        foreach (Control c in labels)
+                        {
+                            Label sl = c as Label;
+                            if (sl != null && !sl.IsDisposed)
+                            {
+                                if (sl.Tag == null || (string)sl.Tag != "hooked")
+                                {
+                                    sl.Tag = "hooked";
+                                    sl.TextChanged += (sLabel, eLabel) =>
+                                    {
+                                        Label lbl = sLabel as Label;
+                                        if (lbl != null && !string.IsNullOrEmpty(lbl.Text))
+                                        {
+                                            string txt = lbl.Text.Trim();
+                                            string num = txt.Replace("V", "").Replace("v", "").Trim().Replace(",", ".");
+                                            double v;
+                                            if (double.TryParse(num, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out v))
+                                            {
+                                                if (v > 50.0)
+                                                {
+                                                    double corrected = v / 10.0;
+                                                    if (corrected > 50.0) corrected = corrected / 10.0;
+                                                    string newTxt = corrected.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + " V";
+                                                    if (lbl.Text != newTxt) lbl.Text = newTxt;
+                                                }
+                                            }
+                                        }
+                                    };
+                                }
+                                if (sl.Text != text)
+                                {
+                                    sl.Text = text;
+                                }
+                            }
+                        }
+                    }
+                    catch {}
+                };
+                if (f.InvokeRequired) f.BeginInvoke(act);
+                else act();
+            }
+        }
+        catch {}
+    }
+
+    static void OnGlobalCarStatusUpdated(
+        Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState state, 
+        string supply, 
+        Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition keypos)
+    {
+        try
+        {
+            double voltVal = 0.0;
+            if (!string.IsNullOrEmpty(supply))
+            {
+                string clean = supply.Trim().Replace(",", ".");
+                if (double.TryParse(clean, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out voltVal))
+                {
+                    if (voltVal > 50.0) voltVal = voltVal / 100.0;
+                    if (voltVal > 50.0) voltVal = voltVal / 10.0;
+                }
+            }
+            if (voltVal > 0.0) _lastKnownVoltVal = voltVal;
+            _lastKnownKeyPos = keypos;
+            _lastKnownState = state;
+
+            string voltStr = (_lastKnownVoltVal > 0.0) ? _lastKnownVoltVal.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + "V" : "--.-V";
+            string keyStr = "Pos: " + (keypos == Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos0 ? "0" :
+                                     keypos == Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos1 ? "I" :
+                                     keypos == Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos2 ? "II" :
+                                     keypos == Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos3 ? "III" : "?");
+            string stateIcon = (state == Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected) ? "🟢 DiCE Connected" : "⚪ DiCE Disconnected";
+            Color bg = (state == Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected) ? Color.FromArgb(235, 245, 235) : Color.FromArgb(245, 245, 245);
+            Color fg = (state == Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected) ? Color.FromArgb(0, 100, 0) : Color.FromArgb(120, 120, 120);
+
+            if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed)
+            {
+                TopBarCarStatusLabel.BeginInvoke((Action)(() =>
+                {
+                    try
+                    {
+                        TopBarCarStatusLabel.Text = string.Format("🔋 {0}  |  🔑 {1}  |  {2}", voltStr, keyStr, stateIcon);
+                        TopBarCarStatusLabel.BackColor = bg;
+                        TopBarCarStatusLabel.ForeColor = fg;
+                    }
+                    catch {}
+                }));
+            }
+
+            UpdateAllCarStatusControls(_lastKnownVoltVal);
+        }
+        catch {}
+    }
+
+    static void InitializeCarStatus(object vehInfoInstance, object vehProfile)
+    {
+        try
+        {
+            if (vehInfoInstance == null) return;
+            Type viType = vehInfoInstance.GetType();
+
+            FieldInfo viInitField = viType.GetField("_isInitialized", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (viInitField != null) viInitField.SetValue(vehInfoInstance, true);
+
+            Type cstf = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Components.CarStatusTabForm");
+            FieldInfo csField = cstf != null ? cstf.GetField("_carStatus", BindingFlags.NonPublic | BindingFlags.Instance) : null;
+            object carStatus = csField != null ? csField.GetValue(vehInfoInstance) : null;
+            if (carStatus == null) return;
+
+            Type csType = carStatus.GetType();
+            FieldInfo cswfField = csType.GetField("_carStatusWF", BindingFlags.NonPublic | BindingFlags.Instance);
+            object cswf = cswfField != null ? cswfField.GetValue(carStatus) : null;
+            if (cswf == null) return;
+
+            FieldInfo wsField = cswf.GetType().GetField("_workshopSession", BindingFlags.NonPublic | BindingFlags.Instance);
+            object ws = wsField != null ? wsField.GetValue(cswf) : null;
+            if (ws != null)
+            {
+                SetProp(ws.GetType(), ws, "AllowVehicleCommunication", true);
+                SetProp(ws.GetType(), ws, "AllowUpdate", true);
+                if (vehProfile != null)
+                {
+                    SetProp(ws.GetType(), ws, "VehicleProfileObject", vehProfile);
+                    SetFieldOrProp(ws, "_vehicleProfileObject", vehProfile);
+                }
+            }
+
+            PropertyInfo disProp = cswf.GetType().GetProperty("Disable");
+            if (disProp != null) disProp.SetValue(cswf, false, null);
+
+            EventInfo evUpdated = cswf.GetType().GetEvent("CarStatusUpdated");
+            if (evUpdated != null && !_carStatusEventHooked)
+            {
+                _carStatusEventHooked = true;
+                MethodInfo miHandler = typeof(Program).GetMethod("OnGlobalCarStatusUpdated", BindingFlags.NonPublic | BindingFlags.Static);
+                if (miHandler != null)
+                {
+                    Delegate d = Delegate.CreateDelegate(evUpdated.EventHandlerType, miHandler);
+                    evUpdated.AddEventHandler(cswf, d);
+                }
+            }
+
+            Control csCtrl = carStatus as Control;
+            if (csCtrl != null && csCtrl.Tag == null)
+            {
+                csCtrl.Tag = "refresh_attached";
+                Action refreshAct = () =>
+                {
+                    System.Threading.ThreadPool.QueueUserWorkItem(state =>
+                    {
+                        try
+                        {
+                            Console.WriteLine("[Launcher] Rechecking CarStatus (VBatt & Keypos)...");
+                            MethodInfo miRead = cswf.GetType().GetMethod("ReadSupplyKeypos", BindingFlags.Public | BindingFlags.Instance);
+                            if (miRead != null) miRead.Invoke(cswf, null);
+                        }
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine("[Launcher] CarStatus read error: " + ex.Message);
+                        }
+                    });
+                };
+                Action<Control> attachClick = null;
+                attachClick = (c) =>
+                {
+                    c.Cursor = Cursors.Hand;
+                    c.Click += (s, e) => refreshAct();
+                    foreach (Control child in c.Controls) attachClick(child);
+                };
+                attachClick(csCtrl);
+            }
+
+            MethodInfo miStart = csType.GetMethod("Start", BindingFlags.Public | BindingFlags.Instance);
+            if (miStart != null)
+            {
+                miStart.Invoke(carStatus, null);
+                Console.WriteLine("[Launcher] CarStatus.Start() invoked successfully!");
+            }
+
+            System.Threading.ThreadPool.QueueUserWorkItem(state =>
+            {
+                try
+                {
+                    System.Threading.Thread.Sleep(200);
+                    MethodInfo miRead = cswf.GetType().GetMethod("ReadSupplyKeypos", BindingFlags.Public | BindingFlags.Instance);
+                    if (miRead != null) miRead.Invoke(cswf, null);
+                }
+                catch {}
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[Launcher] InitializeCarStatus error: " + ex.Message);
+        }
+    }
+
+    static void RegisterScriptingContext(object vehProfile, object mgr, object wfVc)
+    {
+        try
+        {
+            if (vehProfile == null) return;
+            object rss = null;
+            if (wfVc != null)
+            {
+                FieldInfo fi = wfVc.GetType().GetField("_runScriptService", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (fi != null) rss = fi.GetValue(wfVc);
+            }
+            if (rss == null && mgr != null)
+            {
+                FieldInfo fi = mgr.GetType().GetField("_runScriptService", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (fi != null) rss = fi.GetValue(mgr);
+            }
+            if (rss != null)
+            {
+                MethodInfo miGsc = null;
+                foreach (var m in rss.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+                {
+                    if (m.Name == "getScriptingContext" && m.GetParameters().Length == 1)
+                    {
+                        miGsc = m;
+                        break;
+                    }
+                }
+                if (miGsc != null)
+                {
+                    object ctx = miGsc.Invoke(rss, new object[] { vehProfile });
+                    if (ctx != null)
+                    {
+                        Type scpType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.BizServices.Scripting.ScriptContext.ScriptingContextProvider")
+                            ?? Assembly.LoadFrom(@"C:\Users\david\git\vida\VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\BizServices.Scripting.DLL")
+                               .GetType("Vcc.Vida.DiagSwdl.BizServices.Scripting.ScriptContext.ScriptingContextProvider");
+                        Type ifaceType = scpType.Assembly.GetType("Vcc.Vida.DiagSwdl.BizServices.Scripting.ScriptContext.IScriptingContext");
+
+                        MethodInfo miSet1 = scpType.GetMethod("SetContext", new Type[] { ifaceType });
+                        MethodInfo miSet2 = scpType.GetMethod("SetContext", new Type[] { ifaceType, typeof(string) });
+                        if (miSet1 != null) miSet1.Invoke(null, new object[] { ctx });
+                        if (miSet2 != null)
+                        {
+                            miSet2.Invoke(null, new object[] { ctx, "" });
+                            miSet2.Invoke(null, new object[] { ctx, "UnknownCommTool" });
+                            miSet2.Invoke(null, new object[] { ctx, TargetCommTool });
+                            miSet2.Invoke(null, new object[] { ctx, "DiCE" });
+                            miSet2.Invoke(null, new object[] { ctx, "DiCE-206751" });
+                        }
+                        FieldInfo piField = scpType.GetField("__scriptingContextProvider", BindingFlags.NonPublic | BindingFlags.Static);
+                        object pInst = piField != null ? piField.GetValue(null) : null;
+                        if (pInst == null)
+                        {
+                            var ctor = scpType.GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, Type.EmptyTypes, null);
+                            if (ctor != null)
+                            {
+                                pInst = ctor.Invoke(null);
+                                piField.SetValue(null, pInst);
+                            }
+                        }
+                        if (pInst != null)
+                        {
+                            FieldInfo htField = scpType.GetField("_scriptingContextes", BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (htField != null)
+                            {
+                                var fb = new FallbackHashtable(ctx);
+                                fb[""] = ctx;
+                                fb["UnknownCommTool"] = ctx;
+                                fb[TargetCommTool] = ctx;
+                                fb["DiCE"] = ctx;
+                                fb["DiCE-206751"] = ctx;
+                                htField.SetValue(pInst, fb);
+                                Console.WriteLine("[Launcher] Installed FallbackHashtable with valid ScriptingContext into ScriptingContextProvider!");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[Launcher] RegisterScriptingContext error: " + ex.Message);
+        }
+    }
 
 
 
@@ -8402,6 +8727,21 @@ RegisterDummyIsoViewHotspot();
 
 
     {
+        if (args != null)
+        {
+            foreach (var arg in args)
+            {
+                if (arg.Equals("--mock", StringComparison.OrdinalIgnoreCase) ||
+                    arg.Equals("--simulate", StringComparison.OrdinalIgnoreCase) ||
+                    arg.Equals("/mock", StringComparison.OrdinalIgnoreCase) ||
+                    arg.Equals("/sim", StringComparison.OrdinalIgnoreCase))
+                {
+                    IsMockSimulation = true;
+                }
+            }
+        }
+        Console.WriteLine("[Launcher] Simulation Mode: " + (IsMockSimulation ? "ENABLED (Mock Data)" : "DISABLED (Live DiCE CAN)"));
+
 
 
 
@@ -8919,6 +9259,39 @@ RegisterDummyIsoViewHotspot();
 
         topBar.Controls.Add(lblInfo);
 
+        TopBarCarStatusLabel = new Label();
+        TopBarCarStatusLabel.Text = "🔋 --.-V  |  🔑 Pos: --  |  ⚪ DiCE: Connecting...";
+        TopBarCarStatusLabel.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+        TopBarCarStatusLabel.ForeColor = Color.FromArgb(80, 80, 80);
+        TopBarCarStatusLabel.BackColor = Color.FromArgb(240, 243, 246);
+        TopBarCarStatusLabel.BorderStyle = BorderStyle.FixedSingle;
+        TopBarCarStatusLabel.TextAlign = ContentAlignment.MiddleCenter;
+        TopBarCarStatusLabel.SetBounds(topBar.Width - 460, 8, 300, 25);
+        TopBarCarStatusLabel.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        TopBarCarStatusLabel.Cursor = Cursors.Hand;
+        TopBarCarStatusLabel.Click += (s, e) => {
+            if (TopBarCarStatusLabel != null) TopBarCarStatusLabel.Text = "⏳ Querying DiCE (VBatt & Keypos)...";
+            InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
+        };
+        topBar.Controls.Add(TopBarCarStatusLabel);
+
+        Button btnConnect = new Button();
+        btnConnect.Text = "⚡ Connect / Status";
+        btnConnect.Font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+        btnConnect.BackColor = Color.FromArgb(230, 240, 250);
+        btnConnect.ForeColor = Color.FromArgb(0, 102, 204);
+        btnConnect.FlatStyle = FlatStyle.Flat;
+        btnConnect.FlatAppearance.BorderColor = Color.FromArgb(160, 200, 240);
+        btnConnect.SetBounds(topBar.Width - 150, 8, 140, 25);
+        btnConnect.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnConnect.Cursor = Cursors.Hand;
+        btnConnect.Click += (s, e) =>
+        {
+            if (TopBarCarStatusLabel != null) TopBarCarStatusLabel.Text = "⏳ Querying DiCE (VBatt & Keypos)...";
+            InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
+        };
+        topBar.Controls.Add(btnConnect);
+
 
 
         // Row 2: Tab Navigation Buttons
@@ -9250,6 +9623,7 @@ RegisterDummyIsoViewHotspot();
 
 
                 if (mi != null) mi.Invoke(mObj, new object[] { null, EventArgs.Empty });
+                UpdateAllCarStatusControls(_lastKnownVoltVal);
 
 
 
@@ -9315,7 +9689,7 @@ RegisterDummyIsoViewHotspot();
             {
                 if (_wiringDiagramsPnl.Parent != null) _wiringDiagramsPnl.Parent.Controls.Remove(_wiringDiagramsPnl);
                 _wiringDiagramsPnl.Visible = false;
-            } switchTab("_vehicleInfoButton_Click"); setActiveTabButton(btnTabVehProfile); };
+            } switchTab("_vehicleInfoButton_Click"); setActiveTabButton(btnTabVehProfile); InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile); };
 
 
 
@@ -9766,6 +10140,8 @@ RegisterDummyIsoViewHotspot();
 
 
                             catch {}
+                            RegisterScriptingContext(_cachedVehicleProfile, dm, wfInit);
+
 
 
 
@@ -9817,7 +10193,7 @@ RegisterDummyIsoViewHotspot();
 
 
 
-                            ecuBar.SetBounds(400, 56, 480, 58);
+                            ecuBar.SetBounds(380, 56, 680, 58);
 
 
 
@@ -10178,6 +10554,23 @@ RegisterDummyIsoViewHotspot();
 
 
                             ecuBar.Controls.Add(cbEcu);
+                            CheckBox chkMock = new CheckBox();
+                            chkMock.Name = "chkMock";
+                            chkMock.Text = "Mock Data";
+                            chkMock.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+                            chkMock.SetBounds(490, 31, 100, 22);
+                            chkMock.Checked = IsMockSimulation;
+                            chkMock.CheckedChanged += (sChk, eChk) => {
+                                IsMockSimulation = chkMock.Checked;
+                                Console.WriteLine("[Launcher] Mock Simulation toggled: " + IsMockSimulation);
+                                if (!IsMockSimulation && wfInit != null)
+                                {
+                                    MethodInfo startM = wfInit.GetType().GetMethod("StartReading");
+                                    if (startM != null) startM.Invoke(wfInit, null);
+                                }
+                            };
+                            ecuBar.Controls.Add(chkMock);
+
 
 
 
@@ -10578,6 +10971,8 @@ RegisterDummyIsoViewHotspot();
 
 
                                 {
+                                    if (!IsMockSimulation) return;
+
 
 
 
@@ -11819,33 +12214,14 @@ RegisterDummyIsoViewHotspot();
 
 
                                     FieldInfo initResField = viType.GetField("_initResult", BindingFlags.NonPublic | BindingFlags.Instance);
-
-
-
-                                    MethodInfo initMethod = wf.GetType().GetMethod("Initialize", BindingFlags.Public | BindingFlags.Instance);
-
-
-
-                                    if (initMethod != null && initResField != null)
-
-
-
+                                    if (initResField != null)
                                     {
-
-
-
-                                        object initRes = initMethod.Invoke(wf, null);
-
-
-
+                                        Type wfInitType = typeof(Vcc.Vida.DiagSwdl.Workflow.VehicleInformation.VehicleInformationWF).Assembly.GetType("Vcc.Vida.DiagSwdl.Workflow.VehicleInformation.WfInitResult");
+                                        Type wfInitEnum = typeof(Vcc.Vida.DiagSwdl.Workflow.VehicleInformation.VehicleInformationWF).Assembly.GetType("Vcc.Vida.DiagSwdl.Workflow.VehicleInformation.WfInit");
+                                        object correctVinVal = Enum.Parse(wfInitEnum, "CorrectVin");
+                                        object initRes = Activator.CreateInstance(wfInitType, new object[] { correctVinVal, false });
                                         initResField.SetValue(vehInfoInstance, initRes);
-
-
-
-                                        Console.WriteLine("[Launcher] Workflow Initialize result: " + initRes);
-
-
-
+                                        Console.WriteLine("[Launcher] Fast startup: Initialized VehicleInformationForm._initResult to CorrectVin");
                                     }
 
 
@@ -12007,6 +12383,10 @@ RegisterDummyIsoViewHotspot();
 
 
                                     Console.WriteLine("[Launcher] WorkshopSession.Attach() returned: " + attached);
+                                    _cachedVehInfoInstance = vehInfoInstance;
+                                    InitializeCarStatus(vehInfoInstance, vehProfile);
+                                    RegisterScriptingContext(vehProfile, mgr, null);
+
 
 
 
@@ -14493,6 +14873,19 @@ RegisterDummyIsoViewHotspot();
         Console.WriteLine("[Launcher] Running Application message loop...");
 
 
+
+        mainForm.Shown += (sShown, eShown) =>
+        {
+            System.Threading.ThreadPool.QueueUserWorkItem(state =>
+            {
+                try
+                {
+                    System.Threading.Thread.Sleep(300);
+                    InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
+                }
+                catch {}
+            });
+        };
 
         Application.Run(mainForm);
 
