@@ -25,8 +25,6 @@ VIDA/*
 !VIDA/System/Config/vida.properties
 !VIDA/jboss/standalone/configuration/standalone.xml
 !VIDA/jboss/standalone/deployments/VidaEar.ear/VidaWeb.war/jsp/login/login.jsp
-!VIDA/jboss/standalone/deployments/VidaEar.ear/VidaWeb.war/Diagnostics/VidaLauncher.cs
-!VIDA/jboss/standalone/deployments/VidaEar.ear/VidaWeb.war/Diagnostics/DummyIsoView.cs
 !VIDA/jboss/standalone/deployments/VidaEar.ear/VidaWeb.war/Diagnostics/components.config.xml
 !VIDA/jboss/standalone/deployments/VidaEar.ear/VidaWeb.war/Diagnostics/Microsoft.Web.WebView2.WinForms.dll
 !VIDA/jboss/standalone/deployments/VidaEar.ear/VidaWeb.war/Diagnostics/Microsoft.Web.WebView2.Core.dll

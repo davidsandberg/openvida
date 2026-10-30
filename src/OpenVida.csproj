@@ -1,0 +1,102 @@
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Release</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">x86</Platform>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>OpenVida</RootNamespace>
+    <AssemblyName>VidaLauncher</AssemblyName>
+    <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
+    <PlatformTarget>x86</PlatformTarget>
+    <ApplicationIcon>..\assets\vida_icon.ico</ApplicationIcon>
+    <DiagDir>..\VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics</DiagDir>
+    <OutputPath>$(DiagDir)</OutputPath>
+    <Optimize>true</Optimize>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Windows.Forms.DataVisualization" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="UI">
+      <HintPath>$(DiagDir)\UI.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Core">
+      <HintPath>$(DiagDir)\Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Workflow">
+      <HintPath>$(DiagDir)\Workflow.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Util">
+      <HintPath>$(DiagDir)\Util.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="ValueObjects">
+      <HintPath>$(DiagDir)\ValueObjects.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="DummyIsoView">
+      <HintPath>$(DiagDir)\DummyIsoView.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="GuiComponents">
+      <HintPath>$(DiagDir)\GuiComponents.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="ProgressHandler">
+      <HintPath>$(DiagDir)\ProgressHandler.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.Web.WebView2.WinForms">
+      <HintPath>$(DiagDir)\Microsoft.Web.WebView2.WinForms.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="Microsoft.Web.WebView2.Core">
+      <HintPath>$(DiagDir)\Microsoft.Web.WebView2.Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="BizServices.Scripting">
+      <HintPath>$(DiagDir)\BizServices.Scripting.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="AppServices.Scripting">
+      <HintPath>$(DiagDir)\AppServices.Scripting.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="Core\SafeProgressListener.cs" />
+    <Compile Include="Core\FallbackHashtable.cs" />
+    <Compile Include="Core\ReflectionHelpers.cs" />
+    <Compile Include="Core\ScriptingContext.cs" />
+    <Compile Include="Hardware\CarStatusManager.cs" />
+    <Compile Include="Hardware\ActuationPreflightDialog.cs" />
+    <Compile Include="Diagnostics\DiagnosticsLoader.cs" />
+    <Compile Include="Diagnostics\VehicleReadoutHandler.cs" />
+    <Compile Include="Documents\DocumentResolver.cs" />
+    <Compile Include="Documents\DocumentHtmlRenderer.cs" />
+    <Compile Include="Documents\DocumentViewerWindow.cs" />
+    <Compile Include="Documents\DtcExtendedDialogModernizer.cs" />
+    <Compile Include="Tabs\TabControls.cs" />
+    <Compile Include="Tabs\VehicleCommTab.cs" />
+    <Compile Include="Tabs\ServiceManualsTab.cs" />
+    <Compile Include="Tabs\PartsCatalogTab.cs" />
+    <Compile Include="Tabs\WiringDiagramsTab.cs" />
+    <Compile Include="Testing\AutomatedTestRunner.cs" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
