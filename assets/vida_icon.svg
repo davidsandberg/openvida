@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512" viewBox="0 0 512 512">
+  <title>Untitled-2</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <path id="Background_Card" d="M128 16 L384 16 C445.856 16 496 66.144 496 128 L496 384 C496 445.856 445.856 496 384 496 L128 496 C66.144 496 16 445.856 16 384 L16 128 C16 66.144 66.144 16 128 16 Z" fill="#0b132b" stroke="#1e293b" stroke-width="4" stroke-miterlimit="10"/>
+    <path id="Inner_Glow" d="M128 24 L384 24 C441.438 24 488 70.562 488 128 L488 384 C488 441.438 441.438 488 384 488 L128 488 C70.562 488 24 441.438 24 384 L24 128 C24 70.562 70.562 24 128 24 Z" fill="none" stroke="#334155" stroke-width="2" stroke-miterlimit="10" opacity="0.7"/>
+    <path id="Iron_Ring" d="M121 236 C121 172.487 172.487 121 236 121 C299.513 121 351 172.487 351 236 C351 299.513 299.513 351 236 351 C172.487 351 121 299.513 121 236 Z" fill="none" stroke="#e2e8f0" stroke-width="22" stroke-linecap="round" stroke-miterlimit="10"/>
+    <path id="Arrow_Shaft" d="M314 158 L390 82" fill="none" stroke="#e2e8f0" stroke-width="22" stroke-linecap="square" stroke-miterlimit="10"/>
+    <path id="Arrow_Head" d="M322 82 L390 82 L390 150" fill="none" stroke="#e2e8f0" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <path id="Telemetry_Pulse" d="M52 248 L148 248 L176 186 L214 316 L250 205 L272 268 L296 248 L460 248" fill="none" stroke="#00e5ff" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+    <path id="Node_0" d="M142.5 248 C142.5 244.962 144.962 242.5 148 242.5 C151.038 242.5 153.5 244.962 153.5 248 C153.5 251.038 151.038 253.5 148 253.5 C144.962 253.5 142.5 251.038 142.5 248 Z" fill="#00e5ff"/>
+    <path id="Node_1" d="M169.5 186 C169.5 182.41 172.41 179.5 176 179.5 C179.59 179.5 182.5 182.41 182.5 186 C182.5 189.59 179.59 192.5 176 192.5 C172.41 192.5 169.5 189.59 169.5 186 Z" fill="#ffffff"/>
+    <path id="Node_2" d="M207.5 316 C207.5 312.41 210.41 309.5 214 309.5 C217.59 309.5 220.5 312.41 220.5 316 C220.5 319.59 217.59 322.5 214 322.5 C210.41 322.5 207.5 319.59 207.5 316 Z" fill="#ffffff"/>
+    <path id="Node_3" d="M243.5 205 C243.5 201.41 246.41 198.5 250 198.5 C253.59 198.5 256.5 201.41 256.5 205 C256.5 208.59 253.59 211.5 250 211.5 C246.41 211.5 243.5 208.59 243.5 205 Z" fill="#ffffff"/>
+    <path id="Node_4" d="M290.5 248 C290.5 244.962 292.962 242.5 296 242.5 C299.038 242.5 301.5 244.962 301.5 248 C301.5 251.038 299.038 253.5 296 253.5 C292.962 253.5 290.5 251.038 290.5 248 Z" fill="#00e5ff"/>
+    <text transform="matrix(1 0 0 1 256 420)" x="0" y="0" xml:space="preserve" font-family="Arial, sans-serif" font-size="46" fill="#f8fafc" text-anchor="middle"><tspan x="0" y="0">V I D A</tspan></text>
+    <text transform="matrix(1 0 0 1 256 452)" x="0" y="0" xml:space="preserve" font-family="Arial, sans-serif" font-size="13" fill="#38bdf8" text-anchor="middle"><tspan x="0" y="0">D I A G N O S T I C S</tspan></text>
+  </g>
+</svg>

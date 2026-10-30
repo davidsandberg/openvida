@@ -9245,6 +9245,16 @@ RegisterDummyIsoViewHotspot();
 
         mainForm.Text = "Volvo VIDA 2014D - Standalone Diagnostics";
 
+        try
+        {
+            string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vida_icon.ico");
+            if (File.Exists(icoPath))
+                mainForm.Icon = new Icon(icoPath);
+            else
+                mainForm.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        }
+        catch {}
+
 
 
         mainForm.Width = 1366;
