@@ -1,0 +1,263 @@
+<p align="center">
+  <img src="assets/vida_icon_512.png" alt="OpenVIDA Logo" width="180" height="180" />
+</p>
+
+<h1 align="center">OpenVIDA</h1>
+
+<p align="center">
+  <strong>A modern, standalone, native C# / .NET reimagining of Volvo VIDA 2014D</strong><br />
+  <em>Liberated from Internet Explorer, virtual machines, and legacy browser plugins.</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20(x64)-blue.svg" alt="Platform" />
+  <img src="https://img.shields.io/badge/.NET-Framework%204.7.2-purple.svg" alt=".NET Version" />
+  <img src="https://img.shields.io/badge/Hardware-Volvo%20DiCE%20%2F%20J2534-orange.svg" alt="Hardware" />
+  <img src="https://img.shields.io/badge/Renderer-Microsoft%20Edge%20WebView2-teal.svg" alt="WebView2" />
+  <img src="https://img.shields.io/badge/License-Research%20%26%20Diagnostic-success.svg" alt="License" />
+</p>
+
+---
+
+## 📖 Table of Contents
+- [1. What is OpenVIDA?](#1-what-is-openvida)
+- [2. Key Capabilities & The 5 Pillars](#2-key-capabilities--the-5-pillars)
+- [3. Supported Vehicles & Hardware](#3-supported-vehicles--hardware)
+- [4. Quick Start Guide](#4-quick-start-guide)
+- [5. Building from Source](#5-building-from-source)
+- [6. Behind the Scenes: Modernizing Legacy VIDA](#6-behind-the-scenes-modernizing-legacy-vida)
+- [7. Codebase & Project Architecture](#7-codebase--project-architecture)
+- [8. Roadmap & Upcoming Milestones](#8-roadmap--upcoming-milestones)
+
+---
+
+## 1. What is OpenVIDA?
+
+For more than a decade, owners and independent technicians maintaining Volvo vehicles from the 1999–2015 era (P1, P2, and P3 platforms) have had to rely on **Volvo VIDA 2014D**. 
+
+Operating original VIDA in the modern era has become notoriously difficult:
+- **The Legacy VM Trap**: Users were forced to spin up bloated 32-bit Windows 7 VirtualBox or VMware images just to launch a diagnostic session.
+- **Internet Explorer 8/9 & ActiveX**: The original client was deeply coupled to obsolete ActiveX plugins (notably IsoView for vector graphics) and ancient Internet Explorer rendering engines that crash or refuse to load on modern Windows 10/11.
+- **Complex Multi-Tier Stack**: Original VIDA ran a heavy JBoss/Java backend communicating through fragile SOAP proxies, slow database abstractions, and erratic session locks.
+
+**OpenVIDA** liberates the system completely. It extracts the raw diagnostic core and business assemblies into a clean, standalone, native Windows Forms application with Microsoft Edge WebView2 rendering, a custom GDI+ CGM vector engine, direct SQL database integration, and high-performance DiCE J2534 CAN communication.
+
+---
+
+## 2. Key Capabilities & The 5 Pillars
+
+```
++-------------------------------------------------------------------------------------------------+
+|                                       OpenVIDA Workspace                                        |
++-------------------------------------------------------------------------------------------------+
+|  [🚗 Initial State]  [🌐 Network]  [⚡ Vehicle Comm]  [📖 Ref Info]  [📚 Manuals]  [📦 Parts] ... |
++-------------------------------------------------------------------------------------------------+
+```
+
+### 📊 Pillar 1: Live Sensor Telemetry & Streaming
+- **Multi-ECU Concurrent Polling**: Read and decode live CAN parameters simultaneously from engine (ECM), transmission (TCM), brakes (BCM), central electronics (CEM), and climate (CCM).
+- **Auto-Scaling Graph View**: Live time-series plotter with dynamic 20% visual headroom padding to prevent clipping during sudden throttle or boost spikes.
+- **Watchlist Controls**: Rapidly add and remove parameters with top-bar actions (`[❌ Remove Item]`, `[🗑️ Clear All]`), <kbd>Delete</kbd> keyboard shortcuts, or right-click context menus.
+- **Battery & Key Position Monitoring**: Continuous real-time readout of terminal 30 battery voltage and ignition key position (Pos 0, Pos I, Pos II, Pos III).
+
+### ⚡ Pillar 2: Bidirectional Actuators & Component Testing
+- **Physical Relay & Solenoid Control**: Command vehicle components directly over DiCE J2534 (e.g., fuel flap solenoid, front & rear washer sprinklers, stop lights, windshield wipers, cooling fans).
+- **Pre-Flight Prerequisite Verification**: Modern safety popup intercepts actuation triggers to warn the user of necessary preconditions (e.g., Key-On-Engine-Off vs. Key-On-Engine-Running, transmission in Park/Neutral, battery voltage thresholds) with `[▶️ Proceed]` and `[Cancel]` guards.
+- **VehComm Sub-Tabs**: 1-click toggling between **📊 Parameters**, **⚡ Activations**, and **🔧 Advanced** (Special Tools & Adaptations).
+
+### 🌐 Pillar 3: Interactive ECU Network Topology Map
+- **Chassis Architecture Map**: Displays the full Volvo bus architecture (High-Speed CAN, Low-Speed CAN, and LIN subnetworks) across up to 36 onboard control modules.
+- **Live Module Status Coloring**: Color-coded diagnostic health:
+  - 🟢 **Green**: Module communicating normally, zero faults.
+  - 🟠 **Orange / Red**: DTCs stored in non-volatile memory.
+  - 🟡 **Yellow**: Intermittent communication or unconfirmed fault.
+  - ⚪ **Gray**: Module not fitted or unpowered.
+- **Interactive Filtering**: Clicking any ECU node on the vector map automatically filters the fault readout table.
+
+### 📚 Pillar 4: Service & Workshop Repair Manuals
+- **68,000+ Genuine Workshop Procedures**: Extracted and indexed directly from the `servicerep_en-US` database.
+- **Volvo Function Group Hierarchy**: Navigable tree structured by genuine engineering function groups:
+  - `0 - General`, `1 - Service & Maintenance`, `2 - Engine & Equipment`, `3 - Electrical`, `4 - Power Transmission`, `5 - Brakes`, `6 - Suspension & Steering`, `7 - Springs & Wheels`, `8 - Body & Interior`, `9 - Miscellaneous`.
+- **Embedded Technical Diagrams**: Illustrations rendered cleanly in-line alongside procedure text, torques, and warning callouts.
+
+### 📦 Pillar 5: Electronic Parts Catalog (EPC) & Wiring Diagrams (EWD)
+- **150,000+ Parts Catalog (EPC)**: Full parts database with model/engine filters (e.g. V70 D5204T2), exploded component assemblies, callout numbers, Volvo part numbers, fitment notes, and 1-click clipboard copying.
+- **Edge WebView2 Wiring Diagrams (EWD)**: Integrated official wiring diagrams from `Volvo_EWD_2014D.iso` featuring 680+ indexed electrical components (relays, fuses, splices, grounds, ECUs) with fast keyword search and high-DPI vector PDF rendering.
+
+---
+
+## 3. Supported Vehicles & Hardware
+
+### Supported Hardware
+- **Volvo DiCE (Diagnostic Communication Equipment)**: Genuine or high-quality clone hardware communicating over native USB (`dice_usb.dll` / J2534 PassThru).
+- **Generic J2534 PassThru Interfaces**: Standard J2534 PassThru compliant devices.
+
+### Supported Volvo Platforms
+- **P3 Platform**: V70 (08-), XC70 (08-), S80 (07-), XC60 (-17), S60 (11-18), V60 (-18).
+- **P2 Platform**: V70 (00-08), XC70 (01-07), S60 (01-09), S80 (99-06), XC90 (03-14).
+- **P1 Platform**: C30 (07-13), C70 (06-13), S40 (04-12), V50 (04-12).
+
+---
+
+## 4. Quick Start Guide
+
+### Prerequisites
+1. **Operating System**: Windows 10 or Windows 11 (64-bit).
+2. **Microsoft Edge WebView2 Runtime**: Pre-installed on modern Windows 10/11 (or downloadable from Microsoft).
+3. **Microsoft SQL Server Express**: Local SQL Server instance hosting the standard VIDA databases (`BaseData`, `CarCom`, `EPC`, `DiagSwdlRepository`, `servicerep_en-US`).
+4. **DiCE Driver**: Standard Volvo DiCE driver installed for USB connectivity.
+
+### Running OpenVIDA
+To launch OpenVIDA with automatic backend and database verification:
+```cmd
+run_diagnostics.bat
+```
+*The batch script verifies that SQL Server is active, ensures the local JBoss backend is initialized, and launches `VidaLauncher.exe` directly.*
+
+### Running in Mock Simulation Mode (Desk Testing)
+If you want to explore the interface, test DTC navigation, browse manuals, or inspect the parts catalog without being connected to a car:
+```cmd
+Vida.bat --mock
+```
+
+---
+
+## 5. Building from Source
+
+OpenVIDA is organized into clean, modular C# files inside [`src/`](src/) and can be compiled in seconds without requiring heavy IDE installations:
+
+```cmd
+build.bat
+```
+
+The build script invokes the native 32-bit Microsoft .NET Framework C# compiler (`csc.exe`):
+1. **Compiles `DummyIsoView.dll`**: The custom GDI+ CGM vector network renderer.
+2. **Compiles `VidaLauncher.exe`**: Incorporates all source modules in `src/`, links required references, and embeds the high-resolution `vida_icon.ico` directly into the Win32 binary.
+
+Alternatively, you can open and build the project in Visual Studio using [`src/OpenVida.csproj`](src/OpenVida.csproj).
+
+---
+
+## 6. Behind the Scenes: Modernizing Legacy VIDA
+
+Building OpenVIDA required deep reverse-engineering of the legacy Volvo diagnostic suite. Below are the key engineering breakthroughs that made this standalone architecture possible:
+
+```mermaid
+flowchart TD
+    subgraph Legacy["Original VIDA 2014D Architecture"]
+        VM["Virtual Machine (Win7 x86)"]
+        IE["Internet Explorer 8/9"]
+        AX["ActiveX IsoViewX.ocx"]
+        JB["JBoss 4 Application Server"]
+        SOAP["SOAP XML Web Services"]
+    end
+
+    subgraph OpenVIDA["Modern OpenVIDA Architecture"]
+        WIN["Native Windows 10 / 11 Host"]
+        NET[".NET 4.7.2 Standalone Binary"]
+        GDI["Pure GDI+ CGM Vector Engine (DummyIsoView)"]
+        WV2["Microsoft Edge WebView2 (High-DPI PDF/HTML)"]
+        SQL["Direct Local SQL Express Integration"]
+        DICE["Native DiCE J2534 Hardware Communication"]
+    end
+
+    VM -.->|Replaced by| WIN
+    IE -.->|Replaced by| WV2
+    AX -.->|Replaced by| GDI
+    JB -.->|Bypassed for Diagnostics| NET
+    SOAP -.->|Direct Database Access| SQL
+```
+
+### 1. Reverse-Engineering CGM & Replacing ActiveX IsoView
+Original VIDA relied on a proprietary 1990s ActiveX control (`IsoViewX.ocx`) to render the interactive vehicle network diagram. In modern Windows and outside Internet Explorer, this control causes access violations, hangs, and memory corruption.
+
+By analyzing the binary **CGM (Computer Graphics Metafile)** format used by Volvo (`v70_diesel_0920.cgm`), we constructed **`DummyIsoView`**:
+- Implements the COM event interfaces (`_DIsoViewX`, `_DIsoViewXEvents`).
+- Parses CGM element classes (Drawing primitives, Polylines, Text, Application Data markers).
+- Employs double-buffered GDI+ rendering to draw the vehicle chassis, bus routes, and interactive ECU nodes with hover effects and click interception.
+
+### 2. Eliminating the ProgressControler Thread-Race Crash
+Original VIDA suffered from a critical race condition: during ECU scanning and communications, `ProgressControler` would dispatch status updates across threads without ensuring the underlying Windows Forms handle was created, triggering fatal `InvalidOperationException` or `TargetInvocationException` crashes.
+
+OpenVIDA introduces **`SafeProgressListener`** and **`SafeListenerList`**:
+- Intercepts listeners before registration.
+- Wraps all progress, message, and busy-bar notifications with safe marshaling checks (`InvokeRequired`).
+- Catches and drops asynchronous UI disposal exceptions cleanly.
+
+### 3. Liberating Diagnostics from Browser Frames
+Original VIDA ran inside an HTML `<frame>` wrapper, orchestrating diagnostics via JavaScript-to-ActiveX bridges. OpenVIDA instantiates `DiagnosticMainForm` directly inside a modern Windows Forms workspace:
+- Wires custom tab activation controllers (`ITabActivation`).
+- Injects a responsive modern top toolbar and tab bar with high-legibility Segoe UI typography.
+- Solves locale-specific formatting bugs (such as Swedish comma delimiters displaying `12.3V` as `125.0V`).
+
+### 4. Direct SQL & XML-to-HTML Technical Document Pipeline
+Rather than relying on sluggish SOAP requests to fetch repair procedures, OpenVIDA connects directly to `servicerep_en-US` and `DiagSwdlRepository`:
+- Resolves symptom codes and DTC IDs directly to Information Element (IE) records.
+- Converts proprietary Volvo SGML/XML markup into modern, responsive HTML with custom CSS.
+- Automatically extracts and base64-inlines technical schematic diagrams (`.png`/`.cgm`).
+
+---
+
+## 7. Codebase & Project Architecture
+
+The codebase is cleanly separated into focused modules under [`src/`](src/):
+
+```
+vida/
+├── assets/                          # Branding & icons (.vectorcraft, .svg, .png, .ico)
+├── ewd/                             # Extracted Electronic Wiring Diagram schematics
+├── src/                             # Modular C# source code
+│   ├── OpenVida.csproj              # MSBuild project definition
+│   ├── Program.cs                   # Entry point, CLI args, shell layout, navigation
+│   ├── Core/                        # Core runtime infrastructure
+│   │   ├── SafeProgressListener.cs  # Thread-safe UI progress listeners
+│   │   ├── FallbackHashtable.cs     # Fault-tolerant localization lookup
+│   │   ├── ReflectionHelpers.cs     # Assembly inspection & reflection helpers
+│   │   └── ScriptingContext.cs      # Scripting engine & hotspot wire-up
+│   ├── Hardware/                    # Hardware communication & safety
+│   │   ├── CarStatusManager.cs      # DiCE status polling (VBatt, Key Position)
+│   │   └── ActuationPreflightDialog.cs # Pre-actuation prerequisite verification
+│   ├── Diagnostics/                 # Diagnostic sessions & vehicle readout
+│   │   ├── DiagnosticsLoader.cs     # DiagApplication initialization & session binding
+│   │   └── VehicleReadoutHandler.cs # All-ECU fault readout & DTC processing
+│   ├── Documents/                   # Documentation & rendering engine
+│   │   ├── DocumentResolver.cs      # Symptom & DTC to document ID mapper
+│   │   ├── DocumentHtmlRenderer.cs  # XML-to-HTML parser with inline images & notes
+│   │   ├── DocumentViewerWindow.cs  # Standalone documentation viewer dialog
+│   │   └── DtcExtendedDialogModernizer.cs # Enhanced DTC timeline & freeze-frame viewer
+│   ├── Tabs/                        # Feature tab implementations
+│   │   ├── TabControls.cs           # Common panel wrappers & models
+│   │   ├── VehicleCommTab.cs        # Sensor streaming, activations, graph plotter
+│   │   ├── ServiceManualsTab.cs     # Genuine Workshop Repair Manuals (Function Groups 0-9)
+│   │   ├── PartsCatalogTab.cs       # Electronic Parts Catalog (EPC)
+│   │   └── WiringDiagramsTab.cs     # Edge WebView2 Wiring Diagram viewer
+│   ├── Testing/                     # Automated regression testing
+│   │   └── AutomatedTestRunner.cs   # Visual round-trip screenshot regression runner
+│   └── IsoView/                     # Vector graphics subsystem
+│       └── DummyIsoView.cs          # Native GDI+ CGM vector network map
+├── build.bat                        # 1-click native compiler script
+├── run_diagnostics.bat              # Service checker and application launcher
+└── README.md                        # Documentation
+```
+
+---
+
+## 8. Roadmap & Upcoming Milestones
+
+- [x] **Live CAN Sensor Streaming**: Real-time parameter streaming from vehicle ECUs with auto-scaling graph view.
+- [x] **Bidirectional Actuations**: Tested on vehicle hardware (fuel flap, wipers, washers, stop lights).
+- [x] **Pre-Flight Prerequisites Verification**: Interactive safety warnings for KOEO/KOER requirements.
+- [x] **Electronic Parts Catalog (EPC)**: Full parts database with model filtering and exploded diagrams.
+- [x] **Electronic Wiring Diagrams (EWD)**: High-DPI vector PDF rendering via Edge WebView2.
+- [x] **Brand Visual Identity**: Custom vector emblem and Windows icon integration via VectorCraft.
+- [x] **Codebase Modularization**: Clean split into `src/` modular components with `OpenVida.csproj`.
+- [ ] **Startup JBoss Service Verification**: Health probe checking backend readiness at launch with auto-start prompts.
+- [ ] **All-ECU DTC Clear ("Clear All Faults")**: In-car verification of DTC clearing routine over DiCE.
+- [ ] **Service Reset & Adaptations**: SRI reset, Battery Monitoring Sensor (BMS) reset, transmission adaptation counters.
+- [ ] **Automated Windows Installer**: Packaging into a turnkey setup wizard (Inno Setup / WiX).
+
+---
+
+<p align="center">
+  <em>Developed with ❤️ for the Volvo enthusiast and engineering community.</em>
+</p>
