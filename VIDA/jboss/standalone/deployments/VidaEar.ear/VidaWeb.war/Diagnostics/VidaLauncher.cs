@@ -8921,7 +8921,7 @@ RegisterDummyIsoViewHotspot();
 
 
 
-                    if (miOverride != null) miOverride.Invoke(compCfg, new object[] { @"(local)\Vida" });
+                    if (miOverride != null) miOverride.Invoke(compCfg, new object[] { @"localhost\SQLEXPRESS" });
 
 
 
