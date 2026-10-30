@@ -10659,6 +10659,91 @@ RegisterDummyIsoViewHotspot();
                             ecuBar.Controls.Add(btnSubSpec);
                             setSubTabStyle(btnSubParam);
 
+                            // Parameters Watchlist Management Buttons
+                            Button btnRemoveParam = new Button();
+                            btnRemoveParam.Text = "❌ Remove Item";
+                            btnRemoveParam.SetBounds(595, 30, 100, 24);
+                            btnRemoveParam.FlatStyle = FlatStyle.Flat;
+                            btnRemoveParam.FlatAppearance.BorderSize = 1;
+                            btnRemoveParam.FlatAppearance.BorderColor = Color.FromArgb(220, 180, 180);
+                            btnRemoveParam.BackColor = Color.FromArgb(253, 242, 242);
+                            btnRemoveParam.ForeColor = Color.FromArgb(160, 40, 40);
+                            btnRemoveParam.Font = new Font("Segoe UI", 8.2f, FontStyle.Regular);
+                            btnRemoveParam.Cursor = Cursors.Hand;
+                            btnRemoveParam.Click += (sR, eR) => {
+                                try {
+                                    FieldInfo rpf = vcForm.GetType().GetField("_readParametersPage", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    object rp = rpf != null ? rpf.GetValue(vcForm) : null;
+                                    if (rp != null) {
+                                        FieldInfo lvf = rp.GetType().GetField("_paramListView", BindingFlags.NonPublic | BindingFlags.Instance);
+                                        object lvObj = lvf != null ? lvf.GetValue(rp) : null;
+                                        if (lvObj != null) {
+                                            PropertyInfo piSel = lvObj.GetType().GetProperty("SelectedItems");
+                                            IList selList = piSel != null ? piSel.GetValue(lvObj, null) as IList : null;
+                                            if (selList == null || selList.Count == 0) {
+                                                PropertyInfo piItems = lvObj.GetType().GetProperty("Items");
+                                                IEnumerable items = piItems != null ? piItems.GetValue(lvObj, null) as IEnumerable : null;
+                                                object lastIt = null;
+                                                if (items != null) {
+                                                    foreach (object it in items) lastIt = it;
+                                                }
+                                                if (lastIt != null) {
+                                                    PropertyInfo piItSel = lastIt.GetType().GetProperty("Selected");
+                                                    if (piItSel != null) piItSel.SetValue(lastIt, true, null);
+                                                }
+                                            }
+                                        }
+                                        MethodInfo miRem = rp.GetType().GetMethod("removeSelectedItems", BindingFlags.NonPublic | BindingFlags.Instance);
+                                        if (miRem != null) {
+                                            miRem.Invoke(rp, null);
+                                            Console.WriteLine("[Launcher] Parameter removed from watchlist");
+                                        }
+                                    }
+                                } catch (Exception exRem) {
+                                    Console.WriteLine("[Launcher] Error removing parameter: " + exRem.Message);
+                                }
+                            };
+                            ecuBar.Controls.Add(btnRemoveParam);
+
+                            Button btnClearParams = new Button();
+                            btnClearParams.Text = "🗑️ Clear All";
+                            btnClearParams.SetBounds(700, 30, 105, 24);
+                            btnClearParams.FlatStyle = FlatStyle.Flat;
+                            btnClearParams.FlatAppearance.BorderSize = 1;
+                            btnClearParams.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
+                            btnClearParams.BackColor = Color.FromArgb(245, 245, 247);
+                            btnClearParams.ForeColor = Color.FromArgb(70, 70, 80);
+                            btnClearParams.Font = new Font("Segoe UI", 8.2f, FontStyle.Regular);
+                            btnClearParams.Cursor = Cursors.Hand;
+                            btnClearParams.Click += (sC, eC) => {
+                                try {
+                                    FieldInfo rpf = vcForm.GetType().GetField("_readParametersPage", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    object rp = rpf != null ? rpf.GetValue(vcForm) : null;
+                                    if (rp != null) {
+                                        FieldInfo lvf = rp.GetType().GetField("_paramListView", BindingFlags.NonPublic | BindingFlags.Instance);
+                                        object lvObj = lvf != null ? lvf.GetValue(rp) : null;
+                                        if (lvObj != null) {
+                                            PropertyInfo piItems = lvObj.GetType().GetProperty("Items");
+                                            IEnumerable items = piItems != null ? piItems.GetValue(lvObj, null) as IEnumerable : null;
+                                            if (items != null) {
+                                                foreach (object it in items) {
+                                                    PropertyInfo piItSel = it.GetType().GetProperty("Selected");
+                                                    if (piItSel != null) piItSel.SetValue(it, true, null);
+                                                }
+                                            }
+                                        }
+                                        MethodInfo miRem = rp.GetType().GetMethod("removeSelectedItems", BindingFlags.NonPublic | BindingFlags.Instance);
+                                        if (miRem != null) {
+                                            miRem.Invoke(rp, null);
+                                            Console.WriteLine("[Launcher] All parameters cleared from watchlist");
+                                        }
+                                    }
+                                } catch (Exception exClr) {
+                                    Console.WriteLine("[Launcher] Error clearing parameters: " + exClr.Message);
+                                }
+                            };
+                            ecuBar.Controls.Add(btnClearParams);
+
                             // Setup safety logging and DiCE worker binding on ActivationControl
                             try
                             {
@@ -11047,6 +11132,62 @@ RegisterDummyIsoViewHotspot();
 
 
                                 }
+
+                                FieldInfo lvField = rpPage.GetType().GetField("_paramListView", BindingFlags.NonPublic | BindingFlags.Instance);
+                                Control lvCtrl = lvField != null ? lvField.GetValue(rpPage) as Control : null;
+                                if (lvCtrl != null && lvCtrl.Tag == null)
+                                {
+                                    lvCtrl.Tag = "wired_remove";
+                                    lvCtrl.KeyDown += (sKey, eKey) => {
+                                        if (eKey.KeyCode == Keys.Delete)
+                                        {
+                                            try {
+                                                MethodInfo miRem = rpPage.GetType().GetMethod("removeSelectedItems", BindingFlags.NonPublic | BindingFlags.Instance);
+                                                if (miRem != null) {
+                                                    miRem.Invoke(rpPage, null);
+                                                    Console.WriteLine("[Launcher] Parameter removed via Delete key");
+                                                }
+                                            } catch (Exception exK) {
+                                                Console.WriteLine("[Launcher] Delete key error: " + exK.Message);
+                                            }
+                                        }
+                                    };
+
+                                    ContextMenuStrip menu = new ContextMenuStrip();
+                                    ToolStripMenuItem mnuRem = new ToolStripMenuItem("❌ Remove Selected (Delete)");
+                                    mnuRem.Click += (sM, eM) => {
+                                        try {
+                                            MethodInfo miRem = rpPage.GetType().GetMethod("removeSelectedItems", BindingFlags.NonPublic | BindingFlags.Instance);
+                                            if (miRem != null) miRem.Invoke(rpPage, null);
+                                        } catch (Exception exM) { Console.WriteLine("[Launcher] Context menu remove error: " + exM.Message); }
+                                    };
+                                    ToolStripMenuItem mnuClr = new ToolStripMenuItem("🗑️ Clear All");
+                                    mnuClr.Click += (sM, eM) => {
+                                        try {
+                                            PropertyInfo piItems = lvCtrl.GetType().GetProperty("Items");
+                                            IEnumerable items = piItems != null ? piItems.GetValue(lvCtrl, null) as IEnumerable : null;
+                                            if (items != null) {
+                                                foreach (object it in items) {
+                                                    PropertyInfo piItSel = it.GetType().GetProperty("Selected");
+                                                    if (piItSel != null) piItSel.SetValue(it, true, null);
+                                                }
+                                            }
+                                            MethodInfo miRem = rpPage.GetType().GetMethod("removeSelectedItems", BindingFlags.NonPublic | BindingFlags.Instance);
+                                            if (miRem != null) miRem.Invoke(rpPage, null);
+                                        } catch (Exception exM) { Console.WriteLine("[Launcher] Context menu clear error: " + exM.Message); }
+                                    };
+                                    menu.Items.Add(mnuRem);
+                                    menu.Items.Add(mnuClr);
+                                    lvCtrl.ContextMenuStrip = menu;
+                                }
+
+                                FieldInfo btnRemField = rpPage.GetType().GetField("_removeButton", BindingFlags.NonPublic | BindingFlags.Instance);
+                                Control btnRem = btnRemField != null ? btnRemField.GetValue(rpPage) as Control : null;
+                                if (btnRem != null)
+                                {
+                                    btnRem.Visible = true;
+                                }
+
 
 
 
