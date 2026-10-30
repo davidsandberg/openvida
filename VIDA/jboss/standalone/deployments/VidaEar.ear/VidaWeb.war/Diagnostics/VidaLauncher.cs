@@ -10193,7 +10193,7 @@ RegisterDummyIsoViewHotspot();
 
 
 
-                            ecuBar.SetBounds(380, 56, 680, 58);
+                            ecuBar.SetBounds(380, 56, 920, 58);
 
 
 
@@ -10570,6 +10570,146 @@ RegisterDummyIsoViewHotspot();
                                 }
                             };
                             ecuBar.Controls.Add(chkMock);
+                            // Sub-tab switcher inside Vehicle Communication: Parameters vs. Activations vs. Special Tools
+                            Button btnSubParam = new Button();
+                            Button btnSubAct = new Button();
+                            Button btnSubSpec = new Button();
+
+                            Action<Button> setSubTabStyle = (activeBtn) =>
+                            {
+                                Button[] sBtns = new Button[] { btnSubParam, btnSubAct, btnSubSpec };
+                                foreach (var b in sBtns)
+                                {
+                                    if (b == activeBtn)
+                                    {
+                                        b.BackColor = Color.FromArgb(0, 102, 204);
+                                        b.ForeColor = Color.White;
+                                        b.Font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+                                    }
+                                    else
+                                    {
+                                        b.BackColor = Color.FromArgb(235, 240, 245);
+                                        b.ForeColor = Color.FromArgb(50, 60, 70);
+                                        b.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+                                    }
+                                }
+                            };
+
+                            Action<string> switchVehCommSubTab = (tabName) =>
+                            {
+                                try
+                                {
+                                    FieldInfo tabField = vcForm.GetType().GetField("_tab", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    object tabCtrl = tabField != null ? tabField.GetValue(vcForm) : null;
+                                    if (tabCtrl != null)
+                                    {
+                                        FieldInfo targetPageField = vcForm.GetType().GetField(tabName, BindingFlags.NonPublic | BindingFlags.Instance);
+                                        object targetPage = targetPageField != null ? targetPageField.GetValue(vcForm) : null;
+                                        if (targetPage != null)
+                                        {
+                                            MethodInfo miSelChanged = vcForm.GetType().GetMethod("TabSelectedTabChanged", BindingFlags.NonPublic | BindingFlags.Instance);
+                                            PropertyInfo pCurTab = tabCtrl.GetType().GetProperty("SelectedTab");
+                                            object curPage = pCurTab != null ? pCurTab.GetValue(tabCtrl, null) : null;
+                                            if (pCurTab != null) pCurTab.SetValue(tabCtrl, targetPage, null);
+                                            if (miSelChanged != null) miSelChanged.Invoke(vcForm, new object[] { targetPage, curPage });
+                                            Console.WriteLine("[Launcher] Switched VehComm sub-tab to: " + tabName);
+                                        }
+                                    }
+                                }
+                                catch (Exception exTab)
+                                {
+                                    Console.WriteLine("[Launcher] Error switching VehComm sub-tab: " + exTab.Message);
+                                }
+                            };
+
+                            btnSubParam.Text = "📊 Parameters";
+                            btnSubParam.SetBounds(595, 2, 100, 24);
+                            btnSubParam.FlatStyle = FlatStyle.Flat;
+                            btnSubParam.FlatAppearance.BorderSize = 1;
+                            btnSubParam.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
+                            btnSubParam.Cursor = Cursors.Hand;
+                            btnSubParam.Click += (sSub, eSub) => {
+                                setSubTabStyle(btnSubParam);
+                                switchVehCommSubTab("_readingParamTabPage");
+                            };
+                            ecuBar.Controls.Add(btnSubParam);
+
+                            btnSubAct.Text = "⚡ Activations";
+                            btnSubAct.SetBounds(700, 2, 105, 24);
+                            btnSubAct.FlatStyle = FlatStyle.Flat;
+                            btnSubAct.FlatAppearance.BorderSize = 1;
+                            btnSubAct.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
+                            btnSubAct.Cursor = Cursors.Hand;
+                            btnSubAct.Click += (sSub, eSub) => {
+                                setSubTabStyle(btnSubAct);
+                                switchVehCommSubTab("_activationsTabPage");
+                            };
+                            ecuBar.Controls.Add(btnSubAct);
+
+                            btnSubSpec.Text = "🔧 Advanced";
+                            btnSubSpec.SetBounds(810, 2, 95, 24);
+                            btnSubSpec.FlatStyle = FlatStyle.Flat;
+                            btnSubSpec.FlatAppearance.BorderSize = 1;
+                            btnSubSpec.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
+                            btnSubSpec.Cursor = Cursors.Hand;
+                            btnSubSpec.Click += (sSub, eSub) => {
+                                setSubTabStyle(btnSubSpec);
+                                switchVehCommSubTab("_specialToolsTabPage");
+                            };
+                            ecuBar.Controls.Add(btnSubSpec);
+                            setSubTabStyle(btnSubParam);
+
+                            // Setup safety logging and DiCE worker binding on ActivationControl
+                            try
+                            {
+                                FieldInfo actTabField = vcForm.GetType().GetField("_activationsTab", BindingFlags.NonPublic | BindingFlags.Instance);
+                                object actTab = actTabField != null ? actTabField.GetValue(vcForm) : null;
+                                if (actTab != null)
+                                {
+                                    FieldInfo acField = actTab.GetType().GetField("_activationControl", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    object ac = acField != null ? acField.GetValue(actTab) : null;
+                                    if (ac != null)
+                                    {
+                                        EventInfo evStart = ac.GetType().GetEvent("ActivationStarted");
+                                        if (evStart != null)
+                                        {
+                                            EventHandler onActStart = (sAct, eAct) => {
+                                                Console.WriteLine("[Launcher] >>> ACTUATION TRIGGERED: Component test started on ECU via DiCE! <<<");
+                                            };
+                                            evStart.AddEventHandler(ac, onActStart);
+                                        }
+                                        EventInfo evStop = ac.GetType().GetEvent("ActivationStopped");
+                                        if (evStop != null)
+                                        {
+                                            EventHandler onActStop = (sAct, eAct) => {
+                                                Console.WriteLine("[Launcher] <<< ACTUATION STOPPED: Component test finished on ECU via DiCE! >>>");
+                                            };
+                                            evStop.AddEventHandler(ac, onActStop);
+                                        }
+
+                                        // Attach safety interception to _startButton
+                                        FieldInfo sbField = ac.GetType().GetField("_startButton", BindingFlags.NonPublic | BindingFlags.Instance);
+                                        Control sb = sbField != null ? sbField.GetValue(ac) as Control : null;
+                                        if (sb != null)
+                                        {
+                                            sb.MouseDown += (sBtn, eBtn) => {
+                                                if (IsMockSimulation)
+                                                {
+                                                    Console.WriteLine("[Launcher] Warning: Mock Simulation is active! Uncheck 'Mock Data' before running live car actuations.");
+                                                }
+                                                else
+                                                {
+                                                    Console.WriteLine("[Launcher] Preparing DiCE worker thread for live bidirectional activation...");
+                                                }
+                                            };
+                                        }
+                                    }
+                                }
+                            }
+                            catch (Exception exAct)
+                            {
+                                Console.WriteLine("[Launcher] Error hooking ActivationControl: " + exAct.Message);
+                            }
 
 
 
