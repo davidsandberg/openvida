@@ -647,6 +647,156 @@ static class Program
         }
     }
 
+
+    static bool ShowPrerequisitePreflightDialog(string title, string nativeWarning, IList nativePreconds, IWin32Window parent)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(title)) title = "Component Actuation / Diagnostic Routine";
+
+            string engineReq = "";
+            string voltageReq = "• ⚡ Battery Voltage: > 12.0 V (Connect battery maintainer for extended tests)";
+            string transReq = "";
+            string safetyReq = "";
+            string summary = "";
+
+            string tLower = title.ToLowerInvariant();
+
+            if (tLower.Contains("alternator") || tLower.Contains("generator") || tLower.Contains("laddning"))
+            {
+                summary = "Alternator and charging system tests evaluate regulator LIN-bus communication and voltage regulation across 11 duty cycles.";
+                engineReq = "• 🔑 Engine State: MUST BE RUNNING AT IDLE (Alternator rotor must spin to generate charging current).";
+                voltageReq = "• ⚡ Battery Monitoring: Battery Monitoring Sensor (BMS) connected; battery > 12.2 V.";
+                transReq = "• 🛑 Transmission: Gear selector in Park or Neutral, parking brake firmly engaged.";
+            }
+            else if (tLower.Contains("wiper") || tLower.Contains("washer") || tLower.Contains("torkar") || tLower.Contains("spolar"))
+            {
+                summary = "Wiper/washer component test triggers mechanical sweep and high-pressure fluid pumps directly via CEM relays.";
+                engineReq = "• 🔑 Ignition: Position II (Key ON, Engine OFF recommended).";
+                safetyReq = "• ⚠️ Safety: Verify wiper arm sweep path is clear of ice, dry grime, and obstacles.";
+            }
+            else if (tLower.Contains("damper") || tLower.Contains("climate") || tLower.Contains("ccm") || tLower.Contains("spjäll") || tLower.Contains("kalibrer"))
+            {
+                summary = "CCM self-calibration sweeps all air distribution and blend damper stepper motors from stop to stop.";
+                engineReq = "• 🔑 Ignition: Position II (Key ON, Engine OFF).";
+                safetyReq = "• ❄️ Control Panel: Do NOT touch any buttons or dials on the climate panel while calibration runs (~30-45s).";
+            }
+            else if (tLower.Contains("fuel") || tLower.Contains("inject") || tLower.Contains("dpf") || tLower.Contains("bränsle") || tLower.Contains("spridare") || tLower.Contains("partikel"))
+            {
+                summary = "High-pressure fuel injection and exhaust aftertreatment routines require thermal stability and safety interlocks.";
+                engineReq = "• 🔑 Engine State: Running at operating temperature (Coolant temp > 70 °C / 158 °F).";
+                transReq = "• 🛑 Transmission: In Park / Neutral, parking brake engaged.";
+                safetyReq = "• ⛽ Fuel Level: Minimum 20% fuel in tank (never run regeneration on low fuel reserve).";
+            }
+            else if (tLower.Contains("brake") || tLower.Contains("pbm") || tLower.Contains("parkering") || tLower.Contains("broms") || tLower.Contains("luftning"))
+            {
+                summary = "Brake and Electronic Parking Brake (EPB) service routines control hydraulic valves and caliper servo motors.";
+                engineReq = "• 🔑 Ignition: Position II (Key ON, Engine OFF).";
+                safetyReq = "• 🛑 Safety: Vehicle must be on completely level ground; chock wheels if releasing EPB into service mode!";
+            }
+            else
+            {
+                summary = "Diagnostic routines and component actuations command vehicle modules via CAN/LIN bus.";
+                engineReq = "• 🔑 Ignition: Position II (Key ON). Note that routines testing rotation or charging require engine at idle.";
+                safetyReq = "• ⚠️ Preconditions Notice: If the module rejects the request or no movement occurs, ensure physical preconditions (engine state, gear position, doors/hood closed) are satisfied.";
+            }
+
+            using (Form dlg = new Form())
+            {
+                dlg.Text = "Prerequisite Verification";
+                dlg.Size = new Size(540, 390);
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dlg.MaximizeBox = false;
+                dlg.MinimizeBox = false;
+                dlg.BackColor = Color.White;
+
+                Panel pnlHeader = new Panel();
+                pnlHeader.Dock = DockStyle.Top;
+                pnlHeader.Height = 60;
+                pnlHeader.BackColor = Color.FromArgb(240, 246, 252);
+
+                Label lblHeader = new Label();
+                lblHeader.Text = "📋 " + title;
+                lblHeader.Font = new Font("Segoe UI", 10.5f, FontStyle.Bold);
+                lblHeader.ForeColor = Color.FromArgb(15, 45, 85);
+                lblHeader.SetBounds(16, 10, 490, 24);
+
+                Label lblSub = new Label();
+                lblSub.Text = "Verify physical vehicle prerequisites before triggering:";
+                lblSub.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+                lblSub.ForeColor = Color.FromArgb(85, 95, 110);
+                lblSub.SetBounds(18, 34, 490, 18);
+
+                pnlHeader.Controls.Add(lblHeader);
+                pnlHeader.Controls.Add(lblSub);
+                dlg.Controls.Add(pnlHeader);
+
+                RichTextBox txtBody = new RichTextBox();
+                txtBody.ReadOnly = true;
+                txtBody.BorderStyle = BorderStyle.None;
+                txtBody.BackColor = Color.White;
+                txtBody.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
+                txtBody.SetBounds(20, 72, 485, 215);
+
+                var sb = new StringBuilder();
+                if (!string.IsNullOrEmpty(summary)) sb.AppendLine(summary).AppendLine();
+                sb.AppendLine("Required Operating Conditions:");
+                if (!string.IsNullOrEmpty(engineReq)) sb.AppendLine(engineReq);
+                if (!string.IsNullOrEmpty(voltageReq)) sb.AppendLine(voltageReq);
+                if (!string.IsNullOrEmpty(transReq)) sb.AppendLine(transReq);
+                if (!string.IsNullOrEmpty(safetyReq)) sb.AppendLine(safetyReq);
+                if (!string.IsNullOrEmpty(nativeWarning)) sb.AppendLine().AppendLine("⚠️ Volvo Specific Warning: " + nativeWarning);
+                if (nativePreconds != null && nativePreconds.Count > 0)
+                {
+                    sb.AppendLine().AppendLine("Module Preconditions:");
+                    foreach (var pc in nativePreconds)
+                    {
+                        if (pc != null) sb.AppendLine("• " + pc.ToString());
+                    }
+                }
+                txtBody.Text = sb.ToString();
+                dlg.Controls.Add(txtBody);
+
+                Panel pnlBtns = new Panel();
+                pnlBtns.Dock = DockStyle.Bottom;
+                pnlBtns.Height = 52;
+                pnlBtns.BackColor = Color.FromArgb(248, 249, 250);
+
+                Button btnProceed = new Button();
+                btnProceed.Text = "▶️ Proceed & Execute";
+                btnProceed.DialogResult = DialogResult.OK;
+                btnProceed.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+                btnProceed.BackColor = Color.FromArgb(0, 102, 204);
+                btnProceed.ForeColor = Color.White;
+                btnProceed.FlatStyle = FlatStyle.Flat;
+                btnProceed.SetBounds(230, 10, 175, 32);
+                btnProceed.Cursor = Cursors.Hand;
+
+                Button btnCancel = new Button();
+                btnCancel.Text = "Cancel";
+                btnCancel.DialogResult = DialogResult.Cancel;
+                btnCancel.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
+                btnCancel.SetBounds(415, 10, 95, 32);
+                btnCancel.Cursor = Cursors.Hand;
+
+                pnlBtns.Controls.Add(btnProceed);
+                pnlBtns.Controls.Add(btnCancel);
+                dlg.Controls.Add(pnlBtns);
+                dlg.AcceptButton = btnProceed;
+                dlg.CancelButton = btnCancel;
+
+                return dlg.ShowDialog(parent) == DialogResult.OK;
+            }
+        }
+        catch (Exception exDlg)
+        {
+            Console.WriteLine("[Launcher] Preflight dialog error: " + exDlg.Message);
+            return true;
+        }
+    }
+
+
     static void RegisterScriptingContext(object vehProfile, object mgr, object wfVc)
     {
         try
@@ -10772,20 +10922,40 @@ RegisterDummyIsoViewHotspot();
                                             evStop.AddEventHandler(ac, onActStop);
                                         }
 
-                                        // Attach safety interception to _startButton
+                                        // Attach safety interception and prerequisite verification to _startButton
                                         FieldInfo sbField = ac.GetType().GetField("_startButton", BindingFlags.NonPublic | BindingFlags.Instance);
                                         Control sb = sbField != null ? sbField.GetValue(ac) as Control : null;
-                                        if (sb != null)
+                                        MethodInfo mStartOrig = ac.GetType().GetMethod("_startButton_Click", BindingFlags.NonPublic | BindingFlags.Instance);
+                                        if (sb != null && mStartOrig != null && sb.Tag == null)
                                         {
-                                            sb.MouseDown += (sBtn, eBtn) => {
+                                            sb.Tag = "wired_preflight";
+                                            Delegate delStart = Delegate.CreateDelegate(typeof(EventHandler), ac, mStartOrig);
+                                            sb.Click -= (EventHandler)delStart;
+                                            sb.Click += (sBtn, eBtn) => {
                                                 if (IsMockSimulation)
                                                 {
-                                                    Console.WriteLine("[Launcher] Warning: Mock Simulation is active! Uncheck 'Mock Data' before running live car actuations.");
+                                                    Console.WriteLine("[Launcher] Warning: Mock Simulation is active!");
                                                 }
-                                                else
+                                                FieldInfo fCur = ac.GetType().GetField("_currentActivation", BindingFlags.NonPublic | BindingFlags.Instance);
+                                                object curAct = fCur != null ? fCur.GetValue(ac) : null;
+                                                string actName = "Component Activation";
+                                                string actWarn = null;
+                                                IList preConds = null;
+                                                if (curAct != null)
                                                 {
-                                                    Console.WriteLine("[Launcher] Preparing DiCE worker thread for live bidirectional activation...");
+                                                    PropertyInfo piName = curAct.GetType().GetProperty("Name");
+                                                    if (piName != null) actName = piName.GetValue(curAct, null) as string ?? actName;
+                                                    PropertyInfo piWarn = curAct.GetType().GetProperty("Warning");
+                                                    if (piWarn != null) actWarn = piWarn.GetValue(curAct, null) as string;
+                                                    PropertyInfo piPre = curAct.GetType().GetProperty("Preconditions");
+                                                    if (piPre != null) preConds = piPre.GetValue(curAct, null) as IList;
                                                 }
+                                                if (!ShowPrerequisitePreflightDialog(actName, actWarn, preConds, sb.FindForm()))
+                                                {
+                                                    Console.WriteLine("[Launcher] Activation cancelled by user: " + actName);
+                                                    return;
+                                                }
+                                                mStartOrig.Invoke(ac, new object[] { sBtn, eBtn });
                                             };
                                         }
                                     }
@@ -10795,6 +10965,65 @@ RegisterDummyIsoViewHotspot();
                             {
                                 Console.WriteLine("[Launcher] Error hooking ActivationControl: " + exAct.Message);
                             }
+                            // Setup prerequisite pre-flight verification on SpecialToolsTab (Advanced)
+                            try
+                            {
+                                FieldInfo stTabField = vcForm.GetType().GetField("_specialToolsTab", BindingFlags.NonPublic | BindingFlags.Instance);
+                                object stTab = stTabField != null ? stTabField.GetValue(vcForm) : null;
+                                if (stTab != null)
+                                {
+                                    FieldInfo tvField = stTab.GetType().GetField("_treeView", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    TreeView stTv = tvField != null ? tvField.GetValue(stTab) as TreeView : null;
+                                    MethodInfo mDbClickOrig = stTab.GetType().GetMethod("_treeView_DoubleClick", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (stTv != null && mDbClickOrig != null && stTv.Tag == null)
+                                    {
+                                        stTv.Tag = "wired_preflight";
+                                        Delegate delTv = Delegate.CreateDelegate(typeof(EventHandler), stTab, mDbClickOrig);
+                                        stTv.DoubleClick -= (EventHandler)delTv;
+                                        stTv.DoubleClick += (sTv, eTv) => {
+                                            TreeNode selNode = stTv.SelectedNode;
+                                            if (selNode != null && selNode.Nodes.Count == 0)
+                                            {
+                                                string routineTitle = selNode.Text;
+                                                if (!ShowPrerequisitePreflightDialog(routineTitle, null, null, stTv.FindForm()))
+                                                {
+                                                    Console.WriteLine("[Launcher] Routine cancelled by user: " + routineTitle);
+                                                    return;
+                                                }
+                                            }
+                                            mDbClickOrig.Invoke(stTab, new object[] { sTv, eTv });
+                                        };
+                                    }
+
+                                    FieldInfo btnDescField = stTab.GetType().GetField("_viewDescriptionButton", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    Control btnDesc = btnDescField != null ? btnDescField.GetValue(stTab) as Control : null;
+                                    MethodInfo mDescOrig = stTab.GetType().GetMethod("_viewDescriptionButton_Click", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (btnDesc != null && mDescOrig != null && btnDesc.Tag == null)
+                                    {
+                                        btnDesc.Tag = "wired_preflight";
+                                        Delegate delDesc = Delegate.CreateDelegate(typeof(EventHandler), stTab, mDescOrig);
+                                        btnDesc.Click -= (EventHandler)delDesc;
+                                        btnDesc.Click += (sD, eD) => {
+                                            TreeNode selNode = stTv != null ? stTv.SelectedNode : null;
+                                            if (selNode != null && selNode.Nodes.Count == 0)
+                                            {
+                                                string routineTitle = selNode.Text;
+                                                if (!ShowPrerequisitePreflightDialog(routineTitle, null, null, btnDesc.FindForm()))
+                                                {
+                                                    Console.WriteLine("[Launcher] Routine cancelled by user: " + routineTitle);
+                                                    return;
+                                                }
+                                            }
+                                            mDescOrig.Invoke(stTab, new object[] { sD, eD });
+                                        };
+                                    }
+                                }
+                            }
+                            catch (Exception exSt)
+                            {
+                                Console.WriteLine("[Launcher] Error hooking SpecialToolsTab: " + exSt.Message);
+                            }
+
 
 
 
