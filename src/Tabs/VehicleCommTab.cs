@@ -371,16 +371,18 @@ static partial class Program
                             chkMock.Name = "chkMock";
                             chkMock.Text = "Mock Data";
                             chkMock.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
-                            chkMock.SetBounds(490, 31, 100, 22);
+                            chkMock.SetBounds(475, 31, 95, 22);
                             chkMock.Checked = IsMockSimulation;
 
                             _activeChkMock = chkMock;
                             Label lblVehCommStatus = new Label();
                             lblVehCommStatus.Name = "lblVehCommStatus";
                             lblVehCommStatus.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
-                            lblVehCommStatus.SetBounds(230, 4, 680, 20);
-                            lblVehCommStatus.AutoEllipsis = true;
-
+                            lblVehCommStatus.SetBounds(230, 4, 340, 20);
+                            lblVehCommStatus.AutoEllipsis = true;
+
+
+
                             Action updateVehCommStatusText = () =>
                             {
                                 try
@@ -429,11 +431,12 @@ static partial class Program
                             // Sub-tab switcher inside Vehicle Communication: Parameters vs. Activations vs. Special Tools
                             Button btnSubParam = new Button();
                             Button btnSubAct = new Button();
+                            Button btnSubProg = new Button();
                             Button btnSubSpec = new Button();
 
                             Action<Button> setSubTabStyle = (activeBtn) =>
                             {
-                                Button[] sBtns = new Button[] { btnSubParam, btnSubAct, btnSubSpec };
+                                Button[] sBtns = new Button[] { btnSubParam, btnSubAct, btnSubProg, btnSubSpec };
                                 foreach (var b in sBtns)
                                 {
                                     if (b == activeBtn)
@@ -479,7 +482,7 @@ static partial class Program
                             };
 
                             btnSubParam.Text = "📊 Parameters";
-                            btnSubParam.SetBounds(595, 2, 100, 24);
+                            btnSubParam.SetBounds(580, 2, 95, 24);
                             btnSubParam.FlatStyle = FlatStyle.Flat;
                             btnSubParam.FlatAppearance.BorderSize = 1;
                             btnSubParam.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
@@ -491,7 +494,7 @@ static partial class Program
                             ecuBar.Controls.Add(btnSubParam);
 
                             btnSubAct.Text = "⚡ Activations";
-                            btnSubAct.SetBounds(700, 2, 105, 24);
+                            btnSubAct.SetBounds(680, 2, 95, 24);
                             btnSubAct.FlatStyle = FlatStyle.Flat;
                             btnSubAct.FlatAppearance.BorderSize = 1;
                             btnSubAct.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
@@ -502,8 +505,20 @@ static partial class Program
                             };
                             ecuBar.Controls.Add(btnSubAct);
 
+                            btnSubProg.Text = "📝 Programmed Values";
+                            btnSubProg.SetBounds(780, 2, 135, 24);
+                            btnSubProg.FlatStyle = FlatStyle.Flat;
+                            btnSubProg.FlatAppearance.BorderSize = 1;
+                            btnSubProg.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
+                            btnSubProg.Cursor = Cursors.Hand;
+                            btnSubProg.Click += (sSub, eSub) => {
+                                setSubTabStyle(btnSubProg);
+                                switchVehCommSubTab("_programmedValuesTabPage");
+                            };
+                            ecuBar.Controls.Add(btnSubProg);
+
                             btnSubSpec.Text = "🔧 Advanced";
-                            btnSubSpec.SetBounds(810, 2, 95, 24);
+                            btnSubSpec.SetBounds(920, 2, 90, 24);
                             btnSubSpec.FlatStyle = FlatStyle.Flat;
                             btnSubSpec.FlatAppearance.BorderSize = 1;
                             btnSubSpec.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
@@ -518,7 +533,7 @@ static partial class Program
                             // Parameters Watchlist Management Buttons
                             Button btnRemoveParam = new Button();
                             btnRemoveParam.Text = "❌ Remove Item";
-                            btnRemoveParam.SetBounds(595, 30, 100, 24);
+                            btnRemoveParam.SetBounds(580, 30, 95, 24);
                             btnRemoveParam.FlatStyle = FlatStyle.Flat;
                             btnRemoveParam.FlatAppearance.BorderSize = 1;
                             btnRemoveParam.FlatAppearance.BorderColor = Color.FromArgb(220, 180, 180);
@@ -563,7 +578,7 @@ static partial class Program
 
                             Button btnClearParams = new Button();
                             btnClearParams.Text = "🗑️ Clear All";
-                            btnClearParams.SetBounds(700, 30, 105, 24);
+                            btnClearParams.SetBounds(680, 30, 95, 24);
                             btnClearParams.FlatStyle = FlatStyle.Flat;
                             btnClearParams.FlatAppearance.BorderSize = 1;
                             btnClearParams.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
@@ -791,6 +806,69 @@ static partial class Program
                             catch (Exception exSt)
                             {
                                 Console.WriteLine("[Launcher] Error hooking SpecialToolsTab: " + exSt.Message);
+                            }
+
+                            // Wire ProgrammedValuesTab preflight safety guard
+                            try
+                            {
+                                FieldInfo pvTabField = vcForm.GetType().GetField("_programmedValuesTab", BindingFlags.NonPublic | BindingFlags.Instance);
+                                object pvTab = pvTabField != null ? pvTabField.GetValue(vcForm) : null;
+                                if (pvTab != null)
+                                {
+                                    FieldInfo pbField = pvTab.GetType().GetField("_programButton", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    Control pb = pbField != null ? pbField.GetValue(pvTab) as Control : null;
+                                    MethodInfo mProgOrig = pvTab.GetType().GetMethod("_programButton_Click", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    if (pb != null && mProgOrig != null && pb.Tag == null)
+                                    {
+                                        pb.Tag = "wired_preflight";
+                                        Delegate delProg = Delegate.CreateDelegate(typeof(EventHandler), pvTab, mProgOrig);
+                                        pb.Click -= (EventHandler)delProg;
+                                        pb.Click += (sPb, ePb) => {
+                                            if (!IsMockSimulation && !IsDiceConnected)
+                                            {
+                                                var actReq = ShowVehicleRequiredDialog(pb.FindForm(), "Programmed Values / ECU Parameter Programming");
+                                                if (actReq == VehicleRequiredAction.EnableMock)
+                                                {
+                                                    chkMock.Checked = true;
+                                                    IsMockSimulation = true;
+                                                    updateVehCommStatusText();
+                                                }
+                                                else if (actReq == VehicleRequiredAction.TryConnect)
+                                                {
+                                                    InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
+                                                    if (!IsDiceConnected)
+                                                    {
+                                                        MessageBox.Show("DiCE hardware interface is still not detected or car ignition is OFF.\n\nPlease connect DiCE USB cable to vehicle OBD-II port and retry.", "Connection Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                                        return;
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    return;
+                                                }
+                                            }
+
+                                            // Confirm programming action with user
+                                            DialogResult progDr = MessageBox.Show(
+                                                "Are you sure you want to write and program the new configuration value(s) into the ECU non-volatile memory?\n\nEnsure vehicle ignition is ON (Position II) and battery voltage is stable before proceeding.",
+                                                "Confirm ECU Programming",
+                                                MessageBoxButtons.YesNo,
+                                                MessageBoxIcon.Question);
+
+                                            if (progDr != DialogResult.Yes)
+                                            {
+                                                Console.WriteLine("[Launcher] Programming cancelled by user.");
+                                                return;
+                                            }
+
+                                            mProgOrig.Invoke(pvTab, new object[] { sPb, ePb });
+                                        };
+                                    }
+                                }
+                            }
+                            catch (Exception exPv)
+                            {
+                                Console.WriteLine("[Launcher] Error hooking ProgrammedValuesTab: " + exPv.Message);
                             }
 
                             // Shortcut buttons row

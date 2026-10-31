@@ -66,7 +66,7 @@ move /y VidaLauncher_new.exe VidaLauncher.exe >nul 2>&1
 if errorlevel 1 (
     echo [INFO] VidaLauncher.exe is currently running. Stopping running instance to update binary...
     taskkill /f /im VidaLauncher.exe >nul 2>&1
-    timeout /t 1 /nobreak >nul
+    powershell -NoProfile -Command "Start-Sleep -Milliseconds 800"
     move /y VidaLauncher_new.exe VidaLauncher.exe >nul 2>&1
     if errorlevel 1 (
         echo [ERROR] Could not overwrite VidaLauncher.exe. Please close any running instance!
