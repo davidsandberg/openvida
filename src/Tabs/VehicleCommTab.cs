@@ -371,9 +371,50 @@ static partial class Program
                             chkMock.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
                             chkMock.SetBounds(490, 31, 100, 22);
                             chkMock.Checked = IsMockSimulation;
+                            Label lblVehCommStatus = new Label();
+                            lblVehCommStatus.Name = "lblVehCommStatus";
+                            lblVehCommStatus.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
+                            lblVehCommStatus.SetBounds(230, 4, 680, 20);
+                            lblVehCommStatus.AutoEllipsis = true;
+
+                            Action updateVehCommStatusText = () =>
+                            {
+                                try
+                                {
+                                    if (lblVehCommStatus.IsDisposed) return;
+                                    if (IsMockSimulation)
+                                    {
+                                        lblVehCommStatus.Text = "🧪 Mock Simulation Mode — Simulating live vehicle telemetry for desk testing.";
+                                        lblVehCommStatus.ForeColor = Color.FromArgb(2, 132, 199);
+                                    }
+                                    else if (IsDiceConnected)
+                                    {
+                                        lblVehCommStatus.Text = string.Format("🟢 Vehicle Connected — DiCE J2534 ({0:F1}V, Key Pos {1}). Ready for live polling & actuation.", _lastKnownVoltVal, _lastKnownKeyPos);
+                                        lblVehCommStatus.ForeColor = Color.FromArgb(22, 163, 74);
+                                    }
+                                    else
+                                    {
+                                        lblVehCommStatus.Text = "⚪ Vehicle Disconnected — Hardware offline. Browse parameters freely, or enable [☑️ Mock Data].";
+                                        lblVehCommStatus.ForeColor = Color.FromArgb(100, 116, 139);
+                                    }
+                                }
+                                catch {}
+                            };
+
+                            updateVehCommStatusText();
+                            ecuBar.Controls.Add(lblVehCommStatus);
+
+                            OnCarStatusChanged += () => {
+                                try {
+                                    if (lblVehCommStatus.InvokeRequired) lblVehCommStatus.BeginInvoke(updateVehCommStatusText);
+                                    else updateVehCommStatusText();
+                                } catch {}
+                            };
+
                             chkMock.CheckedChanged += (sChk, eChk) => {
                                 IsMockSimulation = chkMock.Checked;
                                 Console.WriteLine("[Launcher] Mock Simulation toggled: " + IsMockSimulation);
+                                updateVehCommStatusText();
                                 if (!IsMockSimulation && wfInit != null)
                                 {
                                     MethodInfo startM = wfInit.GetType().GetMethod("StartReading");
@@ -611,6 +652,30 @@ static partial class Program
                                                     PropertyInfo piPre = curAct.GetType().GetProperty("Preconditions");
                                                     if (piPre != null) preConds = piPre.GetValue(curAct, null) as IList;
                                                 }
+                                                if (!IsMockSimulation && !IsDiceConnected)
+                                                {
+                                                    var actReq = ShowVehicleRequiredDialog(sb.FindForm(), actName);
+                                                    if (actReq == VehicleRequiredAction.EnableMock)
+                                                    {
+                                                        chkMock.Checked = true;
+                                                        IsMockSimulation = true;
+                                                        updateVehCommStatusText();
+                                                    }
+                                                    else if (actReq == VehicleRequiredAction.TryConnect)
+                                                    {
+                                                        InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
+                                                        if (!IsDiceConnected)
+                                                        {
+                                                            MessageBox.Show("Could not connect to vehicle.\n\nPlease ensure DiCE is connected via USB and OBD-II, and ignition is in Position II.", "Vehicle Not Detected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                                            return;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        return;
+                                                    }
+                                                }
+
                                                 if (!ShowPrerequisitePreflightDialog(actName, actWarn, preConds, sb.FindForm()))
                                                 {
                                                     Console.WriteLine("[Launcher] Activation cancelled by user: " + actName);
@@ -646,6 +711,30 @@ static partial class Program
                                             if (selNode != null && selNode.Nodes.Count == 0)
                                             {
                                                 string routineTitle = selNode.Text;
+                                                if (!IsMockSimulation && !IsDiceConnected)
+                                                {
+                                                    var actReq = ShowVehicleRequiredDialog(stTv.FindForm(), routineTitle);
+                                                    if (actReq == VehicleRequiredAction.EnableMock)
+                                                    {
+                                                        chkMock.Checked = true;
+                                                        IsMockSimulation = true;
+                                                        updateVehCommStatusText();
+                                                    }
+                                                    else if (actReq == VehicleRequiredAction.TryConnect)
+                                                    {
+                                                        InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
+                                                        if (!IsDiceConnected)
+                                                        {
+                                                            MessageBox.Show("Could not connect to vehicle.\n\nPlease ensure DiCE is connected via USB and OBD-II, and ignition is in Position II.", "Vehicle Not Detected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                                            return;
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        return;
+                                                    }
+                                                }
+
                                                 if (!ShowPrerequisitePreflightDialog(routineTitle, null, null, stTv.FindForm()))
                                                 {
                                                     Console.WriteLine("[Launcher] Routine cancelled by user: " + routineTitle);

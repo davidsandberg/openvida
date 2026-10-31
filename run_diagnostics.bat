@@ -8,11 +8,17 @@ echo   Starting Volvo VIDA 2014D Standalone Diagnostics
 echo ============================================================
 echo.
 
-rem 1. Check SQL Server
+rem 1. Check SQL Server Service & Responsiveness
 sc query "MSSQL$SQLEXPRESS" | find "RUNNING" >nul
 if errorlevel 1 (
     echo [INFO] Starting SQL Server SQLEXPRESS...
     net start "MSSQL$SQLEXPRESS" >nul 2>&1
+)
+powershell -NoProfile -Command "$c = New-Object System.Data.SqlClient.SqlConnection('Server=localhost\SQLEXPRESS;Database=master;Integrated Security=True;Connection Timeout=2'); try { $c.Open(); $c.Close(); exit 0 } catch { exit 1 }" >nul 2>&1
+if errorlevel 1 (
+    echo [WARNING] SQL Server is not responding to connections (socket timeout / post-sleep hang).
+    echo [INFO] Running elevated service restart via restart_sql.bat...
+    powershell -NoProfile -Command "Start-Process cmd.exe -ArgumentList '/c net stop MSSQL$SQLEXPRESS & net start MSSQL$SQLEXPRESS' -Verb RunAs -Wait" >nul 2>&1
 )
 
 rem 2. Check JBoss HTTP Listener Port 80

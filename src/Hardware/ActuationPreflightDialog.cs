@@ -167,4 +167,101 @@ static partial class Program
         }
     }
 
+
+    public enum VehicleRequiredAction
+    {
+        Cancel,
+        EnableMock,
+        TryConnect
+    }
+
+    public static VehicleRequiredAction ShowVehicleRequiredDialog(IWin32Window parent, string actionName)
+    {
+        using (Form dlg = new Form())
+        {
+            dlg.Text = "OpenVIDA — Vehicle Communication Required";
+            dlg.Size = new Size(520, 270);
+            dlg.StartPosition = FormStartPosition.CenterParent;
+            dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+            dlg.MaximizeBox = false;
+            dlg.MinimizeBox = false;
+            dlg.BackColor = Color.White;
+            dlg.Font = new Font("Segoe UI", 9.0f);
+
+            try
+            {
+                string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vida_icon.ico");
+                if (File.Exists(icoPath)) dlg.Icon = new Icon(icoPath);
+            }
+            catch {}
+
+            Panel header = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.FromArgb(239, 246, 255) };
+            Label lblIcon = new Label { Text = "🚗", Font = new Font("Segoe UI", 20f), Location = new Point(16, 12), AutoSize = true, BackColor = Color.Transparent };
+            Label lblTitle = new Label { Text = "Vehicle Communication Required", Font = new Font("Segoe UI", 11.5f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 64, 175), Location = new Point(56, 12), AutoSize = true, BackColor = Color.Transparent };
+            Label lblSub = new Label { Text = "Live component actuations require an active DiCE vehicle connection.", Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(59, 130, 246), Location = new Point(58, 35), AutoSize = true, BackColor = Color.Transparent };
+            header.Controls.AddRange(new Control[] { lblIcon, lblTitle, lblSub });
+
+            Label lblMsg = new Label
+            {
+                Text = string.Format("'{0}' communicates directly with vehicle control modules over DiCE.\n\nNo vehicle is currently detected (DiCE disconnected or ignition in Position 0).\n\nWould you like to enable Mock Simulation Mode to safely test this control on your desktop?", actionName),
+                Location = new Point(20, 75),
+                Size = new Size(465, 80),
+                ForeColor = Color.FromArgb(51, 65, 85)
+            };
+
+            Panel btnPanel = new Panel { Dock = DockStyle.Bottom, Height = 60, BackColor = Color.FromArgb(248, 250, 252) };
+
+            Button btnMock = new Button
+            {
+                Text = "🧪 Enable Mock Mode",
+                Location = new Point(20, 14),
+                Size = new Size(160, 34),
+                BackColor = Color.FromArgb(0, 102, 204),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9.0f, FontStyle.Bold),
+                Cursor = Cursors.Hand
+            };
+            btnMock.FlatAppearance.BorderSize = 0;
+
+            Button btnConnect = new Button
+            {
+                Text = "⚡ Try DiCE Connect",
+                Location = new Point(190, 14),
+                Size = new Size(160, 34),
+                BackColor = Color.FromArgb(226, 232, 240),
+                ForeColor = Color.FromArgb(30, 41, 59),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnConnect.FlatAppearance.BorderSize = 0;
+
+            Button btnCancel = new Button
+            {
+                Text = "Cancel",
+                Location = new Point(360, 14),
+                Size = new Size(90, 34),
+                BackColor = Color.FromArgb(241, 245, 249),
+                ForeColor = Color.FromArgb(100, 116, 139),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand
+            };
+            btnCancel.FlatAppearance.BorderSize = 0;
+
+            VehicleRequiredAction action = VehicleRequiredAction.Cancel;
+
+            btnMock.Click += (s, e) => { action = VehicleRequiredAction.EnableMock; dlg.Close(); };
+            btnConnect.Click += (s, e) => { action = VehicleRequiredAction.TryConnect; dlg.Close(); };
+            btnCancel.Click += (s, e) => { action = VehicleRequiredAction.Cancel; dlg.Close(); };
+
+            btnPanel.Controls.AddRange(new Control[] { btnMock, btnConnect, btnCancel });
+            dlg.Controls.AddRange(new Control[] { header, lblMsg, btnPanel });
+
+            if (parent != null) dlg.ShowDialog(parent);
+            else dlg.ShowDialog();
+
+            return action;
+        }
+    }
+
 }

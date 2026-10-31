@@ -25,7 +25,16 @@ static partial class Program
     public static Label TopBarCarStatusLabel = null;
     static double _lastKnownVoltVal = 0.0;
     static Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition _lastKnownKeyPos = Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos0;
-    static Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState _lastKnownState = Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected;
+    static Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState _lastKnownState = Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Disconnected;
+    public static event Action OnCarStatusChanged;
+
+    public static bool IsDiceConnected
+    {
+        get
+        {
+            return !IsMockSimulation && _lastKnownState == Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected && _lastKnownVoltVal > 5.0;
+        }
+    }
 
     static void UpdateAllCarStatusControls(double voltVal)
     {
@@ -131,6 +140,10 @@ static partial class Program
             }
 
             UpdateAllCarStatusControls(_lastKnownVoltVal);
+            if (OnCarStatusChanged != null)
+            {
+                try { OnCarStatusChanged(); } catch {}
+            }
         }
         catch {}
     }

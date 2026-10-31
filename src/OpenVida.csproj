@@ -78,6 +78,7 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="Core\StartupHealthCheck.cs" />
     <Compile Include="Core\SafeProgressListener.cs" />
     <Compile Include="Core\FallbackHashtable.cs" />
     <Compile Include="Core\ReflectionHelpers.cs" />

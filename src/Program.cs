@@ -122,6 +122,12 @@ static partial class Program
 
         };
 
+        // Pre-flight environment & database health check
+        if (!PerformStartupHealthCheck(vidaPath))
+        {
+            return;
+        }
+
         // 3. Initialize DiagApplication singleton
 
         DiagApplication.Instance.RootUrl = "http://localhost/Vida/Diagnostics/";
