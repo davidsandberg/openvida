@@ -180,7 +180,7 @@ static partial class Program
         using (Form dlg = new Form())
         {
             dlg.Text = "OpenVIDA — Vehicle Communication Required";
-            dlg.Size = new Size(520, 270);
+            dlg.Size = new Size(540, 270);
             dlg.StartPosition = FormStartPosition.CenterParent;
             dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
             dlg.MaximizeBox = false;
@@ -196,9 +196,9 @@ static partial class Program
             catch {}
 
             Panel header = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.FromArgb(239, 246, 255) };
-            Label lblIcon = new Label { Text = "🚗", Font = new Font("Segoe UI", 20f), Location = new Point(16, 12), AutoSize = true, BackColor = Color.Transparent };
-            Label lblTitle = new Label { Text = "Vehicle Communication Required", Font = new Font("Segoe UI", 11.5f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 64, 175), Location = new Point(56, 12), AutoSize = true, BackColor = Color.Transparent };
-            Label lblSub = new Label { Text = "Live component actuations require an active DiCE vehicle connection.", Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(59, 130, 246), Location = new Point(58, 35), AutoSize = true, BackColor = Color.Transparent };
+            Label lblIcon = new Label { Text = "🚗", Font = new Font("Segoe UI", 20f), Location = new Point(14, 10), Size = new Size(46, 42), AutoSize = false, BackColor = Color.Transparent };
+            Label lblTitle = new Label { Text = "Vehicle Communication Required", Font = new Font("Segoe UI", 11.5f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 64, 175), Location = new Point(68, 12), AutoSize = true, BackColor = Color.Transparent };
+            Label lblSub = new Label { Text = "Live component actuations require an active DiCE vehicle connection.", Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(59, 130, 246), Location = new Point(68, 35), AutoSize = true, BackColor = Color.Transparent };
             header.Controls.AddRange(new Control[] { lblIcon, lblTitle, lblSub });
 
             Label lblMsg = new Label

@@ -85,9 +85,9 @@ static partial class Program
                 catch {}
 
                 Panel header = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.FromArgb(254, 243, 199) };
-                Label lblIcon = new Label { Text = "⚠️", Font = new Font("Segoe UI", 20f), Location = new Point(16, 12), AutoSize = true, BackColor = Color.Transparent };
-                Label lblTitle = new Label { Text = "SQL Server (SQLEXPRESS) Not Responding", Font = new Font("Segoe UI", 11.5f, FontStyle.Bold), ForeColor = Color.FromArgb(146, 64, 14), Location = new Point(56, 12), AutoSize = true, BackColor = Color.Transparent };
-                Label lblSub = new Label { Text = "The database service is stopped or stuck in a socket timeout.", Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(180, 83, 9), Location = new Point(58, 35), AutoSize = true, BackColor = Color.Transparent };
+                Label lblIcon = new Label { Text = "⚠️", Font = new Font("Segoe UI", 20f), Location = new Point(14, 10), Size = new Size(46, 42), AutoSize = false, BackColor = Color.Transparent };
+                Label lblTitle = new Label { Text = "SQL Server (SQLEXPRESS) Not Responding", Font = new Font("Segoe UI", 11.5f, FontStyle.Bold), ForeColor = Color.FromArgb(146, 64, 14), Location = new Point(68, 12), AutoSize = true, BackColor = Color.Transparent };
+                Label lblSub = new Label { Text = "The database service is stopped or stuck in a socket timeout.", Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(180, 83, 9), Location = new Point(68, 35), AutoSize = true, BackColor = Color.Transparent };
                 header.Controls.AddRange(new Control[] { lblIcon, lblTitle, lblSub });
 
                 Label lblMsg = new Label

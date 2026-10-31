@@ -270,7 +270,7 @@ static partial class Program
 
             sb.Append(".warning { background: #fef2f2; border-left: 4px solid #ef4444; padding: 12px 16px; margin: 14px 0; border-radius: 4px; color: #991b1b; font-weight: 500; }");
 
-            sb.Append(".question-box { background: #f0fdf4; border: 1px solid #86efac; border-left: 4px solid #22c55e; padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-weight: 500; color: #14532d; }");
+            sb.Append(".question-box { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #005087; padding: 12px 16px; margin: 16px 0; border-radius: 4px; font-weight: 500; color: #1e293b; }");
 
             sb.Append(".btn-print { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 12px; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer; text-decoration: none; }");
 
@@ -295,13 +295,13 @@ static partial class Program
             sb.Append(".doc-link:hover { color: #0369a1; }");
 
             sb.Append(".doc-img { max-width: 95%; height: auto; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }");
-            sb.Append(".smarttool-box { background: #f0fdf4; border: 2px solid #22c55e; border-radius: 6px; padding: 14px 18px; margin: 16px 0; box-shadow: 0 2px 6px rgba(34, 197, 94, 0.12); }");
+            sb.Append(".smarttool-box { background: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid #005087; border-radius: 4px; padding: 14px 18px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }");
             sb.Append(".smarttool-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }");
-            sb.Append(".smarttool-badge { background: #16a34a; color: white; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 3px; letter-spacing: 0.5px; }");
-            sb.Append(".smarttool-title { font-size: 14px; font-weight: 600; color: #14532d; }");
+            sb.Append(".smarttool-badge { background: #003057; color: white; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 3px; letter-spacing: 0.5px; }");
+            sb.Append(".smarttool-title { font-size: 14px; font-weight: 600; color: #003057; }");
             sb.Append(".smarttool-action { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }");
-            sb.Append(".btn-smarttool { display: inline-flex; align-items: center; background: #16a34a; color: #ffffff !important; text-decoration: none !important; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.15); transition: background 0.15s ease; }");
-            sb.Append(".btn-smarttool:hover { background: #15803d; color: #ffffff !important; }");
+            sb.Append(".btn-smarttool { display: inline-flex; align-items: center; background: #005087; color: #ffffff !important; text-decoration: none !important; padding: 8px 18px; border-radius: 4px; font-size: 13px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.12); transition: background 0.15s ease; }");
+            sb.Append(".btn-smarttool:hover { background: #003b66; color: #ffffff !important; }");
             sb.Append(".smarttool-id { font-size: 12px; color: #475569; }");
             sb.Append(".smarttool-id code { background: #e2e8f0; padding: 2px 6px; border-radius: 3px; font-family: Consolas, monospace; font-size: 11.5px; }");
 
@@ -796,7 +796,7 @@ static partial class Program
         sb.AppendFormat("<span class='smarttool-title'>{0}</span>", System.Security.SecurityElement.Escape(routineTitle));
         sb.Append("</div>");
         sb.Append("<div class='smarttool-action'>");
-        sb.AppendFormat("<a href='{0}' class='btn-smarttool'>{1}▶️ Run Adaptation / Routine on ECU</a>", clickUrl, iconHtml);
+        sb.AppendFormat("<a href='{0}' class='btn-smarttool'>{1}Run Adaptation on ECU</a>", clickUrl, iconHtml);
         sb.AppendFormat("<span class='smarttool-id'>Script: <code>{0}</code></span>", System.Security.SecurityElement.Escape(scriptId));
         sb.Append("</div>");
         sb.Append("</div>");
