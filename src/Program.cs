@@ -86,6 +86,12 @@ static partial class Program
 
         {
 
+            Application.EnableVisualStyles();
+
+            Application.SetCompatibleTextRenderingDefault(false);
+
+            Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
+
             System.Threading.Thread.CurrentThread.CurrentCulture = new CultureInfo("en-US");
 
             System.Threading.Thread.CurrentThread.CurrentUICulture = new CultureInfo("en-US");
@@ -223,12 +229,6 @@ static partial class Program
         }
 
         // 4. Setup Windows Forms styling & unhandled exception safeguards
-
-        Application.EnableVisualStyles();
-
-        Application.SetCompatibleTextRenderingDefault(false);
-
-        Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
 
         Application.ThreadException += (s, e) => {
 
@@ -1060,11 +1060,12 @@ static partial class Program
         // If run with /test flag, systematically switch across all tabs and capture screenshots
 
         if (args.Length > 0 && (args[0] == "/test" || args[0] == "--test"))
-
         {
-
             StartAutomatedTestSequence(vidaPath, mainForm, btnTabFaultTrace, btnTabNetwork, btnTabVehComm, btnTabRefInfo, _btnTabManuals, _btnTabParts, _btnTabWiring, switchTab, setActiveTabButton);
-
+        }
+        else if (args.Length > 0 && (args[0] == "/ewd-test" || args[0] == "--ewd-test"))
+        {
+            StartEwdTestSequence(vidaPath, mainForm, _btnTabWiring);
         }
 
         Console.WriteLine("[Launcher] Running Application message loop...");

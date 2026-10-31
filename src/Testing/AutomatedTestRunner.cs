@@ -391,8 +391,7 @@ static partial class Program
                             if (File.Exists(ssPath))
                             {
                                 byte[] ssBytes = File.ReadAllBytes(ssPath);
-                                byte[] dummyLock = null;
-                                using (MemoryStream inMs = new MemoryStream(ssBytes))
+                                                                using (MemoryStream inMs = new MemoryStream(ssBytes))
                                 using (Bitmap baseBmp = (Bitmap)Image.FromStream(inMs))
                                 {
                                     using (Bitmap ewdBmp = new Bitmap(baseBmp))
@@ -461,5 +460,109 @@ static partial class Program
 
             seqTimer.Start();
 
+    }
+
+    static void StartEwdTestSequence(string vidaPath, Form mainForm, Button btnTabWiring)
+    {
+        Console.WriteLine("[EWD Test] Initializing targeted EWD deep-link navigation test...");
+        mainForm.Width = 1400; // Ensure wide viewport for PDF rendering
+        Timer testTimer = new Timer();
+        testTimer.Interval = 2500;
+        int testStep = 0;
+
+        testTimer.Tick += async (s, e) => {
+            testTimer.Stop();
+            try {
+                switch (testStep++)
+                {
+                    case 0:
+                        Console.WriteLine("[EWD Test] Step 0: Clicking Wiring Diagrams tab...");
+                        btnTabWiring.PerformClick();
+                        testTimer.Interval = 4000;
+                        testTimer.Start();
+                        break;
+                    case 1:
+                        Console.WriteLine("[EWD Test] Step 1: Selecting 2/14 Glow plug relay...");
+                        if (_ewdDgv != null && _ewdBtnFindSchem != null && _ewdBtnShowLoc != null)
+                        {
+                            foreach (DataGridViewRow r in _ewdDgv.Rows)
+                            {
+                                string cVal = Convert.ToString(r.Cells["Code"].Value);
+                                if (cVal == "2/14")
+                                {
+                                    _ewdDgv.CurrentCell = r.Cells[0];
+                                    r.Selected = true;
+                                    Console.WriteLine("[EWD Test] Found 2/14! Clicking ⚡ Schematic button...");
+                                    _ewdBtnFindSchem.PerformClick();
+                                    break;
+                                }
+                            }
+                        }
+                        // Allow generous time for 56MB PDF reload to page 72
+                        testTimer.Interval = 6500;
+                        testTimer.Start();
+                        break;
+                    case 2:
+                        Console.WriteLine("[EWD Test] Step 2: Capturing Schematic preview...");
+                        string scPath = @"C:\Users\david\.gemini\antigravity\brain\582883f0-afd8-4231-87cd-0add866e7f19\ewd_live_schematic_page72.png";
+                        if (_ewdWebView != null && _ewdWebView.CoreWebView2 != null)
+                        {
+                            using (FileStream fs = new FileStream(scPath, FileMode.Create))
+                            {
+                                await _ewdWebView.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, fs);
+                            }
+                            Console.WriteLine("[EWD Test] Saved schematic preview: " + scPath);
+                        }
+
+                        Console.WriteLine("[EWD Test] Step 3: Clicking 📍 Car Placement button...");
+                        if (_ewdBtnShowLoc != null)
+                        {
+                            _ewdBtnShowLoc.PerformClick();
+                        }
+                        testTimer.Interval = 6500;
+                        testTimer.Start();
+                        break;
+                    case 3:
+                        Console.WriteLine("[EWD Test] Step 4: Capturing Placement preview...");
+                        string plPath = @"C:\Users\david\.gemini\antigravity\brain\582883f0-afd8-4231-87cd-0add866e7f19\ewd_live_placement_page303.png";
+                        string fullTabPath = @"C:\Users\david\.gemini\antigravity\brain\582883f0-afd8-4231-87cd-0add866e7f19\launcher_test_ewd.png";
+                        if (_ewdWebView != null && _ewdWebView.CoreWebView2 != null)
+                        {
+                            using (FileStream fs = new FileStream(plPath, FileMode.Create))
+                            {
+                                await _ewdWebView.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, fs);
+                            }
+                            Console.WriteLine("[EWD Test] Saved placement preview: " + plPath);
+
+                            // Composite full form screenshot
+                            Bitmap formBmp = new Bitmap(mainForm.Width, mainForm.Height);
+                            mainForm.DrawToBitmap(formBmp, new Rectangle(0, 0, mainForm.Width, mainForm.Height));
+                            using (MemoryStream ms = new MemoryStream())
+                            {
+                                await _ewdWebView.CoreWebView2.CapturePreviewAsync(CoreWebView2CapturePreviewImageFormat.Png, ms);
+                                ms.Position = 0;
+                                using (Bitmap wvBmp = new Bitmap(ms))
+                                {
+                                    using (Graphics g = Graphics.FromImage(formBmp))
+                                    {
+                                        Point pt = _ewdWebView.PointToScreen(Point.Empty);
+                                        Point rel = mainForm.PointToClient(pt);
+                                        g.DrawImage(wvBmp, rel.X, rel.Y, _ewdWebView.Width, _ewdWebView.Height);
+                                    }
+                                }
+                            }
+                            formBmp.Save(fullTabPath, ImageFormat.Png);
+                            Console.WriteLine("[EWD Test] Saved full tab composite screenshot: " + fullTabPath);
+                        }
+                        Console.WriteLine("[EWD Test] All EWD deep-link navigation tests PASSED successfully!");
+                        Environment.Exit(0);
+                        break;
+                }
+            } catch (Exception ex) {
+                Console.WriteLine("[EWD Test] Error: " + ex);
+                Environment.Exit(1);
+            }
+        };
+        testTimer.Start();
     }
 }

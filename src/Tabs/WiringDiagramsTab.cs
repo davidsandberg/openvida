@@ -93,14 +93,14 @@ static partial class Program
             // Bottom detail panel
             Panel pnlDetail = new Panel { Dock = DockStyle.Bottom, Height = 48, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Padding = new Padding(6, 6, 6, 6) };
 
-            Button btnFindSchematic = new Button { Text = "⚡ Schematics", Dock = DockStyle.Right, Width = 110, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            Button btnFindSchematic = new Button { Text = "⚡ Schematics", Dock = DockStyle.Right, Width = 145, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             btnFindSchematic.FlatAppearance.BorderSize = 0;
             pnlDetail.Controls.Add(btnFindSchematic);
 
             Panel spcDetail1 = new Panel { Dock = DockStyle.Right, Width = 6 };
             pnlDetail.Controls.Add(spcDetail1);
 
-            Button btnShowLoc = new Button { Text = "📍 Car Placement", Dock = DockStyle.Right, Width = 125, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(43, 87, 154), ForeColor = Color.White, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
+            Button btnShowLoc = new Button { Text = "📍 Car Placement", Dock = DockStyle.Right, Width = 145, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(43, 87, 154), ForeColor = Color.White, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold) };
             btnShowLoc.FlatAppearance.BorderSize = 0;
             pnlDetail.Controls.Add(btnShowLoc);
 
@@ -138,7 +138,7 @@ static partial class Program
             dgvComponents.ColumnHeadersHeight = 28;
             dgvComponents.RowTemplate.Height = 24;
 
-            DataGridViewTextBoxColumn colCode = new DataGridViewTextBoxColumn { Name = "Code", DataPropertyName = "Code", HeaderText = "ID", Width = 75 };
+            DataGridViewTextBoxColumn colCode = new DataGridViewTextBoxColumn { Name = "Code", DataPropertyName = "Code", HeaderText = "ID", Width = 68 };
             colCode.DefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
             colCode.DefaultCellStyle.ForeColor = Color.FromArgb(0, 102, 204);
             dgvComponents.Columns.Add(colCode);
@@ -148,12 +148,24 @@ static partial class Program
             colDesc.DefaultCellStyle.ForeColor = Color.FromArgb(30, 40, 50);
             dgvComponents.Columns.Add(colDesc);
 
-            DataGridViewTextBoxColumn colPage = new DataGridViewTextBoxColumn { Name = "PageDisp", DataPropertyName = "PageDisp", HeaderText = "Placement", Width = 90 };
-            colPage.DefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
-            colPage.DefaultCellStyle.ForeColor = Color.FromArgb(43, 87, 154);
-            colPage.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            colPage.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-            dgvComponents.Columns.Add(colPage);
+            DataGridViewTextBoxColumn colSchem = new DataGridViewTextBoxColumn { Name = "SchematicDisp", DataPropertyName = "SchematicDisp", HeaderText = "⚡ Schematics", Width = 95 };
+            colSchem.DefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+            colSchem.DefaultCellStyle.ForeColor = Color.FromArgb(0, 102, 204);
+            colSchem.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colSchem.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgvComponents.Columns.Add(colSchem);
+
+            DataGridViewTextBoxColumn colPlace = new DataGridViewTextBoxColumn { Name = "PlacementDisp", DataPropertyName = "PlacementDisp", HeaderText = "📍 Placement", Width = 90 };
+            colPlace.DefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+            colPlace.DefaultCellStyle.ForeColor = Color.FromArgb(43, 87, 154);
+            colPlace.DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            colPlace.HeaderCell.Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgvComponents.Columns.Add(colPlace);
+
+            // Hidden columns to support robust direct value binding
+            dgvComponents.Columns.Add(new DataGridViewTextBoxColumn { Name = "SchematicPage", DataPropertyName = "SchematicPage", Visible = false });
+            dgvComponents.Columns.Add(new DataGridViewTextBoxColumn { Name = "PlacementPage", DataPropertyName = "PlacementPage", Visible = false });
+            dgvComponents.Columns.Add(new DataGridViewTextBoxColumn { Name = "PageNum", DataPropertyName = "PageNum", Visible = false });
 
             splitMain.Panel1.Controls.Add(dgvComponents);
             dgvComponents.BringToFront();
@@ -248,6 +260,10 @@ static partial class Program
             DataTable dtComponents = new DataTable();
             dtComponents.Columns.Add("Code");
             dtComponents.Columns.Add("Description");
+            dtComponents.Columns.Add("SchematicPage", typeof(int));
+            dtComponents.Columns.Add("SchematicDisp");
+            dtComponents.Columns.Add("PlacementPage", typeof(int));
+            dtComponents.Columns.Add("PlacementDisp");
             dtComponents.Columns.Add("PageNum", typeof(int));
             dtComponents.Columns.Add("PageDisp");
             dgvComponents.DataSource = dtComponents.DefaultView;
@@ -274,18 +290,41 @@ static partial class Program
             Action<int> jumpToPage = (pageNum) => {
                 try
                 {
+                    Console.WriteLine("[Launcher] jumpToPage requested for page " + pageNum + ", curPdf: " + curPdfPath);
                     if (pageNum > 0 && File.Exists(curPdfPath))
                     {
-                        string uriStr = new Uri(curPdfPath).AbsoluteUri + "?nav=" + DateTime.Now.Ticks + "#page=" + pageNum;
+                        string targetUri = new Uri(curPdfPath).AbsoluteUri + "#page=" + pageNum;
                         if (wvPdf.CoreWebView2 != null)
                         {
-                            wvPdf.CoreWebView2.Navigate(uriStr);
+                            string curUri = (wvPdf.Source != null) ? wvPdf.Source.ToString() : "";
+                            string baseUri = new Uri(curPdfPath).AbsoluteUri;
+                            Console.WriteLine("[Launcher] curUri: " + curUri + " vs baseUri: " + baseUri);
+                            if (curUri.StartsWith(baseUri, StringComparison.OrdinalIgnoreCase))
+                            {
+                                Console.WriteLine("[Launcher] Already on PDF, resetting via NavigateToString...");
+                                EventHandler<Microsoft.Web.WebView2.Core.CoreWebView2NavigationCompletedEventArgs> navHandler = null;
+                                navHandler = (s, e) => {
+                                    wvPdf.CoreWebView2.NavigationCompleted -= navHandler;
+                                    Console.WriteLine("[Launcher] Reset completed! Navigating to: " + targetUri);
+                                    wvPdf.CoreWebView2.Navigate(targetUri);
+                                    updateNavStyles();
+                                };
+                                wvPdf.CoreWebView2.NavigationCompleted += navHandler;
+                                wvPdf.CoreWebView2.NavigateToString("<html><body style='background:#f0f2f5;'></body></html>");
+                            }
+                            else
+                            {
+                                Console.WriteLine("[Launcher] Direct navigation to: " + targetUri);
+                                wvPdf.CoreWebView2.Navigate(targetUri);
+                                updateNavStyles();
+                            }
                         }
                         else
                         {
-                            wvPdf.Source = new Uri(uriStr);
+                            Console.WriteLine("[Launcher] CoreWebView2 is null, setting wvPdf.Source: " + targetUri);
+                            wvPdf.Source = new Uri(targetUri);
+                            updateNavStyles();
                         }
-                        updateNavStyles();
                     }
                 }
                 catch (Exception exJump) { Console.WriteLine("[Launcher] EWD page navigation failed: " + exJump.Message); }
@@ -329,15 +368,31 @@ static partial class Program
                         string[] lines = File.ReadAllLines(navTsv, Encoding.UTF8);
                         foreach (string line in lines)
                         {
-                            string[] parts = line.Split('\t');
-                            if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[0].Trim()))
+                            string trimmed = line.Trim();
+                            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith("Code\t", StringComparison.OrdinalIgnoreCase))
+                                continue;
+                            string[] parts = trimmed.Split('\t');
+                            if (parts.Length >= 4 && !string.IsNullOrEmpty(parts[0].Trim()))
                             {
                                 string code = parts[0].Trim();
                                 string desc = parts[1].Trim();
-                                int pageNum = 0;
-                                int.TryParse(parts[2].Trim(), out pageNum);
-                                string pageDisp = (pageNum > 0) ? "Page " + pageNum : "-";
-                                dtComponents.Rows.Add(code, desc, pageNum, pageDisp);
+                                int schemPage = 0;
+                                int placePage = 0;
+                                int.TryParse(parts[2].Trim(), out schemPage);
+                                int.TryParse(parts[3].Trim(), out placePage);
+                                string schemDisp = (schemPage > 0) ? "Page " + schemPage : "-";
+                                string placeDisp = (placePage > 0) ? "Page " + placePage : "-";
+                                int defaultPage = (schemPage > 0) ? schemPage : placePage;
+                                dtComponents.Rows.Add(code, desc, schemPage, schemDisp, placePage, placeDisp, defaultPage, (defaultPage > 0 ? "Page " + defaultPage : "-"));
+                            }
+                            else if (parts.Length >= 3 && !string.IsNullOrEmpty(parts[0].Trim()))
+                            {
+                                string code = parts[0].Trim();
+                                string desc = parts[1].Trim();
+                                int pNum = 0;
+                                int.TryParse(parts[2].Trim(), out pNum);
+                                string pDisp = (pNum > 0) ? "Page " + pNum : "-";
+                                dtComponents.Rows.Add(code, desc, 0, "-", pNum, pDisp, pNum, pDisp);
                             }
                         }
                     }
@@ -352,7 +407,7 @@ static partial class Program
                                 string[] parts = line.Split(new char[] { '\t' }, 2);
                                 if (parts.Length >= 2 && !string.IsNullOrEmpty(parts[0].Trim()))
                                 {
-                                    dtComponents.Rows.Add(parts[0].Trim(), parts[1].Trim(), 0, "-");
+                                    dtComponents.Rows.Add(parts[0].Trim(), parts[1].Trim(), 0, "-", 0, "-", 0, "-");
                                 }
                             }
                         }
@@ -447,18 +502,44 @@ static partial class Program
                 lblCount.Text = dtComponents.DefaultView.Count + " matches";
             };
 
+            Func<DataGridViewRow, string, int> getRowInt = (row, col) => {
+                if (row == null) return 0;
+                try {
+                    DataRowView drv = row.DataBoundItem as DataRowView;
+                    if (drv != null && drv.Row.Table.Columns.Contains(col))
+                    {
+                        object o = drv[col];
+                        if (o != null && o != DBNull.Value) return Convert.ToInt32(o);
+                    }
+                    if (row.DataGridView != null && row.DataGridView.Columns.Contains(col))
+                    {
+                        object o = row.Cells[col].Value;
+                        if (o != null && o != DBNull.Value) return Convert.ToInt32(o);
+                    }
+                } catch {}
+                return 0;
+            };
+
             Action updateCompSelection = () => {
                 if (dgvComponents.CurrentRow != null)
                 {
                     string code = Convert.ToString(dgvComponents.CurrentRow.Cells["Code"].Value);
                     string desc = Convert.ToString(dgvComponents.CurrentRow.Cells["Description"].Value);
-                    int pNum = 0;
-                    try { pNum = Convert.ToInt32(dgvComponents.CurrentRow.Cells["PageNum"].Value); } catch { }
+                    int schPage = getRowInt(dgvComponents.CurrentRow, "SchematicPage");
+                    int locPage = getRowInt(dgvComponents.CurrentRow, "PlacementPage");
+
                     if (!string.IsNullOrEmpty(code))
                     {
-                        lblSelComp.Text = code + ": " + desc + (pNum > 0 ? " (📍 Placement: Page " + pNum + ")" : "");
-                        btnShowLoc.Text = (pNum > 0) ? "📍 Page " + pNum : "📍 Car Placement";
-                        btnShowLoc.Enabled = (pNum > 0);
+                        string details = code + ": " + desc;
+                        if (schPage > 0) details += " | ⚡ Schematic: Page " + schPage;
+                        if (locPage > 0) details += " | 📍 Placement: Page " + locPage;
+                        lblSelComp.Text = details;
+
+                        btnFindSchematic.Text = (schPage > 0) ? "⚡ Schematic (P." + schPage + ")" : "⚡ Schematics";
+                        btnFindSchematic.Enabled = (schPage > 0);
+
+                        btnShowLoc.Text = (locPage > 0) ? "📍 Placement (P." + locPage + ")" : "📍 Car Placement";
+                        btnShowLoc.Enabled = (locPage > 0);
                     }
                 }
             };
@@ -468,14 +549,19 @@ static partial class Program
             };
 
             dgvComponents.CellClick += (s, e) => {
-                if (e.RowIndex >= 0)
+                if (e.RowIndex >= 0 && e.ColumnIndex >= 0)
                 {
-                    int pNum = 0;
-                    try { pNum = Convert.ToInt32(dgvComponents.Rows[e.RowIndex].Cells["PageNum"].Value); } catch { }
-                    string code = Convert.ToString(dgvComponents.Rows[e.RowIndex].Cells["Code"].Value);
-                    if (dgvComponents.Columns[e.ColumnIndex].Name == "PageDisp" && pNum > 0)
+                    string colName = dgvComponents.Columns[e.ColumnIndex].Name;
+                    int schPage = getRowInt(dgvComponents.Rows[e.RowIndex], "SchematicPage");
+                    int locPage = getRowInt(dgvComponents.Rows[e.RowIndex], "PlacementPage");
+
+                    if (colName == "SchematicDisp" && schPage > 0)
                     {
-                        jumpToPage(pNum);
+                        jumpToPage(schPage);
+                    }
+                    else if ((colName == "PlacementDisp" || colName == "PageDisp") && locPage > 0)
+                    {
+                        jumpToPage(locPage);
                     }
                 }
             };
@@ -483,16 +569,16 @@ static partial class Program
             dgvComponents.CellDoubleClick += (s, e) => {
                 if (e.RowIndex >= 0)
                 {
-                    int pNum = 0;
-                    try { pNum = Convert.ToInt32(dgvComponents.Rows[e.RowIndex].Cells["PageNum"].Value); } catch { }
-                    string code = Convert.ToString(dgvComponents.Rows[e.RowIndex].Cells["Code"].Value);
-                    if (pNum > 0)
+                    int schPage = getRowInt(dgvComponents.Rows[e.RowIndex], "SchematicPage");
+                    int locPage = getRowInt(dgvComponents.Rows[e.RowIndex], "PlacementPage");
+
+                    if (schPage > 0)
                     {
-                        jumpToPage(pNum);
+                        jumpToPage(schPage);
                     }
-                    else
+                    else if (locPage > 0)
                     {
-                        jumpToSearch(code);
+                        jumpToPage(locPage);
                     }
                 }
             };
@@ -500,23 +586,27 @@ static partial class Program
             btnShowLoc.Click += (s, e) => {
                 if (dgvComponents.CurrentRow != null)
                 {
-                    int pNum = 0;
-                    try { pNum = Convert.ToInt32(dgvComponents.CurrentRow.Cells["PageNum"].Value); } catch { }
-                    string code = Convert.ToString(dgvComponents.CurrentRow.Cells["Code"].Value);
-                    if (pNum > 0) jumpToPage(pNum);
-                    else jumpToSearch(code);
+                    int locPage = getRowInt(dgvComponents.CurrentRow, "PlacementPage");
+                    if (locPage > 0) jumpToPage(locPage);
                 }
             };
 
             btnFindSchematic.Click += (s, e) => {
                 if (dgvComponents.CurrentRow != null)
                 {
-                    string code = Convert.ToString(dgvComponents.CurrentRow.Cells["Code"].Value);
-                    if (!string.IsNullOrEmpty(code))
+                    int schPage = getRowInt(dgvComponents.CurrentRow, "SchematicPage");
+                    if (schPage > 0)
                     {
-                        Clipboard.SetText(code);
-                        lblSelComp.Text = "Searching for " + code + " in schematics...";
-                        jumpToSearch(code);
+                        jumpToPage(schPage);
+                    }
+                    else
+                    {
+                        string code = Convert.ToString(dgvComponents.CurrentRow.Cells["Code"].Value);
+                        if (!string.IsNullOrEmpty(code))
+                        {
+                            Clipboard.SetText(code);
+                            lblSelComp.Text = "Code " + code + " copied to clipboard (search in PDF)";
+                        }
                     }
                 }
             };
