@@ -270,6 +270,25 @@ static partial class Program
                             FieldInfo wfField = form.GetType().GetField("_dtcFaulttraceWf", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
                             object wf = wfField != null ? wfField.GetValue(form) : null;
+                            _activeDtcFaulttraceWf = wf;
+
+                            try
+                            {
+                                MethodInfo miGetNet = mgrType.GetMethod("GetNetworkForm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                if (miGetNet != null)
+                                {
+                                    object netForm = miGetNet.Invoke(mgr, null);
+                                    if (netForm != null)
+                                    {
+                                        FieldInfo nwfField = netForm.GetType().GetField("_networkFaulttraceWf", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                                        if (nwfField != null) _activeNetworkFaulttraceWf = nwfField.GetValue(netForm);
+                                    }
+                                }
+                            }
+                            catch (Exception exNet)
+                            {
+                                Console.WriteLine("[Launcher] NetworkForm resolution error: " + exNet.Message);
+                            }
 
                             if (wf != null)
 

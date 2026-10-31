@@ -51,6 +51,8 @@ static partial class Program
     static bool vehCommInitialized = false;
     static object _activeVehicleCommunicationWf = null;
     static object _activeSpecialToolsTab = null;
+    static object _activeDtcFaulttraceWf = null;
+    static object _activeNetworkFaulttraceWf = null;
     static CheckBox _activeChkMock = null;
     static Action _refreshVehCommStatusAction = null;
     static Control internalReadoutBtn = null;
@@ -255,6 +257,7 @@ static partial class Program
         Form mainForm = new Form();
 
         _mainLauncherForm = mainForm;
+        StartOpenVidaIpcServer();
 
         mainForm.Text = "Volvo VIDA 2014D - Standalone Diagnostics";
 
@@ -1072,6 +1075,7 @@ static partial class Program
 
         mainForm.Shown += (sShown, eShown) =>
         {
+            StartOpenVidaIpcServer();
             System.Threading.ThreadPool.QueueUserWorkItem(state =>
             {
                 try
@@ -1081,6 +1085,11 @@ static partial class Program
                 }
                 catch {}
             });
+        };
+
+        mainForm.FormClosed += (sClosed, eClosed) =>
+        {
+            StopOpenVidaIpcServer();
         };
 
         Application.Run(mainForm);
