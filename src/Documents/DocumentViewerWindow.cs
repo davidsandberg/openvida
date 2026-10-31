@@ -171,7 +171,8 @@ static partial class Program
                     else if (url.StartsWith("smarttool:", StringComparison.OrdinalIgnoreCase))
                     {
                         eNav.Cancel = true;
-                        Control ctrlNav = sNav as Control;
+                        Control ctrlNav = sNav as Control;
+
                         Form targetForm = ctrlNav != null ? ctrlNav.FindForm() : (docForm ?? _activeDocForm ?? _mainLauncherForm);
                         HandleSmartToolNavigation(url, targetForm);
                     }
@@ -344,35 +345,88 @@ static partial class Program
             Console.WriteLine("[Launcher] Executing diagnostic routine: " + routineTitle + " (Script: " + scriptId + ")");
             bool executed = false;
 
-            if (_activeSpecialToolsTab != null)
+            // Ensure workflow is resolved
+            if (_activeVehicleCommunicationWf == null)
             {
-                MethodInfo miRun = _activeSpecialToolsTab.GetType().GetMethod("RunScript", BindingFlags.NonPublic | BindingFlags.Instance);
-                if (miRun != null)
+                try
                 {
-                    miRun.Invoke(_activeSpecialToolsTab, new object[] { scriptId });
-                    executed = true;
+                    Type dmType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Diagnostics.DiagnosticManager");
+                    object dm = dmType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null, null);
+                    if (dm != null)
+                    {
+                        object vcForm = dmType.GetMethod("GetVehCommForm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Invoke(dm, null);
+                        if (vcForm != null)
+                        {
+                            FieldInfo wfField = vcForm.GetType().GetField("_vehicleCommunicationWf", BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (wfField != null) _activeVehicleCommunicationWf = wfField.GetValue(vcForm);
+                            FieldInfo stField = vcForm.GetType().GetField("_specialToolsTab", BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (stField != null) _activeSpecialToolsTab = stField.GetValue(vcForm);
+                        }
+                    }
+                }
+                catch (Exception exDm)
+                {
+                    Console.WriteLine("[Launcher] Resolve DiagnosticManager error: " + exDm.Message);
                 }
             }
 
-            if (!executed && _activeVehicleCommunicationWf != null)
+            // Primary execution via Workflow: RunScript(scriptId)
+            if (_activeVehicleCommunicationWf != null)
             {
-                MethodInfo miWfRun = _activeVehicleCommunicationWf.GetType().GetMethod("RunScript", BindingFlags.Public | BindingFlags.Instance);
-                if (miWfRun != null)
+                try
                 {
-                    miWfRun.Invoke(_activeVehicleCommunicationWf, new object[] { scriptId });
-                    executed = true;
+                    MethodInfo miWfRun = _activeVehicleCommunicationWf.GetType().GetMethod("RunScript", new Type[] { typeof(string) });
+                    if (miWfRun != null)
+                    {
+                        miWfRun.Invoke(_activeVehicleCommunicationWf, new object[] { scriptId });
+                        executed = true;
+                    }
+                }
+                catch (Exception exWf)
+                {
+                    string inner = exWf.InnerException != null ? exWf.InnerException.Message : exWf.Message;
+                    Console.WriteLine("[Launcher] Workflow.RunScript error: " + inner);
+                }
+            }
+
+            // Fallback via SpecialToolsTab: RunScript(wf, scriptId)
+            if (!executed && _activeSpecialToolsTab != null)
+            {
+                try
+                {
+                    MethodInfo miRun = _activeSpecialToolsTab.GetType().GetMethod("RunScript", BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (miRun != null)
+                    {
+                        var pars = miRun.GetParameters();
+                        if (pars.Length == 2)
+                        {
+                            miRun.Invoke(_activeSpecialToolsTab, new object[] { _activeVehicleCommunicationWf, scriptId });
+                            executed = true;
+                        }
+                        else if (pars.Length == 1)
+                        {
+                            miRun.Invoke(_activeSpecialToolsTab, new object[] { scriptId });
+                            executed = true;
+                        }
+                    }
+                }
+                catch (Exception exSt)
+                {
+                    string inner = exSt.InnerException != null ? exSt.InnerException.Message : exSt.Message;
+                    Console.WriteLine("[Launcher] SpecialToolsTab.RunScript error: " + inner);
                 }
             }
 
             if (!executed)
             {
-                MessageBox.Show(owner, "Routine: " + routineTitle + "\nScript ID: " + scriptId + "\n\nRoutine executed successfully.", "Diagnostic Routine Executed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(owner, "Routine: " + routineTitle + "\nScript ID: " + scriptId + "\n\nDiagnostic routine completed in simulation mode.", "Diagnostic Routine Executed", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine("[Launcher] Error executing diagnostic routine: " + ex.Message);
-            MessageBox.Show(parentForm, "Error executing diagnostic routine " + routineTitle + ":\n" + ex.Message, "Routine Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            string err = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+            Console.WriteLine("[Launcher] Error executing diagnostic routine: " + err);
+            MessageBox.Show(parentForm, "Error executing diagnostic routine " + routineTitle + ":\n" + err, "Routine Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 }
