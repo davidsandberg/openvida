@@ -575,7 +575,7 @@ static partial class Program
 
         {
 
-            sb.AppendFormat("<div class='question-box'><strong>Action / Question:</strong> {0}</div>", el.Value.Trim());
+            sb.AppendFormat("<p class='question'>{0}</p>", el.Value.Trim());
 
         }
 
@@ -790,15 +790,17 @@ static partial class Program
 
         string clickUrl = string.Format("smarttool://{0}?title={1}", Uri.EscapeDataString(scriptId), Uri.EscapeDataString(routineTitle));
 
-        sb.Append("<div class='smarttool-box'>");
-        sb.Append("<div class='smarttool-header'>");
-        sb.Append("<span class='smarttool-badge'>⚡ VEHICLE ROUTINE</span>");
-        sb.AppendFormat("<span class='smarttool-title'>{0}</span>", System.Security.SecurityElement.Escape(routineTitle));
-        sb.Append("</div>");
-        sb.Append("<div class='smarttool-action'>");
-        sb.AppendFormat("<a href='{0}' class='btn-smarttool'>{1}Run Adaptation on ECU</a>", clickUrl, iconHtml);
-        sb.AppendFormat("<span class='smarttool-id'>Script: <code>{0}</code></span>", System.Security.SecurityElement.Escape(scriptId));
-        sb.Append("</div>");
+        sb.Append("<div class='vct-tool'>");
+        sb.AppendFormat("<a href='{0}' class='vct-btn' title='Click to execute: {1}'>", clickUrl, System.Security.SecurityElement.Escape(routineTitle));
+        if (!string.IsNullOrEmpty(iconSrc))
+        {
+            sb.AppendFormat("<img src='{0}' alt='VCT2000' />", iconSrc);
+        }
+        else
+        {
+            sb.Append("<span style='font-size:16px;'>⚡</span>");
+        }
+        sb.Append("<span>VCT2000</span></a>");
         sb.Append("</div>");
     }
 }
