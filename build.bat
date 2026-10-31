@@ -77,22 +77,22 @@ if errorlevel 1 (
 )
 popd
 
-echo [3/3] Compiling VolvoMcp.exe (MCP Bridge)...
-pushd "%~dp0mcp\volvo-dice"
+echo [3/3] Compiling VidaMcp.exe (MCP Bridge)...
+pushd "%~dp0mcp\vida-mcp"
 "%CSC%" /nologo /platform:x86 /target:exe ^
-    /out:VolvoMcp_new.exe ^
+    /out:VidaMcp_new.exe ^
     /r:System.Web.Extensions.dll ^
     /r:System.Data.dll ^
     /r:System.IO.Compression.dll ^
     /r:System.IO.Compression.FileSystem.dll ^
     /r:System.Web.dll ^
-    VolvoMcp.cs
+    VidaMcp.cs
 if not errorlevel 1 (
-    move /y VolvoMcp_new.exe VolvoMcp.exe >nul 2>&1
+    move /y VidaMcp_new.exe VidaMcp.exe >nul 2>&1
     if errorlevel 1 (
-        taskkill /f /im VolvoMcp.exe >nul 2>&1
+        taskkill /f /im VidaMcp.exe >nul 2>&1
         powershell -NoProfile -Command "Start-Sleep -Milliseconds 400"
-        move /y VolvoMcp_new.exe VolvoMcp.exe >nul 2>&1
+        move /y VidaMcp_new.exe VidaMcp.exe >nul 2>&1
     )
 )
 popd
@@ -102,7 +102,7 @@ echo ============================================================
 echo   BUILD COMPLETED SUCCESSFULLY!
 echo ============================================================
 echo OpenVIDA Diagnostics: %DIAG_DIR%\VidaLauncher.exe
-echo Volvo MCP Bridge:     %~dp0mcp\volvo-dice\VolvoMcp.exe
+echo OpenVIDA MCP Bridge:  %~dp0mcp\vida-mcp\VidaMcp.exe
 echo ============================================================
 exit /b 0
 echo [OK] Build succeeded! Output: %DIAG_DIR%\VidaLauncher.exe

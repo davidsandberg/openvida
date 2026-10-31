@@ -134,7 +134,7 @@ build.bat
 The build script invokes the native 32-bit Microsoft .NET Framework C# compiler (`csc.exe`):
 1. **Compiles `DummyIsoView.dll`**: The custom GDI+ CGM vector network renderer.
 2. **Compiles `VidaLauncher.exe`**: Incorporates all source modules in `src/`, links required references, and embeds the high-resolution `vida_icon.ico` directly into the Win32 binary.
-3. **Compiles `VolvoMcp.exe`**: Builds the standalone Model Context Protocol (MCP) bridge in [`mcp/volvo-dice/`](mcp/volvo-dice/).
+3. **Compiles `VidaMcp.exe`**: Builds the standalone Model Context Protocol (MCP) bridge in [`mcp/vida-mcp/`](mcp/vida-mcp/).
 
 Alternatively, you can open and build the project in Visual Studio using [`src/OpenVida.csproj`](src/OpenVida.csproj).
 
@@ -142,7 +142,7 @@ Alternatively, you can open and build the project in Visual Studio using [`src/O
 
 ## 6. Model Context Protocol (MCP) AI Integration
 
-OpenVIDA includes a dedicated **Model Context Protocol (MCP)** server ([`VolvoMcp.exe`](mcp/volvo-dice/VolvoMcp.cs)) that connects modern AI assistants (such as Claude Desktop, Google Antigravity, Cursor, and ChatGPT MCP clients) directly to your Volvo vehicle and the factory VIDA technical knowledge base.
+OpenVIDA includes a dedicated **Model Context Protocol (MCP)** server ([`VidaMcp.exe`](mcp/vida-mcp/VidaMcp.cs)) that connects modern AI assistants (such as Claude Desktop, Google Antigravity, Cursor, and ChatGPT MCP clients) directly to your Volvo vehicle and the factory VIDA technical knowledge base.
 
 ### What is it?
 The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is an open standard that allows large language models (LLMs) to securely access local tools, inspect data, and interact with desktop environments. The OpenVIDA MCP bridge turns your AI assistant into an expert Volvo Master Technician that can autonomously query vehicle telemetry, read Diagnostic Trouble Codes (DTCs), look up factory torque specs, locate parts in the EPC, and pinpoint wiring schematics in real time.
@@ -156,13 +156,13 @@ The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is an open 
 ### How to use it
 
 #### 1. Configure your MCP Client
-Add the `volvo-dice` server definition to your client configuration file (e.g. `claude_desktop_config.json` or `mcp_config.json`):
+Add the `vida-mcp` server definition to your client configuration file (e.g. `claude_desktop_config.json` or `mcp_config.json`):
 
 ```json
 {
   "mcpServers": {
-    "volvo-dice": {
-      "command": "C:\\path\\to\\vida\\mcp\\volvo-dice\\VolvoMcp.exe",
+    "vida-mcp": {
+      "command": "C:\\path\\to\\vida\\mcp\\vida-mcp\\VidaMcp.exe",
       "args": []
     }
   }
@@ -272,7 +272,7 @@ flowchart TD
         Agent["AI Assistant (Claude Desktop / Antigravity / Cursor)"]
     end
 
-    subgraph MCPBridge["VolvoMcp.exe (MCP Bridge)"]
+    subgraph MCPBridge["VidaMcp.exe (MCP Bridge)"]
         Server["MCP Server (JSON-RPC stdio)"]
         Router{"Tool Dispatcher"}
         LiveTools["Live Telemetry Tools\n(dice_status, scan_network,\nread_active_dtcs, read_parameters)"]
@@ -312,12 +312,12 @@ flowchart TD
 
 #### Dual-Path Execution Model
 1. **Live Car Path (Arbitrated via IPC)**:
-   - When the AI invokes `dice_status`, `scan_network`, `read_active_dtcs`, or `read_parameters`, `VolvoMcp.exe` connects to the local Windows Named Pipe `\\.\pipe\openvida_rpc` hosted by [`OpenVidaIpcServer.cs`](src/Core/OpenVidaIpcServer.cs).
+   - When the AI invokes `dice_status`, `scan_network`, `read_active_dtcs`, or `read_parameters`, `VidaMcp.exe` connects to the local Windows Named Pipe `\\.\pipe\openvida_rpc` hosted by [`OpenVidaIpcServer.cs`](src/Core/OpenVidaIpcServer.cs).
    - `VidaLauncher` streams live telemetry, active DTCs, and network status directly from its active in-memory session without relinquishing the physical DiCE J2534 hardware lock.
-   - If `VidaLauncher` is closed, `VolvoMcp.exe` intercepts the call and returns an informative prompt guiding the user to start OpenVIDA, completely avoiding device contention or unhandled exceptions.
+   - If `VidaLauncher` is closed, `VidaMcp.exe` intercepts the call and returns an informative prompt guiding the user to start OpenVIDA, completely avoiding device contention or unhandled exceptions.
 
 2. **Technical Library Path (Direct & 100% Offline)**:
-   - When the AI invokes `lookup_dtc`, `search_repair_manual`, `get_repair_document`, `get_wiring_schematic`, `search_parts_catalog`, `decode_vin`, or `list_ecus`, `VolvoMcp.exe` queries the local SQL Express databases and EWD navigation tables directly.
+   - When the AI invokes `lookup_dtc`, `search_repair_manual`, `get_repair_document`, `get_wiring_schematic`, `search_parts_catalog`, `decode_vin`, or `list_ecus`, `VidaMcp.exe` queries the local SQL Express databases and EWD navigation tables directly.
    - Queries execute with sub-millisecond latency and require neither an active car connection nor `VidaLauncher` to be running.
 
 ---
@@ -331,9 +331,9 @@ vida/
 ├── assets/                          # Branding & icons (.vectorcraft, .svg, .png, .ico)
 ├── ewd/                             # Extracted Electronic Wiring Diagram schematics
 ├── mcp/                             # Model Context Protocol (MCP) server
-│   └── volvo-dice/                  # Standalone MCP bridge server
-│       ├── VolvoMcp.cs              # Dual-path MCP bridge (Named Pipe IPC + offline SQL)
-│       └── VolvoMcp.exe             # Compiled MCP executable
+│   └── vida-mcp/                    # Standalone MCP bridge server
+│       ├── VidaMcp.cs               # Dual-path MCP bridge (Named Pipe IPC + offline SQL)
+│       └── VidaMcp.exe              # Compiled MCP executable
 ├── src/                             # Modular C# source code
 │   ├── OpenVida.csproj              # MSBuild project definition
 │   ├── Program.cs                   # Entry point, CLI args, shell layout, navigation
@@ -364,7 +364,7 @@ vida/
 │   │   └── AutomatedTestRunner.cs   # Visual round-trip screenshot regression runner
 │   └── IsoView/                     # Vector graphics subsystem
 │       └── DummyIsoView.cs          # Native GDI+ CGM vector network map
-├── build.bat                        # 1-click native compiler (VidaLauncher + VolvoMcp)
+├── build.bat                        # 1-click native compiler (VidaLauncher + VidaMcp)
 ├── run_diagnostics.bat              # Service checker and application launcher
 └── README.md                        # Documentation
 ```
@@ -380,8 +380,11 @@ vida/
 - [x] **Electronic Wiring Diagrams (EWD)**: High-DPI vector PDF rendering via Edge WebView2.
 - [x] **Brand Visual Identity**: Custom vector emblem and Windows icon integration via VectorCraft.
 - [x] **Codebase Modularization**: Clean split into `src/` modular components with `OpenVida.csproj`.
+- [x] **Startup JBoss Service Verification**: Health probe checking backend readiness at launch with auto-start prompts.
 - [x] **MCP Server Evolution & In-App IPC Integration**: Built in-app Named Pipe server and unified Volvo MCP bridge connecting AI assistants to live car telemetry and offline factory data.
-- [ ] **Startup JBoss Service Verification**: Health probe checking backend readiness at launch with auto-start prompts.
+- [ ] **All-ECU DTC Clear ("Clear All Faults")**: In-car verification of DTC clearing routine over DiCE.
+- [ ] **Service Reset & Adaptations**: SRI reset, Battery Monitoring Sensor (BMS) reset, transmission adaptation counters.
+- [ ] **Automated Windows Installer**: Packaging into a turnkey setup wizard (Inno Setup / WiX).
 - [ ] **All-ECU DTC Clear ("Clear All Faults")**: In-car verification of DTC clearing routine over DiCE.
 - [ ] **Service Reset & Adaptations**: SRI reset, Battery Monitoring Sensor (BMS) reset, transmission adaptation counters.
 - [ ] **Automated Windows Installer**: Packaging into a turnkey setup wizard (Inno Setup / WiX).

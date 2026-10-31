@@ -10,7 +10,7 @@ using System.Data.SqlClient;
 using System.Diagnostics;
 using System.Web.Script.Serialization;
 
-class VolvoMcpServer
+class VidaMcpServer
 {
     private static readonly JavaScriptSerializer _json = new JavaScriptSerializer();
     private const string ConnStr = "Server=127.0.0.1,1433;User Id=ASUser;Password=GunnarS3g3;Database=master;TrustServerCertificate=True;";
@@ -54,7 +54,7 @@ class VolvoMcpServer
             {
                 { "protocolVersion", "2024-11-05" },
                 { "capabilities", new Dictionary<string, object> { { "tools", new Dictionary<string, object>() } } },
-                { "serverInfo", new Dictionary<string, object> { { "name", "volvo-dice-mcp" }, { "version", "2.0.0" } } }
+                { "serverInfo", new Dictionary<string, object> { { "name", "vida-mcp" }, { "version", "2.0.0" } } }
             };
             SendResult(id, result);
         }
