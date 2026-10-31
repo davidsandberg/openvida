@@ -25,9 +25,10 @@
 - [3. Supported Vehicles & Hardware](#3-supported-vehicles--hardware)
 - [4. Quick Start Guide](#4-quick-start-guide)
 - [5. Building from Source](#5-building-from-source)
-- [6. Behind the Scenes: Modernizing Legacy VIDA](#6-behind-the-scenes-modernizing-legacy-vida)
-- [7. Codebase & Project Architecture](#7-codebase--project-architecture)
-- [8. Roadmap & Upcoming Milestones](#8-roadmap--upcoming-milestones)
+- [6. Model Context Protocol (MCP) AI Integration](#6-model-context-protocol-mcp-ai-integration)
+- [7. Behind the Scenes: Modernizing Legacy VIDA](#7-behind-the-scenes-modernizing-legacy-vida)
+- [8. Codebase & Project Architecture](#8-codebase--project-architecture)
+- [9. Roadmap & Upcoming Milestones](#9-roadmap--upcoming-milestones)
 
 ---
 
@@ -133,12 +134,75 @@ build.bat
 The build script invokes the native 32-bit Microsoft .NET Framework C# compiler (`csc.exe`):
 1. **Compiles `DummyIsoView.dll`**: The custom GDI+ CGM vector network renderer.
 2. **Compiles `VidaLauncher.exe`**: Incorporates all source modules in `src/`, links required references, and embeds the high-resolution `vida_icon.ico` directly into the Win32 binary.
+3. **Compiles `VolvoMcp.exe`**: Builds the standalone Model Context Protocol (MCP) bridge in [`mcp/volvo-dice/`](mcp/volvo-dice/).
 
 Alternatively, you can open and build the project in Visual Studio using [`src/OpenVida.csproj`](src/OpenVida.csproj).
 
 ---
 
-## 6. Behind the Scenes: Modernizing Legacy VIDA
+## 6. Model Context Protocol (MCP) AI Integration
+
+OpenVIDA includes a dedicated **Model Context Protocol (MCP)** server ([`VolvoMcp.exe`](mcp/volvo-dice/VolvoMcp.cs)) that connects modern AI assistants (such as Claude Desktop, Google Antigravity, Cursor, and ChatGPT MCP clients) directly to your Volvo vehicle and the factory VIDA technical knowledge base.
+
+### What is it?
+The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) is an open standard that allows large language models (LLMs) to securely access local tools, inspect data, and interact with desktop environments. The OpenVIDA MCP bridge turns your AI assistant into an expert Volvo Master Technician that can autonomously query vehicle telemetry, read Diagnostic Trouble Codes (DTCs), look up factory torque specs, locate parts in the EPC, and pinpoint wiring schematics in real time.
+
+### Why is it useful?
+- **AI-Guided Troubleshooting**: Instead of manually cross-referencing DTC codes across manuals, ask your AI assistant: *"My car threw ECM-2000 and CCM-0070. What are the common failure modes and what should I inspect first?"* The AI fetches the real DTC definitions, failure conditions, and factory test steps directly from the database.
+- **Zero Hallucination with Grounded Data**: Torque values, wire colors, pinouts, and OEM part numbers are pulled directly from Volvo factory databases (`servicerep_en-US`, `EPC`, `DiagSwdlRepository`), ensuring factual diagnostic guidance.
+- **Hardware Conflict-Free**: All physical communication with the DiCE interface is arbitrated through OpenVIDA to eliminate `ERR_DEVICE_IN_USE` hardware crashes.
+- **Works 100% Offline for Research**: Even with no car connected and OpenVIDA closed, the technical library tools (DTC lookup, workshop procedures, parts catalog, wiring diagrams, VIN decoder) remain fully operational offline.
+
+### How to use it
+
+#### 1. Configure your MCP Client
+Add the `volvo-dice` server definition to your client configuration file (e.g. `claude_desktop_config.json` or `mcp_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "volvo-dice": {
+      "command": "C:\\path\\to\\vida\\mcp\\volvo-dice\\VolvoMcp.exe",
+      "args": []
+    }
+  }
+}
+```
+
+#### 2. Available MCP Tools
+
+##### 🔌 Live Vehicle Diagnostics (Powered via OpenVIDA IPC)
+*Requires `VidaLauncher.exe` running with DiCE connected (or in Mock mode). If OpenVIDA is not running, the tool provides a friendly prompt reminding you to launch it.*
+
+| Tool | Parameters | Description |
+| :--- | :--- | :--- |
+| **`dice_status`** | *None* | Checks physical DiCE connection, real-time terminal 30 battery voltage (mV and V), ignition key position, and profile. |
+| **`scan_network`** | *None* | Scans HS-CAN (500 kbps) and LS-CAN (125 kbps) buses for all responding ECUs (ECM, TCM, BCM, CEM, DIM, CCM, REM, etc.). |
+| **`read_active_dtcs`** | *None* | Reads currently active Diagnostic Trouble Codes (DTCs), fault states (Permanent / Intermittent), and ECU sources directly from the car. |
+| **`read_parameters`** | `ecu` *(optional, e.g. "ECM", "CCM", "BCM")* | Streams real-time ECU live sensor data (RPM, coolant temperature, mass air flow, throttle angle, damper angles, wheel speeds). |
+
+##### 📚 Factory Technical Library & Knowledge Base (100% Offline)
+*Direct SQL Server Express & TSV index integration. Runs with sub-millisecond response times whether OpenVIDA is open or closed.*
+
+| Tool | Parameters | Description |
+| :--- | :--- | :--- |
+| **`lookup_dtc`** | `code` *(required)*, `language` *(optional)* | Searches factory knowledge base for DTC definitions, root causes, trigger conditions, and CarCom symptoms. |
+| **`search_repair_manual`** | `query` *(required)*, `limit` *(optional)* | Searches 68,000+ official Volvo workshop procedures by keyword (e.g. *"timing belt"*, *"alternator replacement"*). |
+| **`get_repair_document`** | `document_id` *(required)* | Retrieves full step-by-step repair instructions, tightening torque specifications, and safety warnings by Document ID. |
+| **`get_wiring_schematic`** | `component` *(required)*, `publication_id` *(optional)* | Searches Electronic Wiring Diagrams (EWD) by component name or code (e.g. `1/1` Battery, `10/1` Alternator, `4/56` CEM) returning both electrical schematic and physical placement pages. |
+| **`search_parts_catalog`** | `query` *(required)*, `limit` *(optional)* | Searches the Electronic Parts Catalog (`EPC`) database for official Volvo part numbers, descriptions, unit types, and assembly groups. |
+| **`decode_vin`** | `vin` *(required)* | Decodes 17-character Volvo VINs into vehicle model series, model year, assembly plant, and serial number. |
+| **`list_ecus`** | `query` *(optional)* | Lists standard Volvo ECU abbreviations, full names, and system functions. |
+
+#### 3. Example Conversations with your AI Assistant
+- *"What is my battery voltage and are any trouble codes currently active in my Volvo?"*
+- *"Look up trouble code ECM-2000 and show me the repair instructions for replacing the sensor."*
+- *"Search the parts catalog for front brake pads and discs for my V70, and list the Volvo part numbers."*
+- *"Find the wiring diagram for the alternator control module (ACM) in publication 39180202 and tell me which pages to check."*
+
+---
+
+## 7. Behind the Scenes: Modernizing Legacy VIDA
 
 Building OpenVIDA required deep reverse-engineering of the legacy Volvo diagnostic suite. Below are the key engineering breakthroughs that made this standalone architecture possible:
 
@@ -196,20 +260,85 @@ Rather than relying on sluggish SOAP requests to fetch repair procedures, OpenVI
 - Converts proprietary Volvo SGML/XML markup into modern, responsive HTML with custom CSS.
 - Automatically extracts and base64-inlines technical schematic diagrams (`.png`/`.cgm`).
 
+### 5. How It Works: Unified MCP Architecture & Named Pipe IPC (Single Hardware Owner Model)
+
+Connecting external AI assistants directly to physical automotive hardware introduces a critical concurrency challenge: the SAE J2534 PassThru standard and Volvo's `TSDiCE32.dll` driver are strictly **single-client**. If an external process attempts to open the DiCE USB handle while `VidaLauncher` is communicating with the vehicle, the driver returns `ERR_DEVICE_IN_USE` (Error 8), locking the device or crashing the diagnostic session.
+
+OpenVIDA resolves this with a **Single Exclusive Hardware Owner** architecture powered by local Windows Named Pipe IPC:
+
+```mermaid
+flowchart TD
+    subgraph AI["AI Assistant Environment"]
+        Agent["AI Assistant (Claude Desktop / Antigravity / Cursor)"]
+    end
+
+    subgraph MCPBridge["VolvoMcp.exe (MCP Bridge)"]
+        Server["MCP Server (JSON-RPC stdio)"]
+        Router{"Tool Dispatcher"}
+        LiveTools["Live Telemetry Tools\n(dice_status, scan_network,\nread_active_dtcs, read_parameters)"]
+        OfflineTools["Technical Library Tools\n(lookup_dtc, search_repair_manual,\nsearch_parts_catalog, get_wiring_schematic)"]
+    end
+
+    subgraph OpenVIDAApp["OpenVIDA (VidaLauncher.exe) - Exclusive DiCE Owner"]
+        IPCServer["OpenVidaIpcServer\n(\\.\\pipe\\openvida_rpc)"]
+        DiagMgr["DiagnosticManager / VehicleCommunicationWF"]
+        HardwareLock["DiCE J2534 Driver (TSDiCE32.dll)"]
+    end
+
+    subgraph LocalDB["Local Factory Databases (Offline)"]
+        SQL["SQL Express (servicerep_en-US, EPC, DiagSwdl)"]
+        EWD["EWD TSV & Vector PDF Navigation Indices"]
+    end
+
+    subgraph Vehicle["Physical Vehicle"]
+        DiCE["Volvo DiCE Hardware (OBD-II / USB)"]
+        CAN["High-Speed & Low-Speed CAN Bus"]
+    end
+
+    Agent <-->|stdio JSON-RPC| Server
+    Server --> Router
+    Router -->|Live Query| LiveTools
+    Router -->|Offline Query| OfflineTools
+
+    LiveTools <-->|Named Pipe IPC| IPCServer
+    IPCServer <--> DiagMgr
+    DiagMgr <--> HardwareLock
+    HardwareLock <-->|USB / J2534| DiCE
+    DiCE <-->|CAN Bus| CAN
+
+    OfflineTools <-->|Direct SQL Query| SQL
+    OfflineTools <-->|Direct File Lookup| EWD
+```
+
+#### Dual-Path Execution Model
+1. **Live Car Path (Arbitrated via IPC)**:
+   - When the AI invokes `dice_status`, `scan_network`, `read_active_dtcs`, or `read_parameters`, `VolvoMcp.exe` connects to the local Windows Named Pipe `\\.\pipe\openvida_rpc` hosted by [`OpenVidaIpcServer.cs`](src/Core/OpenVidaIpcServer.cs).
+   - `VidaLauncher` streams live telemetry, active DTCs, and network status directly from its active in-memory session without relinquishing the physical DiCE J2534 hardware lock.
+   - If `VidaLauncher` is closed, `VolvoMcp.exe` intercepts the call and returns an informative prompt guiding the user to start OpenVIDA, completely avoiding device contention or unhandled exceptions.
+
+2. **Technical Library Path (Direct & 100% Offline)**:
+   - When the AI invokes `lookup_dtc`, `search_repair_manual`, `get_repair_document`, `get_wiring_schematic`, `search_parts_catalog`, `decode_vin`, or `list_ecus`, `VolvoMcp.exe` queries the local SQL Express databases and EWD navigation tables directly.
+   - Queries execute with sub-millisecond latency and require neither an active car connection nor `VidaLauncher` to be running.
+
 ---
 
-## 7. Codebase & Project Architecture
+## 8. Codebase & Project Architecture
 
-The codebase is cleanly separated into focused modules under [`src/`](src/):
+The codebase is cleanly separated into focused modules under [`src/`](src/) and [`mcp/`](mcp/):
 
 ```
 vida/
 ├── assets/                          # Branding & icons (.vectorcraft, .svg, .png, .ico)
 ├── ewd/                             # Extracted Electronic Wiring Diagram schematics
+├── mcp/                             # Model Context Protocol (MCP) server
+│   └── volvo-dice/                  # Standalone MCP bridge server
+│       ├── VolvoMcp.cs              # Dual-path MCP bridge (Named Pipe IPC + offline SQL)
+│       └── VolvoMcp.exe             # Compiled MCP executable
 ├── src/                             # Modular C# source code
 │   ├── OpenVida.csproj              # MSBuild project definition
 │   ├── Program.cs                   # Entry point, CLI args, shell layout, navigation
 │   ├── Core/                        # Core runtime infrastructure
+│   │   ├── OpenVidaIpcServer.cs     # Named Pipe IPC server (\\.\pipe\openvida_rpc)
 │   │   ├── SafeProgressListener.cs  # Thread-safe UI progress listeners
 │   │   ├── FallbackHashtable.cs     # Fault-tolerant localization lookup
 │   │   ├── ReflectionHelpers.cs     # Assembly inspection & reflection helpers
@@ -235,14 +364,14 @@ vida/
 │   │   └── AutomatedTestRunner.cs   # Visual round-trip screenshot regression runner
 │   └── IsoView/                     # Vector graphics subsystem
 │       └── DummyIsoView.cs          # Native GDI+ CGM vector network map
-├── build.bat                        # 1-click native compiler script
+├── build.bat                        # 1-click native compiler (VidaLauncher + VolvoMcp)
 ├── run_diagnostics.bat              # Service checker and application launcher
 └── README.md                        # Documentation
 ```
 
 ---
 
-## 8. Roadmap & Upcoming Milestones
+## 9. Roadmap & Upcoming Milestones
 
 - [x] **Live CAN Sensor Streaming**: Real-time parameter streaming from vehicle ECUs with auto-scaling graph view.
 - [x] **Bidirectional Actuations**: Tested on vehicle hardware (fuel flap, wipers, washers, stop lights).
@@ -251,6 +380,7 @@ vida/
 - [x] **Electronic Wiring Diagrams (EWD)**: High-DPI vector PDF rendering via Edge WebView2.
 - [x] **Brand Visual Identity**: Custom vector emblem and Windows icon integration via VectorCraft.
 - [x] **Codebase Modularization**: Clean split into `src/` modular components with `OpenVida.csproj`.
+- [x] **MCP Server Evolution & In-App IPC Integration**: Built in-app Named Pipe server and unified Volvo MCP bridge connecting AI assistants to live car telemetry and offline factory data.
 - [ ] **Startup JBoss Service Verification**: Health probe checking backend readiness at launch with auto-start prompts.
 - [ ] **All-ECU DTC Clear ("Clear All Faults")**: In-car verification of DTC clearing routine over DiCE.
 - [ ] **Service Reset & Adaptations**: SRI reset, Battery Monitoring Sensor (BMS) reset, transmission adaptation counters.
