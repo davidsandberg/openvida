@@ -49,6 +49,10 @@ static partial class Program
 
 
     static bool vehCommInitialized = false;
+    static object _activeVehicleCommunicationWf = null;
+    static object _activeSpecialToolsTab = null;
+    static CheckBox _activeChkMock = null;
+    static Action _refreshVehCommStatusAction = null;
     static Control internalReadoutBtn = null;
     static object vehInfoInstance = null;
     static object vehProfile = null;

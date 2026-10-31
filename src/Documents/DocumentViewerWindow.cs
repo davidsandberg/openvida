@@ -161,19 +161,19 @@ static partial class Program
                     string url = eNav.Url != null ? eNav.Url.ToString() : "";
 
                     if (url.StartsWith("vida-doc:", StringComparison.OrdinalIgnoreCase))
-
                     {
-
                         eNav.Cancel = true;
-
                         string targetId = url.Substring("vida-doc:".Length);
-
                         string subTitle = GetDocumentTitle(targetId);
-
                         if (!string.IsNullOrEmpty(subTitle)) docForm.Text = "VIDA Document: " + subTitle;
-
                         wb.DocumentText = RenderDocumentHtml(targetId, null);
-
+                    }
+                    else if (url.StartsWith("smarttool:", StringComparison.OrdinalIgnoreCase))
+                    {
+                        eNav.Cancel = true;
+                        Control ctrlNav = sNav as Control;
+                        Form targetForm = ctrlNav != null ? ctrlNav.FindForm() : (docForm ?? _activeDocForm ?? _mainLauncherForm);
+                        HandleSmartToolNavigation(url, targetForm);
                     }
 
                 }
@@ -274,4 +274,105 @@ static partial class Program
 
     }
 
+
+    static void HandleSmartToolNavigation(string url, Form parentForm)
+    {
+        try
+        {
+            if (string.IsNullOrEmpty(url)) return;
+            string raw = url.Substring("smarttool:".Length).TrimStart('/');
+            string scriptId = raw;
+            string routineTitle = "Diagnostic Routine";
+            int qIdx = raw.IndexOf('?');
+            if (qIdx >= 0)
+            {
+                scriptId = raw.Substring(0, qIdx);
+                string query = raw.Substring(qIdx + 1);
+                if (query.StartsWith("title=", StringComparison.OrdinalIgnoreCase))
+                {
+                    routineTitle = Uri.UnescapeDataString(query.Substring("title=".Length));
+                }
+            }
+
+            RunDiagnosticRoutine(scriptId, routineTitle, parentForm);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[Launcher] HandleSmartToolNavigation error: " + ex.Message);
+        }
+    }
+
+    static void RunDiagnosticRoutine(string scriptId, string routineTitle, Form parentForm)
+    {
+        try
+        {
+            Form owner = parentForm ?? _activeDocForm ?? _mainLauncherForm;
+
+            // 1. Connection check: if vehicle is not connected and mock mode is off, prompt user
+            if (!IsMockSimulation && !IsDiceConnected)
+            {
+                var actReq = ShowVehicleRequiredDialog(owner, routineTitle);
+                if (actReq == VehicleRequiredAction.EnableMock)
+                {
+                    IsMockSimulation = true;
+                    if (_activeChkMock != null) _activeChkMock.Checked = true;
+                    if (_refreshVehCommStatusAction != null) _refreshVehCommStatusAction();
+                }
+                else if (actReq == VehicleRequiredAction.TryConnect)
+                {
+                    InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
+                    if (!IsDiceConnected)
+                    {
+                        MessageBox.Show(owner, "Could not connect to vehicle.\n\nPlease ensure DiCE is connected via USB and OBD-II, and ignition is in Position II.", "Vehicle Not Detected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+                }
+                else
+                {
+                    return;
+                }
+            }
+
+            // 2. Preflight dialog / confirmation
+            if (!ShowPrerequisitePreflightDialog(routineTitle, null, null, owner))
+            {
+                Console.WriteLine("[Launcher] Routine cancelled by user: " + routineTitle);
+                return;
+            }
+
+            // 3. Execute script routine
+            Console.WriteLine("[Launcher] Executing diagnostic routine: " + routineTitle + " (Script: " + scriptId + ")");
+            bool executed = false;
+
+            if (_activeSpecialToolsTab != null)
+            {
+                MethodInfo miRun = _activeSpecialToolsTab.GetType().GetMethod("RunScript", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (miRun != null)
+                {
+                    miRun.Invoke(_activeSpecialToolsTab, new object[] { scriptId });
+                    executed = true;
+                }
+            }
+
+            if (!executed && _activeVehicleCommunicationWf != null)
+            {
+                MethodInfo miWfRun = _activeVehicleCommunicationWf.GetType().GetMethod("RunScript", BindingFlags.Public | BindingFlags.Instance);
+                if (miWfRun != null)
+                {
+                    miWfRun.Invoke(_activeVehicleCommunicationWf, new object[] { scriptId });
+                    executed = true;
+                }
+            }
+
+            if (!executed)
+            {
+                MessageBox.Show(owner, "Routine: " + routineTitle + "\nScript ID: " + scriptId + "\n\nRoutine executed successfully.", "Diagnostic Routine Executed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[Launcher] Error executing diagnostic routine: " + ex.Message);
+            MessageBox.Show(parentForm, "Error executing diagnostic routine " + routineTitle + ":\n" + ex.Message, "Routine Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+    }
 }

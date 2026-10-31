@@ -30,6 +30,7 @@ static partial class Program
         if (clean.Length > 5 && clean[2] == '-') clean = clean.Substring(5);
 
         if (clean.Contains("#")) clean = clean.Substring(0, clean.IndexOf("#"));
+        if (clean.Contains("_nev")) clean = clean.Substring(0, clean.IndexOf("_nev"));
 
         return clean.Trim();
 

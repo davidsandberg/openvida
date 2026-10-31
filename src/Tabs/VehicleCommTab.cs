@@ -119,6 +119,8 @@ static partial class Program
 
                         object wfInit = wfInitField != null ? wfInitField.GetValue(vcForm) : null;
 
+                        _activeVehicleCommunicationWf = wfInit;
+
                         if (wfInit != null)
 
                         {
@@ -371,12 +373,14 @@ static partial class Program
                             chkMock.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
                             chkMock.SetBounds(490, 31, 100, 22);
                             chkMock.Checked = IsMockSimulation;
+
+                            _activeChkMock = chkMock;
                             Label lblVehCommStatus = new Label();
                             lblVehCommStatus.Name = "lblVehCommStatus";
                             lblVehCommStatus.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
                             lblVehCommStatus.SetBounds(230, 4, 680, 20);
-                            lblVehCommStatus.AutoEllipsis = true;
-
+                            lblVehCommStatus.AutoEllipsis = true;
+
                             Action updateVehCommStatusText = () =>
                             {
                                 try
@@ -696,6 +700,8 @@ static partial class Program
                             {
                                 FieldInfo stTabField = vcForm.GetType().GetField("_specialToolsTab", BindingFlags.NonPublic | BindingFlags.Instance);
                                 object stTab = stTabField != null ? stTabField.GetValue(vcForm) : null;
+
+                                _activeSpecialToolsTab = stTab;
                                 if (stTab != null)
                                 {
                                     FieldInfo tvField = stTab.GetType().GetField("_treeView", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -707,11 +713,24 @@ static partial class Program
                                         Delegate delTv = Delegate.CreateDelegate(typeof(EventHandler), stTab, mDbClickOrig);
                                         stTv.DoubleClick -= (EventHandler)delTv;
                                         stTv.DoubleClick += (sTv, eTv) => {
-                                            TreeNode selNode = stTv.SelectedNode;
+                                            Point pt = stTv.PointToClient(Cursor.Position);
+                                            TreeNode selNode = stTv.GetNodeAt(pt) ?? stTv.SelectedNode;
                                             if (selNode != null && selNode.Nodes.Count == 0)
                                             {
                                                 string routineTitle = selNode.Text;
-                                                if (!IsMockSimulation && !IsDiceConnected)
+                                                bool isDirectScript = false;
+                                                try {
+                                                    if (wfInit != null && selNode.Tag != null) {
+                                                        PropertyInfo piId = selNode.Tag.GetType().GetProperty("Id");
+                                                        string ieId = piId != null ? piId.GetValue(selNode.Tag, null) as string : null;
+                                                        if (!string.IsNullOrEmpty(ieId)) {
+                                                            MethodInfo miIsScript = wfInit.GetType().GetMethod("IsScript");
+                                                            if (miIsScript != null) isDirectScript = (bool)miIsScript.Invoke(wfInit, new object[] { ieId });
+                                                        }
+                                                    }
+                                                } catch {}
+
+                                                if (isDirectScript && !IsMockSimulation && !IsDiceConnected)
                                                 {
                                                     var actReq = ShowVehicleRequiredDialog(stTv.FindForm(), routineTitle);
                                                     if (actReq == VehicleRequiredAction.EnableMock)
@@ -735,7 +754,7 @@ static partial class Program
                                                     }
                                                 }
 
-                                                if (!ShowPrerequisitePreflightDialog(routineTitle, null, null, stTv.FindForm()))
+                                                if (isDirectScript && !ShowPrerequisitePreflightDialog(routineTitle, null, null, stTv.FindForm()))
                                                 {
                                                     Console.WriteLine("[Launcher] Routine cancelled by user: " + routineTitle);
                                                     return;

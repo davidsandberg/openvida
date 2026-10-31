@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -19,58 +20,42 @@ using Vcc.Vida.DiagSwdl.UI.Diagnostics;
 
 static partial class Program
 {
-    static string GetImageTag(string filename)
-
+    static string GetImageSrc(string filename)
     {
-
-        if (string.IsNullOrEmpty(filename)) return "";
-
+        if (string.IsNullOrEmpty(filename)) return null;
         try
-
         {
-
             byte[] imgBytes = null;
-
             using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=imagerepository;Integrated Security=True"))
-
             {
-
                 conn.Open();
-
                 using (var cmd = conn.CreateCommand())
-
                 {
-
                     cmd.CommandText = "SELECT TOP 1 imageData FROM LocalizedGraphics WHERE path = @p OR path LIKE '%' + @p";
-
                     cmd.Parameters.AddWithValue("@p", filename);
-
                     var obj = cmd.ExecuteScalar();
-
                     if (obj != null && obj != DBNull.Value) imgBytes = (byte[])obj;
-
                 }
-
             }
-
             if (imgBytes != null && imgBytes.Length > 0)
-
             {
-
                 string mime = filename.EndsWith(".png", StringComparison.OrdinalIgnoreCase) ? "image/png" :
-
                               filename.EndsWith(".jpg", StringComparison.OrdinalIgnoreCase) || filename.EndsWith(".jpeg", StringComparison.OrdinalIgnoreCase) ? "image/jpeg" : "image/gif";
-
-                return string.Format("<div style='text-align:center; margin:16px 0;'><img class='doc-img' src='data:{0};base64,{1}' alt='{2}' /></div>", mime, Convert.ToBase64String(imgBytes), filename);
-
+                return string.Format("data:{0};base64,{1}", mime, Convert.ToBase64String(imgBytes));
             }
-
         }
-
         catch {}
+        return null;
+    }
 
+    static string GetImageTag(string filename)
+    {
+        string src = GetImageSrc(filename);
+        if (!string.IsNullOrEmpty(src))
+        {
+            return string.Format("<div style='text-align:center; margin:16px 0;'><img class='doc-img' src='{0}' alt='{1}' /></div>", src, filename);
+        }
         return "";
-
     }
 
     static string RenderDocumentHtml(string docId, string highlight)
@@ -310,6 +295,15 @@ static partial class Program
             sb.Append(".doc-link:hover { color: #0369a1; }");
 
             sb.Append(".doc-img { max-width: 95%; height: auto; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }");
+            sb.Append(".smarttool-box { background: #f0fdf4; border: 2px solid #22c55e; border-radius: 6px; padding: 14px 18px; margin: 16px 0; box-shadow: 0 2px 6px rgba(34, 197, 94, 0.12); }");
+            sb.Append(".smarttool-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }");
+            sb.Append(".smarttool-badge { background: #16a34a; color: white; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 3px; letter-spacing: 0.5px; }");
+            sb.Append(".smarttool-title { font-size: 14px; font-weight: 600; color: #14532d; }");
+            sb.Append(".smarttool-action { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }");
+            sb.Append(".btn-smarttool { display: inline-flex; align-items: center; background: #16a34a; color: #ffffff !important; text-decoration: none !important; padding: 8px 16px; border-radius: 4px; font-size: 13px; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,0.15); transition: background 0.15s ease; }");
+            sb.Append(".btn-smarttool:hover { background: #15803d; color: #ffffff !important; }");
+            sb.Append(".smarttool-id { font-size: 12px; color: #475569; }");
+            sb.Append(".smarttool-id code { background: #e2e8f0; padding: 2px 6px; border-radius: 3px; font-family: Consolas, monospace; font-size: 11.5px; }");
 
             sb.Append("@media print { .btn-print { display: none; } body { margin: 10px; } }");
 
@@ -612,45 +606,39 @@ static partial class Program
         }
 
         else if (name == "list1" || name == "list2")
-
         {
-
             var listTitle = el.Element("title");
-
             if (listTitle != null) sb.AppendFormat("<h3>{0}</h3>", listTitle.Value.Trim());
-
-            sb.Append("<ul>");
-
+            string enumType = (string)el.Attribute("enumtype") ?? "";
+            bool isOrdered = enumType == "n" || enumType == "1";
+            string listTag = isOrdered ? "ol" : "ul";
+            sb.AppendFormat("<{0}>", listTag);
             foreach (var item in el.Elements("item"))
-
             {
-
                 sb.Append("<li>");
-
                 var xrefs = new System.Collections.Generic.List<System.Xml.Linq.XElement>(item.Descendants("xref"));
-
                 if (xrefs.Count > 0)
-
                 {
-
                     foreach (var xr in xrefs) RenderXref(xr, sb);
-
                 }
-
                 else
-
                 {
-
                     foreach (var p in item.Descendants("ptxt")) sb.Append(p.Value.Trim() + " ");
-
                 }
-
                 sb.Append("</li>");
-
             }
-
-            sb.Append("</ul>");
-
+            sb.AppendFormat("</{0}>", listTag);
+        }
+        else if (name == "diaglist")
+        {
+            RenderDiaglist(el, sb);
+        }
+        else if (name == "smarttool")
+        {
+            if (!el.Ancestors("diaglist").Any())
+            {
+                RenderSmarttool(el, sb, null);
+            }
         }
 
         else if (name == "table1" || name == "table")
@@ -759,4 +747,58 @@ static partial class Program
 
     }
 
+
+    static void RenderDiaglist(System.Xml.Linq.XElement el, System.Text.StringBuilder sb)
+    {
+        string iconSrc = null;
+        var graphicEl = el.Descendants("graphic").FirstOrDefault();
+        if (graphicEl != null)
+        {
+            var hrefEl = graphicEl.Element("href");
+            if (hrefEl != null && !string.IsNullOrEmpty(hrefEl.Value))
+            {
+                iconSrc = GetImageSrc(hrefEl.Value.Trim());
+            }
+        }
+
+        var smartTools = el.Descendants("smarttool").ToList();
+        if (smartTools.Count > 0)
+        {
+            foreach (var st in smartTools)
+            {
+                RenderSmarttool(st, sb, iconSrc);
+            }
+        }
+        else if (!string.IsNullOrEmpty(iconSrc))
+        {
+            sb.AppendFormat("<div style='margin:12px 0;'><img src='{0}' alt='Diagnostic Tool' /></div>", iconSrc);
+        }
+    }
+
+    static void RenderSmarttool(System.Xml.Linq.XElement st, System.Text.StringBuilder sb, string iconSrc)
+    {
+        var href = st.Element("href");
+        string scriptId = href != null ? href.Value.Trim() : st.Value.Trim();
+        string routineTitle = href != null ? (string)href.Attribute("title") ?? "" : "";
+        if (string.IsNullOrEmpty(routineTitle)) routineTitle = "Diagnostic Routine";
+
+        string iconHtml = "";
+        if (!string.IsNullOrEmpty(iconSrc))
+        {
+            iconHtml = string.Format("<img src='{0}' style='width:22px;height:22px;vertical-align:middle;margin-right:8px;border:none;' alt='VCT2000' />", iconSrc);
+        }
+
+        string clickUrl = string.Format("smarttool://{0}?title={1}", Uri.EscapeDataString(scriptId), Uri.EscapeDataString(routineTitle));
+
+        sb.Append("<div class='smarttool-box'>");
+        sb.Append("<div class='smarttool-header'>");
+        sb.Append("<span class='smarttool-badge'>⚡ VEHICLE ROUTINE</span>");
+        sb.AppendFormat("<span class='smarttool-title'>{0}</span>", System.Security.SecurityElement.Escape(routineTitle));
+        sb.Append("</div>");
+        sb.Append("<div class='smarttool-action'>");
+        sb.AppendFormat("<a href='{0}' class='btn-smarttool'>{1}▶️ Run Adaptation / Routine on ECU</a>", clickUrl, iconHtml);
+        sb.AppendFormat("<span class='smarttool-id'>Script: <code>{0}</code></span>", System.Security.SecurityElement.Escape(scriptId));
+        sb.Append("</div>");
+        sb.Append("</div>");
+    }
 }
