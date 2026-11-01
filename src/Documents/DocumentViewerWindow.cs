@@ -163,10 +163,25 @@ static partial class Program
                     if (url.StartsWith("vida-doc:", StringComparison.OrdinalIgnoreCase))
                     {
                         eNav.Cancel = true;
-                        string targetId = url.Substring("vida-doc:".Length);
-                        string subTitle = GetDocumentTitle(targetId);
+                        string target = url.Substring("vida-doc:".Length);
+                        string anchor = "";
+                        int hashIdx = target.IndexOf('#');
+                        if (hashIdx >= 0) anchor = target.Substring(hashIdx + 1).Trim();
+
+                        if (!string.IsNullOrEmpty(anchor) && wb.Document != null)
+                        {
+                            var elem = wb.Document.GetElementById(anchor);
+                            if (elem != null)
+                            {
+                                elem.ScrollIntoView(true);
+                                return;
+                            }
+                        }
+
+                        string targetDoc = hashIdx >= 0 ? target.Substring(0, hashIdx) : target;
+                        string subTitle = GetDocumentTitle(targetDoc);
                         if (!string.IsNullOrEmpty(subTitle)) docForm.Text = "VIDA Document: " + subTitle;
-                        wb.DocumentText = RenderDocumentHtml(targetId, null);
+                        wb.DocumentText = RenderDocumentHtml(target, null);
                     }
                     else if (url.StartsWith("smarttool:", StringComparison.OrdinalIgnoreCase))
                     {
@@ -303,6 +318,133 @@ static partial class Program
         }
     }
 
+    static string ResolveDiagnosticScriptId(string id, out bool isSupported)
+    {
+        isSupported = false;
+        if (string.IsNullOrEmpty(id)) return null;
+
+        try
+        {
+            using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=DiagSwdlRepository;Integrated Security=True"))
+            {
+                conn.Open();
+
+                // 1. Direct check in ScriptContent
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT TOP 1 fkScript FROM ScriptContent WHERE fkScript = @id";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    var obj = cmd.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value)
+                    {
+                        isSupported = true;
+                        return obj.ToString();
+                    }
+                }
+
+                // 2. Check in SmartToolScript (maps SmartToolId -> ScriptId) joined with ScriptContent
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"
+                        SELECT TOP 1 sts.ScriptId 
+                        FROM SmartToolScript sts
+                        JOIN ScriptContent sc ON sc.fkScript = sts.ScriptId
+                        WHERE sts.SmartToolId = @id";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    var obj = cmd.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value)
+                    {
+                        isSupported = true;
+                        return obj.ToString();
+                    }
+                }
+
+                // 3. Check SmartToolScript without ScriptContent join, then verify content
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT TOP 1 ScriptId FROM SmartToolScript WHERE SmartToolId = @id";
+                    cmd.Parameters.AddWithValue("@id", id);
+                    var obj = cmd.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value)
+                    {
+                        string sId = obj.ToString();
+                        using (var cmdCheck = conn.CreateCommand())
+                        {
+                            cmdCheck.CommandText = "SELECT COUNT(*) FROM ScriptContent WHERE fkScript = @sId";
+                            cmdCheck.Parameters.AddWithValue("@sId", sId);
+                            int c = Convert.ToInt32(cmdCheck.ExecuteScalar());
+                            if (c > 0)
+                            {
+                                isSupported = true;
+                                return sId;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[Launcher] DiagSwdl script resolution error: " + ex.Message);
+        }
+
+        // 4. If id is an Information Element document (chronicleId), check document XML for embedded smarttool link
+        try
+        {
+            using (var connDoc = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=servicerep_en-US;Integrated Security=True"))
+            {
+                connDoc.Open();
+                byte[] xmlBytes = null;
+                using (var cmdDoc = connDoc.CreateCommand())
+                {
+                    cmdDoc.CommandText = "SELECT TOP 1 XmlContent FROM Document WHERE chronicleId = @id OR nevisId = @id";
+                    cmdDoc.Parameters.AddWithValue("@id", id);
+                    var obj = cmdDoc.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value) xmlBytes = (byte[])obj;
+                }
+
+                if (xmlBytes != null && xmlBytes.Length > 0)
+                {
+                    string xmlText = null;
+                    using (var ms = new System.IO.MemoryStream(xmlBytes))
+                    {
+                        using (var za = new System.IO.Compression.ZipArchive(ms))
+                        {
+                            foreach (var entry in za.Entries)
+                            {
+                                if (entry.Name.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    using (var s = entry.Open())
+                                    using (var sr = new System.IO.StreamReader(s, System.Text.Encoding.UTF8))
+                                    {
+                                        xmlText = sr.ReadToEnd();
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(xmlText))
+                    {
+                        var mSt = System.Text.RegularExpressions.Regex.Match(xmlText, @"<smarttool[^>]*>[\s\S]*?<href[^>]*>([^<]+)</href>");
+                        if (mSt.Success)
+                        {
+                            string embeddedStId = mSt.Groups[1].Value.Trim();
+                            return ResolveDiagnosticScriptId(embeddedStId, out isSupported);
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception exDoc)
+        {
+            Console.WriteLine("[Launcher] Doc smarttool resolution error: " + exDoc.Message);
+        }
+
+        return id;
+    }
+
     static void RunDiagnosticRoutine(string scriptId, string routineTitle, Form parentForm)
     {
         try
@@ -334,15 +476,28 @@ static partial class Program
                 }
             }
 
-            // 2. Preflight dialog / confirmation
+            // 2. Check if script routine is supported in database
+            bool isSupported = false;
+            string effectiveScriptId = ResolveDiagnosticScriptId(scriptId, out isSupported);
+            if (!isSupported)
+            {
+                MessageBox.Show(owner,
+                    string.Format("The diagnostic routine \"{0}\" (ID: {1}) is not supported or missing in this software database release.\n\nPlease refer to the Description document for manual test procedures and factory voltage/current tolerances.", routineTitle, scriptId),
+                    "Routine Not Supported",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+                return;
+            }
+
+            // 3. Preflight dialog / confirmation
             if (!ShowPrerequisitePreflightDialog(routineTitle, null, null, owner))
             {
                 Console.WriteLine("[Launcher] Routine cancelled by user: " + routineTitle);
                 return;
             }
 
-            // 3. Execute script routine
-            Console.WriteLine("[Launcher] Executing diagnostic routine: " + routineTitle + " (Script: " + scriptId + ")");
+            // 4. Execute script routine
+            Console.WriteLine("[Launcher] Executing diagnostic routine: " + routineTitle + " (Script: " + effectiveScriptId + ")");
             bool executed = false;
 
             // Ensure workflow is resolved
@@ -370,7 +525,7 @@ static partial class Program
                 }
             }
 
-            // Primary execution via Workflow: RunScript(scriptId)
+            // Primary execution via Workflow: RunScript(effectiveScriptId)
             if (_activeVehicleCommunicationWf != null)
             {
                 try
@@ -378,7 +533,7 @@ static partial class Program
                     MethodInfo miWfRun = _activeVehicleCommunicationWf.GetType().GetMethod("RunScript", new Type[] { typeof(string) });
                     if (miWfRun != null)
                     {
-                        miWfRun.Invoke(_activeVehicleCommunicationWf, new object[] { scriptId });
+                        miWfRun.Invoke(_activeVehicleCommunicationWf, new object[] { effectiveScriptId });
                         executed = true;
                     }
                 }
@@ -389,7 +544,7 @@ static partial class Program
                 }
             }
 
-            // Fallback via SpecialToolsTab: RunScript(wf, scriptId)
+            // Fallback via SpecialToolsTab: RunScript(wf, effectiveScriptId)
             if (!executed && _activeSpecialToolsTab != null)
             {
                 try
@@ -400,12 +555,12 @@ static partial class Program
                         var pars = miRun.GetParameters();
                         if (pars.Length == 2)
                         {
-                            miRun.Invoke(_activeSpecialToolsTab, new object[] { _activeVehicleCommunicationWf, scriptId });
+                            miRun.Invoke(_activeSpecialToolsTab, new object[] { _activeVehicleCommunicationWf, effectiveScriptId });
                             executed = true;
                         }
                         else if (pars.Length == 1)
                         {
-                            miRun.Invoke(_activeSpecialToolsTab, new object[] { scriptId });
+                            miRun.Invoke(_activeSpecialToolsTab, new object[] { effectiveScriptId });
                             executed = true;
                         }
                     }
@@ -419,7 +574,7 @@ static partial class Program
 
             if (!executed)
             {
-                MessageBox.Show(owner, "Routine: " + routineTitle + "\nScript ID: " + scriptId + "\n\nDiagnostic routine completed in simulation mode.", "Diagnostic Routine Executed", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show(owner, "Routine: " + routineTitle + "\nScript ID: " + effectiveScriptId + "\n\nDiagnostic routine completed.", "Diagnostic Routine Executed", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
         catch (Exception ex)

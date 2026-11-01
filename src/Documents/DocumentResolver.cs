@@ -84,6 +84,26 @@ static partial class Program
 
             }
 
+            // Fallback for diagnostic scripts in DiagSwdlRepository
+            using (var conn2 = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=DiagSwdlRepository;Integrated Security=True"))
+            {
+                conn2.Open();
+                using (var cmd2 = conn2.CreateCommand())
+                {
+                    cmd2.CommandText = "SELECT TOP 1 DisplayText FROM IETitle WHERE fkIE = @id ORDER BY CASE WHEN fkLanguage IN (15, 16) THEN 0 ELSE 1 END, fkLanguage";
+                    cmd2.Parameters.AddWithValue("@id", cleanId);
+                    var obj = cmd2.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value) return obj.ToString().Trim();
+                }
+                using (var cmd2 = conn2.CreateCommand())
+                {
+                    cmd2.CommandText = "SELECT TOP 1 DisplayText FROM ScriptContent WHERE fkScript = @id ORDER BY CASE WHEN fkLanguage IN (15, 16) THEN 0 ELSE 1 END, fkLanguage";
+                    cmd2.Parameters.AddWithValue("@id", cleanId);
+                    var obj = cmd2.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value) return obj.ToString().Trim();
+                }
+            }
+
         }
 
         catch {}
@@ -102,6 +122,28 @@ static partial class Program
         if (s.EndsWith("es") && s.Length > 5) return s.Substring(0, s.Length - 2);
         if (s.EndsWith("s") && s.Length > 4 && !s.EndsWith("ss")) return s.Substring(0, s.Length - 1);
         return s;
+    }
+
+    static bool IsDiagScript(string id)
+    {
+        if (string.IsNullOrEmpty(id)) return false;
+        try
+        {
+            string clean = CleanDocId(id);
+            using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=DiagSwdlRepository;Integrated Security=True"))
+            {
+                conn.Open();
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT COUNT(*) FROM Script WHERE id = @id";
+                    cmd.Parameters.AddWithValue("@id", clean);
+                    var obj = cmd.ExecuteScalar();
+                    if (obj != null && obj != DBNull.Value && Convert.ToInt32(obj) > 0) return true;
+                }
+            }
+        }
+        catch {}
+        return false;
     }
 
     static string ResolveDocumentId(string rawId, string title)
@@ -181,6 +223,14 @@ static partial class Program
                         if (obj != null && obj != DBNull.Value) return obj.ToString().Trim();
                     }
 
+                    // If rawId is a diagnostic script and not a service manual document,
+                    // return rawId immediately. Do not perform fuzzy symptom matching (Step 6)
+                    // or substring searches (Step 8/9).
+                    if (!string.IsNullOrEmpty(rawId) && IsDiagScript(rawId))
+                    {
+                        return rawId;
+                    }
+
                     // 6. Structured Symptom Title keyword match (e.g. "Fuel system, Fuel leakage, XY", "Steering, Oil leakage, U6")
                     if (queryText.Contains(","))
                     {
@@ -238,8 +288,11 @@ static partial class Program
                             }
 
                             // Prioritize defect/action words (e.g. "leak") before generic nouns (e.g. "oil")
-                            devWords.AddRange(priorityDev);
-                            devWords.AddRange(otherDev);
+                            if (priorityDev.Count > 0)
+                            {
+                                devWords.AddRange(priorityDev);
+                                devWords.AddRange(otherDev);
+                            }
                         }
 
                         // Try each prioritized deviation word with each component word in Document

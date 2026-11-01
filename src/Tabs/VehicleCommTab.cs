@@ -700,7 +700,16 @@ static partial class Program
                                                     Console.WriteLine("[Launcher] Activation cancelled by user: " + actName);
                                                     return;
                                                 }
-                                                mStartOrig.Invoke(ac, new object[] { sBtn, eBtn });
+                                                try
+                                                {
+                                                    mStartOrig.Invoke(ac, new object[] { sBtn, eBtn });
+                                                }
+                                                catch (Exception exStart)
+                                                {
+                                                    string msg = exStart.InnerException != null ? exStart.InnerException.Message : exStart.Message;
+                                                    Console.WriteLine("[Launcher] Activation execution error: " + msg);
+                                                    MessageBox.Show(sb.FindForm(), "Failed to execute activation '" + actName + "':\n\n" + msg, "Activation Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                                }
                                             };
                                         }
                                     }
@@ -732,46 +741,12 @@ static partial class Program
                                             TreeNode selNode = stTv.GetNodeAt(pt) ?? stTv.SelectedNode;
                                             if (selNode != null && selNode.Nodes.Count == 0)
                                             {
-                                                string routineTitle = selNode.Text;
-                                                bool isDirectScript = false;
-                                                try {
-                                                    if (wfInit != null && selNode.Tag != null) {
-                                                        PropertyInfo piId = selNode.Tag.GetType().GetProperty("Id");
-                                                        string ieId = piId != null ? piId.GetValue(selNode.Tag, null) as string : null;
-                                                        if (!string.IsNullOrEmpty(ieId)) {
-                                                            MethodInfo miIsScript = wfInit.GetType().GetMethod("IsScript");
-                                                            if (miIsScript != null) isDirectScript = (bool)miIsScript.Invoke(wfInit, new object[] { ieId });
-                                                        }
-                                                    }
-                                                } catch {}
-
-                                                if (isDirectScript && !IsMockSimulation && !IsDiceConnected)
+                                                PropertyInfo piId = selNode.Tag != null ? selNode.Tag.GetType().GetProperty("Id") : null;
+                                                string ieId = piId != null ? piId.GetValue(selNode.Tag, null) as string : null;
+                                                if (!string.IsNullOrEmpty(ieId))
                                                 {
-                                                    var actReq = ShowVehicleRequiredDialog(stTv.FindForm(), routineTitle);
-                                                    if (actReq == VehicleRequiredAction.EnableMock)
-                                                    {
-                                                        chkMock.Checked = true;
-                                                        IsMockSimulation = true;
-                                                        updateVehCommStatusText();
-                                                    }
-                                                    else if (actReq == VehicleRequiredAction.TryConnect)
-                                                    {
-                                                        InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
-                                                        if (!IsDiceConnected)
-                                                        {
-                                                            MessageBox.Show("Could not connect to vehicle.\n\nPlease ensure DiCE is connected via USB and OBD-II, and ignition is in Position II.", "Vehicle Not Detected", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                                                            return;
-                                                        }
-                                                    }
-                                                    else
-                                                    {
-                                                        return;
-                                                    }
-                                                }
-
-                                                if (isDirectScript && !ShowPrerequisitePreflightDialog(routineTitle, null, null, stTv.FindForm()))
-                                                {
-                                                    Console.WriteLine("[Launcher] Routine cancelled by user: " + routineTitle);
+                                                    // Double-clicking always opens the documentation
+                                                    ShowDocumentWindow(ieId, selNode.Text, stTv.FindForm());
                                                     return;
                                                 }
                                             }
@@ -779,27 +754,73 @@ static partial class Program
                                         };
                                     }
 
+                                    // Hook Description button to always show documentation
                                     FieldInfo btnDescField = stTab.GetType().GetField("_viewDescriptionButton", BindingFlags.NonPublic | BindingFlags.Instance);
                                     Control btnDesc = btnDescField != null ? btnDescField.GetValue(stTab) as Control : null;
                                     MethodInfo mDescOrig = stTab.GetType().GetMethod("_viewDescriptionButton_Click", BindingFlags.NonPublic | BindingFlags.Instance);
                                     if (btnDesc != null && mDescOrig != null && btnDesc.Tag == null)
                                     {
-                                        btnDesc.Tag = "wired_preflight";
+                                        btnDesc.Tag = "wired_desc_only";
                                         Delegate delDesc = Delegate.CreateDelegate(typeof(EventHandler), stTab, mDescOrig);
                                         btnDesc.Click -= (EventHandler)delDesc;
                                         btnDesc.Click += (sD, eD) => {
                                             TreeNode selNode = stTv != null ? stTv.SelectedNode : null;
                                             if (selNode != null && selNode.Nodes.Count == 0)
                                             {
-                                                string routineTitle = selNode.Text;
-                                                if (!ShowPrerequisitePreflightDialog(routineTitle, null, null, btnDesc.FindForm()))
+                                                PropertyInfo piId = selNode.Tag != null ? selNode.Tag.GetType().GetProperty("Id") : null;
+                                                string ieId = piId != null ? piId.GetValue(selNode.Tag, null) as string : null;
+                                                if (!string.IsNullOrEmpty(ieId))
                                                 {
-                                                    Console.WriteLine("[Launcher] Routine cancelled by user: " + routineTitle);
+                                                    ShowDocumentWindow(ieId, selNode.Text, btnDesc.FindForm());
                                                     return;
                                                 }
                                             }
                                             mDescOrig.Invoke(stTab, new object[] { sD, eD });
                                         };
+                                    }
+
+                                    // Add Execute button next to Description in _buttonContainer
+                                    FieldInfo btnContainerField = stTab.GetType().GetField("_buttonContainer", BindingFlags.NonPublic | BindingFlags.Instance);
+                                    Control btnContainer = btnContainerField != null ? btnContainerField.GetValue(stTab) as Control : null;
+
+                                    if (btnContainer != null && btnDesc != null && btnContainer.Controls["_executeButton"] == null)
+                                    {
+                                        var btnExec = new Vcc.Vida.DiagSwdl.GuiComponents.FlatButton();
+                                        btnExec.Name = "_executeButton";
+                                        btnExec.Text = "Execute";
+                                        btnExec.Size = btnDesc.Size;
+                                        btnExec.Cursor = Cursors.Hand;
+                                        if (btnDesc is Vcc.Vida.DiagSwdl.GuiComponents.FlatButton)
+                                        {
+                                            var fbDesc = (Vcc.Vida.DiagSwdl.GuiComponents.FlatButton)btnDesc;
+                                            btnExec.HighlightColor = fbDesc.HighlightColor;
+                                            btnExec.HighlightTextColor = fbDesc.HighlightTextColor;
+                                        }
+                                        btnExec.Enabled = (stTv != null && stTv.SelectedNode != null && stTv.SelectedNode.Nodes.Count == 0);
+
+                                        btnExec.Click += (sEx, eEx) => {
+                                            TreeNode selNode = stTv != null ? stTv.SelectedNode : null;
+                                            if (selNode == null || selNode.Nodes.Count > 0)
+                                            {
+                                                MessageBox.Show(btnExec.FindForm(), "Please select an activation or diagnostic routine to execute.", "No Routine Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                                return;
+                                            }
+
+                                            string routineTitle = selNode.Text;
+                                            PropertyInfo piId = selNode.Tag != null ? selNode.Tag.GetType().GetProperty("Id") : null;
+                                            string ieId = piId != null ? piId.GetValue(selNode.Tag, null) as string : null;
+
+                                            RunDiagnosticRoutine(ieId, routineTitle, btnExec.FindForm());
+                                        };
+
+                                        if (stTv != null)
+                                        {
+                                            stTv.AfterSelect += (sAs, eAs) => {
+                                                btnExec.Enabled = (eAs.Node != null && eAs.Node.Nodes.Count == 0);
+                                            };
+                                        }
+
+                                        btnContainer.Controls.Add(btnExec);
                                     }
                                 }
                             }

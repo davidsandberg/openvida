@@ -242,46 +242,85 @@ static partial class Program
         return false;
     }
 
-    private static bool EnsureJBossRunning(string vidaPath)
+    private static bool ProbeJBossVidaReady()
     {
-        if (ProbeJBossPort80())
-        {
-            Console.WriteLine("[HealthCheck] JBoss Application Server: Responding on port 80.");
-            return true;
-        }
-
-        Console.WriteLine("[HealthCheck] JBoss server is not responding on port 80. Attempting auto-start...");
-
-        string jbossBat = Path.Combine(vidaPath, "jboss.bat");
-        if (!File.Exists(jbossBat))
-        {
-            Console.WriteLine("[HealthCheck] Warning: jboss.bat not found at " + jbossBat);
-            return true;
-        }
-
-        // Auto-launch JBoss in background
         try
         {
-            ProcessStartInfo psi = new ProcessStartInfo
+            var req = (System.Net.HttpWebRequest)System.Net.WebRequest.Create("http://127.0.0.1/Vida/version.txt");
+            req.Timeout = 1500;
+            req.Method = "GET";
+            using (var resp = (System.Net.HttpWebResponse)req.GetResponse())
             {
-                WorkingDirectory = vidaPath,
-                FileName = "cmd.exe",
-                Arguments = "/c jboss.bat start",
-                WindowStyle = ProcessWindowStyle.Minimized
-            };
-            Process.Start(psi);
+                return (int)resp.StatusCode == 200;
+            }
         }
-        catch (Exception ex)
+        catch
         {
-            Console.WriteLine("[HealthCheck] Failed to launch jboss.bat: " + ex.Message);
+            try
+            {
+                var reqRoot = (System.Net.HttpWebRequest)System.Net.WebRequest.Create("http://127.0.0.1/");
+                reqRoot.Timeout = 1500;
+                reqRoot.Method = "GET";
+                using (var respRoot = (System.Net.HttpWebResponse)reqRoot.GetResponse())
+                {
+                    return (int)respRoot.StatusCode == 200;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    private static bool EnsureJBossRunning(string vidaPath)
+    {
+        if (ProbeJBossVidaReady())
+        {
+            Console.WriteLine("[HealthCheck] JBoss Application Server & VidaWeb: Responding on port 80.");
             return true;
         }
 
-        // Display sleek progress dialog while polling port 80 (up to 25 seconds)
+        bool port80Open = ProbeJBossPort80();
+        if (port80Open)
+        {
+            Console.WriteLine("[HealthCheck] JBoss port 80 is open, but VidaWeb deployment is still initializing. Waiting for readiness...");
+        }
+        else
+        {
+            Console.WriteLine("[HealthCheck] JBoss server is not responding on port 80. Attempting auto-start...");
+
+            string jbossBat = Path.Combine(vidaPath, "jboss.bat");
+            if (!File.Exists(jbossBat))
+            {
+                Console.WriteLine("[HealthCheck] Warning: jboss.bat not found at " + jbossBat);
+                return true;
+            }
+
+            // Auto-launch JBoss in background
+            try
+            {
+                ProcessStartInfo psi = new ProcessStartInfo
+                {
+                    WorkingDirectory = vidaPath,
+                    FileName = "cmd.exe",
+                    Arguments = "/c jboss.bat start",
+                    WindowStyle = ProcessWindowStyle.Minimized
+                };
+                Process.Start(psi);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[HealthCheck] Failed to launch jboss.bat: " + ex.Message);
+                return true;
+            }
+        }
+
+        // Display sleek progress dialog while polling ProbeJBossVidaReady() (up to 40 seconds)
         using (Form splash = new Form())
         {
             splash.Text = "OpenVIDA — Initializing Backend";
-            splash.Size = new Size(420, 170);
+            splash.Size = new Size(440, 175);
             splash.StartPosition = FormStartPosition.CenterScreen;
             splash.FormBorderStyle = FormBorderStyle.FixedDialog;
             splash.ControlBox = false;
@@ -297,7 +336,7 @@ static partial class Program
 
             Label lblStatus = new Label
             {
-                Text = "Starting JBoss Application Server...",
+                Text = port80Open ? "Initializing Diagnostic Web Services..." : "Starting JBoss Application Server...",
                 Font = new Font("Segoe UI", 10.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(15, 23, 42),
                 Location = new Point(20, 20),
@@ -306,7 +345,7 @@ static partial class Program
 
             Label lblSub = new Label
             {
-                Text = "Waiting for diagnostic services to bind on port 80...",
+                Text = "Waiting for VidaWeb deployment to mount on port 80...",
                 Font = new Font("Segoe UI", 8.5f),
                 ForeColor = Color.FromArgb(100, 116, 139),
                 Location = new Point(22, 45),
@@ -318,7 +357,7 @@ static partial class Program
                 Style = ProgressBarStyle.Marquee,
                 MarqueeAnimationSpeed = 30,
                 Location = new Point(20, 80),
-                Size = new Size(365, 20)
+                Size = new Size(385, 20)
             };
 
             splash.Controls.AddRange(new Control[] { lblStatus, lblSub, pb });
@@ -329,13 +368,13 @@ static partial class Program
 
             pollTimer.Tick += (s, e) => {
                 elapsedSec++;
-                if (ProbeJBossPort80())
+                if (ProbeJBossVidaReady())
                 {
                     jbossReady = true;
                     pollTimer.Stop();
                     splash.Close();
                 }
-                else if (elapsedSec >= 25)
+                else if (elapsedSec >= 40)
                 {
                     pollTimer.Stop();
                     splash.Close();
@@ -347,12 +386,12 @@ static partial class Program
 
             if (jbossReady)
             {
-                Console.WriteLine("[HealthCheck] JBoss backend initialized successfully on port 80!");
+                Console.WriteLine("[HealthCheck] JBoss backend & VidaWeb initialized successfully on port 80!");
                 return true;
             }
             else
             {
-                Console.WriteLine("[HealthCheck] JBoss start timed out after 25s. Continuing anyway...");
+                Console.WriteLine("[HealthCheck] JBoss VidaWeb wait timed out after 40s. Continuing anyway...");
                 return true;
             }
         }

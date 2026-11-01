@@ -67,6 +67,9 @@ static partial class Program
         {
 
             string cleanId = CleanDocId(docId);
+            string targetAnchor = "";
+            int hashIdx = (docId ?? "").IndexOf('#');
+            if (hashIdx >= 0) targetAnchor = docId.Substring(hashIdx + 1).Trim();
 
             var docs = new System.Collections.Generic.List<Tuple<string, byte[]>>();
 
@@ -169,6 +172,13 @@ static partial class Program
             if (docs.Count == 0)
 
             {
+
+                // Check if this ID is a Diagnostic Script from DiagSwdlRepository
+                string scriptHtml = TryRenderDiagnosticScriptHtml(cleanId, highlight);
+                if (!string.IsNullOrEmpty(scriptHtml))
+                {
+                    return scriptHtml;
+                }
 
                 string extraInfo = "";
 
@@ -295,6 +305,18 @@ static partial class Program
             sb.Append(".doc-link:hover { color: #0369a1; }");
 
             sb.Append(".doc-img { max-width: 95%; height: auto; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }");
+            sb.Append(".diag-step { display: flex; gap: 16px; align-items: flex-start; margin: 14px 0; padding: 12px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; }");
+            sb.Append(".diag-graphic { flex-shrink: 0; max-width: 200px; text-align: center; }");
+            sb.Append(".diag-graphic img { max-width: 180px; max-height: 140px; height: auto; width: auto; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }");
+            sb.Append(".diag-content { flex-grow: 1; }");
+            sb.Append(".diag-content ul { margin: 4px 0 8px 18px; padding: 0; }");
+            sb.Append(".diag-content li { margin: 4px 0; font-size: 13.5px; color: #1e293b; }");
+            sb.Append(".vct-tool-container { margin: 10px 0; }");
+            sb.Append(".vct-btn { display: inline-flex; align-items: center; gap: 10px; background: #005087; color: #ffffff !important; text-decoration: none !important; padding: 10px 20px; border-radius: 6px; font-size: 13.5px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,48,87,0.25); transition: all 0.15s ease; cursor: pointer; border: 1px solid #003b66; }");
+            sb.Append(".vct-btn:hover { background: #00385e; color: #ffffff !important; box-shadow: 0 3px 8px rgba(0,48,87,0.35); }");
+            sb.Append(".vct-btn img, .vct-icon { width: 32px !important; height: 32px !important; max-width: 32px !important; max-height: 32px !important; object-fit: contain; border: none !important; background: transparent !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; vertical-align: middle; }");
+            sb.Append(".vct-btn .vct-badge { background: #003057; color: #93c5fd; font-size: 11px; font-weight: 700; padding: 3px 7px; border-radius: 3px; letter-spacing: 0.5px; }");
+            sb.Append(".vct-btn .vct-title { font-size: 13.5px; font-weight: 600; color: #ffffff; }");
             sb.Append(".smarttool-box { background: #f8fafc; border: 1px solid #cbd5e1; border-left: 5px solid #005087; border-radius: 4px; padding: 14px 18px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }");
             sb.Append(".smarttool-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }");
             sb.Append(".smarttool-badge { background: #003057; color: white; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 3px; letter-spacing: 0.5px; }");
@@ -369,12 +391,13 @@ static partial class Program
 
             }
 
-            if (foundTarget)
-
+            if (!string.IsNullOrEmpty(targetAnchor))
             {
-
+                sb.AppendFormat("<script>window.onload = function() {{ var el = document.getElementById('{0}'); if(el) el.scrollIntoView({{behavior: 'smooth', block: 'start'}}); }};</script>", targetAnchor);
+            }
+            else if (foundTarget)
+            {
                 sb.Append("<script>window.onload = function() { var el = document.getElementById('target'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'}); };</script>");
-
             }
 
             sb.Append("</body></html>");
@@ -435,7 +458,11 @@ static partial class Program
 
             string stepTitle = title != null ? title.Value.Trim() : "";
 
-            sb.Append("<div class='step-box'>");
+            string tgId = (string)el.Attribute("id") ?? "";
+            if (!string.IsNullOrEmpty(tgId))
+                sb.AppendFormat("<div class='step-box' id='{0}'>", tgId);
+            else
+                sb.Append("<div class='step-box'>");
 
             if (!string.IsNullOrEmpty(stepTitle)) sb.AppendFormat("<div class='step-title'>{0}</div>", stepTitle);
 
@@ -762,17 +789,52 @@ static partial class Program
         }
 
         var smartTools = el.Descendants("smarttool").ToList();
-        if (smartTools.Count > 0)
+        var ditems = el.Descendants("ditem").ToList();
+
+        sb.Append("<div class='diag-step'>");
+
+        // If there is an illustration graphic (and no smarttools), show as step illustration
+        if (!string.IsNullOrEmpty(iconSrc) && smartTools.Count == 0)
         {
-            foreach (var st in smartTools)
+            sb.AppendFormat("<div class='diag-graphic'><img src='{0}' alt='Step illustration' /></div>", iconSrc);
+        }
+
+        sb.Append("<div class='diag-content'>");
+
+        // Render instruction items
+        if (ditems.Count > 0)
+        {
+            sb.Append("<ul>");
+            foreach (var item in ditems)
             {
-                RenderSmarttool(st, sb, iconSrc);
+                var texts = item.Descendants("ptxt").Select(p => p.Value.Trim()).Where(t => !string.IsNullOrEmpty(t)).ToList();
+                if (texts.Count > 0)
+                {
+                    foreach (var t in texts)
+                    {
+                        sb.AppendFormat("<li>{0}</li>", System.Security.SecurityElement.Escape(t));
+                    }
+                }
+                else
+                {
+                    string raw = item.Value.Trim();
+                    if (!string.IsNullOrEmpty(raw))
+                    {
+                        sb.AppendFormat("<li>{0}</li>", System.Security.SecurityElement.Escape(raw));
+                    }
+                }
             }
+            sb.Append("</ul>");
         }
-        else if (!string.IsNullOrEmpty(iconSrc))
+
+        // Render smarttools
+        foreach (var st in smartTools)
         {
-            sb.AppendFormat("<div style='margin:12px 0;'><img src='{0}' alt='Diagnostic Tool' /></div>", iconSrc);
+            RenderSmarttool(st, sb, iconSrc);
         }
+
+        sb.Append("</div>"); // .diag-content
+        sb.Append("</div>"); // .diag-step
     }
 
     static void RenderSmarttool(System.Xml.Linq.XElement st, System.Text.StringBuilder sb, string iconSrc)
@@ -780,27 +842,232 @@ static partial class Program
         var href = st.Element("href");
         string scriptId = href != null ? href.Value.Trim() : st.Value.Trim();
         string routineTitle = href != null ? (string)href.Attribute("title") ?? "" : "";
-        if (string.IsNullOrEmpty(routineTitle)) routineTitle = "Diagnostic Routine";
+        string toolName = (string)st.Attribute("toolname") ?? "";
 
-        string iconHtml = "";
-        if (!string.IsNullOrEmpty(iconSrc))
+        if (string.IsNullOrEmpty(routineTitle))
         {
-            iconHtml = string.Format("<img src='{0}' style='width:22px;height:22px;vertical-align:middle;margin-right:8px;border:none;' alt='VCT2000' />", iconSrc);
+            routineTitle = !string.IsNullOrEmpty(toolName) ? ("Routine " + toolName) : "Diagnostic Routine";
         }
 
         string clickUrl = string.Format("smarttool://{0}?title={1}", Uri.EscapeDataString(scriptId), Uri.EscapeDataString(routineTitle));
 
-        sb.Append("<div class='vct-tool'>");
+        sb.Append("<div class='vct-tool-container'>");
         sb.AppendFormat("<a href='{0}' class='vct-btn' title='Click to execute: {1}'>", clickUrl, System.Security.SecurityElement.Escape(routineTitle));
+        
         if (!string.IsNullOrEmpty(iconSrc))
         {
-            sb.AppendFormat("<img src='{0}' alt='VCT2000' />", iconSrc);
+            sb.AppendFormat("<img src='{0}' class='vct-icon' style='width:32px;height:32px;max-width:32px;max-height:32px;object-fit:contain;border:none;margin-right:8px;' alt='VCT2000' />", iconSrc);
         }
         else
         {
-            sb.Append("<span style='font-size:16px;'>⚡</span>");
+            sb.Append("<span style='font-size:18px;'>⚡</span>");
         }
-        sb.Append("<span>VCT2000</span></a>");
-        sb.Append("</div>");
+
+        if (!string.IsNullOrEmpty(toolName))
+        {
+            sb.AppendFormat("<span class='vct-badge'>{0}</span>", System.Security.SecurityElement.Escape(toolName));
+        }
+
+        sb.AppendFormat("<span class='vct-title'>▶ Run Test: {0}</span>", System.Security.SecurityElement.Escape(routineTitle));
+        sb.Append("</a></div>");
+    }
+
+    static string TryRenderDiagnosticScriptHtml(string scriptId, string highlight)
+    {
+        if (string.IsNullOrEmpty(scriptId)) return null;
+
+        try
+        {
+            string cleanId = CleanDocId(scriptId);
+            using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=DiagSwdlRepository;Integrated Security=True"))
+            {
+                conn.Open();
+
+                string title = null;
+                byte[] xmlBytes = null;
+
+                using (var cmd = conn.CreateCommand())
+                {
+                    cmd.CommandText = @"SELECT TOP 1 DisplayText, XmlDataCompressed 
+                                        FROM ScriptContent 
+                                        WHERE fkScript = @id 
+                                        ORDER BY CASE WHEN fkLanguage IN (15, 16) THEN 0 ELSE 1 END, fkLanguage";
+                    cmd.Parameters.AddWithValue("@id", cleanId);
+                    using (var r = cmd.ExecuteReader())
+                    {
+                        if (r.Read())
+                        {
+                            if (r[0] != DBNull.Value) title = r[0].ToString().Trim();
+                            if (r[1] != DBNull.Value) xmlBytes = (byte[])r[1];
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(title))
+                {
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"SELECT TOP 1 DisplayText 
+                                            FROM IETitle 
+                                            WHERE fkIE = @id 
+                                            ORDER BY CASE WHEN fkLanguage IN (15, 16) THEN 0 ELSE 1 END, fkLanguage";
+                        cmd.Parameters.AddWithValue("@id", cleanId);
+                        var obj = cmd.ExecuteScalar();
+                        if (obj != null && obj != DBNull.Value) title = obj.ToString().Trim();
+                    }
+                }
+
+                // If not found in ScriptContent or IETitle, check Script table
+                if (string.IsNullOrEmpty(title))
+                {
+                    using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT COUNT(*) FROM Script WHERE id = @id";
+                        cmd.Parameters.AddWithValue("@id", cleanId);
+                        var cnt = cmd.ExecuteScalar();
+                        if (cnt == null || cnt == DBNull.Value || Convert.ToInt32(cnt) == 0) return null;
+                        title = "Diagnostic Routine " + cleanId;
+                    }
+                }
+
+                // Parse XML phrases/notes if available
+                var phrases = new List<string>();
+                var actions = new List<string>();
+                var notices = new List<string>();
+
+                if (xmlBytes != null && xmlBytes.Length > 0)
+                {
+                    try
+                    {
+                        using (var ms = new System.IO.MemoryStream(xmlBytes))
+                        using (var za = new System.IO.Compression.ZipArchive(ms))
+                        {
+                            if (za.Entries.Count > 0)
+                            {
+                                using (var entryStream = za.Entries[0].Open())
+                                using (var sr = new System.IO.StreamReader(entryStream, System.Text.Encoding.UTF8))
+                                {
+                                    string xmlContent = sr.ReadToEnd();
+                                    var matches = System.Text.RegularExpressions.Regex.Matches(xmlContent, @"<phrase(?:\s+category=""([^""]*)"")?[^>]*>([^<]+)</phrase>");
+                                    var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+                                    foreach (System.Text.RegularExpressions.Match m in matches)
+                                    {
+                                        string cat = m.Groups[1].Success ? m.Groups[1].Value : "";
+                                        string p = m.Groups[2].Value.Trim();
+
+                                        if (string.IsNullOrEmpty(p) || seen.Contains(p) || p.Equals(title, StringComparison.OrdinalIgnoreCase))
+                                            continue;
+
+                                        seen.Add(p);
+
+                                        // Categorize buttons/controls vs instructions/notices
+                                        if (p.Length < 35 && (p.StartsWith("Activate", StringComparison.OrdinalIgnoreCase) ||
+                                                               p.StartsWith("Windshield", StringComparison.OrdinalIgnoreCase) ||
+                                                               p.StartsWith("Rear window", StringComparison.OrdinalIgnoreCase) ||
+                                                               p.Equals("Start", StringComparison.OrdinalIgnoreCase) ||
+                                                               p.Equals("Stop", StringComparison.OrdinalIgnoreCase) ||
+                                                               p.Equals("Reset", StringComparison.OrdinalIgnoreCase) ||
+                                                               p.Equals("Exit", StringComparison.OrdinalIgnoreCase) ||
+                                                               p.Equals("Continue", StringComparison.OrdinalIgnoreCase) ||
+                                                               p.Equals("Hide", StringComparison.OrdinalIgnoreCase) ||
+                                                               cat.Equals("Button", StringComparison.OrdinalIgnoreCase) ||
+                                                               cat.Equals("Component And Functionality", StringComparison.OrdinalIgnoreCase)))
+                                        {
+                                            actions.Add(p);
+                                        }
+                                        else if (p.Length > 30 || p.Contains("!") || p.Contains(".") || p.Contains("voltage") || p.Contains("battery") || p.Contains("control module") || p.Contains("Note"))
+                                        {
+                                            notices.Add(p);
+                                        }
+                                        else
+                                        {
+                                            phrases.Add(p);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch {}
+                }
+
+                var sb = new System.Text.StringBuilder();
+                sb.Append("<!DOCTYPE html><html><head><meta charset='utf-8'>");
+                sb.Append("<style>");
+                sb.Append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 24px 32px; line-height: 1.6; color: #1e293b; background: #fff; }");
+                sb.Append(".header { border-bottom: 2px solid #005087; padding-bottom: 12px; margin-bottom: 20px; }");
+                sb.Append(".badge-pill { display: inline-block; background: #005087; color: white; padding: 4px 10px; border-radius: 4px; font-weight: 600; font-size: 12px; text-transform: uppercase; margin-bottom: 8px; }");
+                sb.Append(".id-pill { display: inline-block; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px; font-family: Consolas, monospace; }");
+                sb.Append("h1 { color: #0f172a; font-size: 24px; margin: 6px 0; font-weight: 700; }");
+                sb.Append(".info-card { background: #f8fafc; border: 1px solid #e2e8f0; border-left: 4px solid #0284c7; border-radius: 6px; padding: 16px 20px; margin: 18px 0; }");
+                sb.Append(".exec-btn { display: inline-block; background-color: #005087; color: #ffffff !important; padding: 12px 24px; font-weight: 600; font-size: 14px; text-decoration: none; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.15); margin-top: 10px; margin-bottom: 10px; }");
+                sb.Append(".exec-btn:hover { background-color: #00385e; color: #ffffff !important; }");
+                sb.Append(".section-title { font-size: 15px; font-weight: 700; color: #005087; margin-top: 22px; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }");
+                sb.Append(".action-tag { display: inline-block; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; padding: 4px 12px; border-radius: 16px; font-weight: 600; font-size: 13px; margin: 4px 6px 4px 0; }");
+                sb.Append(".notice-box { background: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #f59e0b; padding: 12px 16px; border-radius: 4px; margin: 10px 0; color: #92400e; font-size: 13px; line-height: 1.5; }");
+                sb.Append(".bullet-list { margin: 8px 0; padding-left: 20px; color: #334155; }");
+                sb.Append(".bullet-list li { margin-bottom: 6px; }");
+                sb.Append("</style></head><body>");
+
+                sb.Append("<div class='header'>");
+                sb.Append("<div><span class='badge-pill'>Interactive Diagnostic Routine</span><span class='id-pill'>Script ID: ").Append(cleanId).Append("</span></div>");
+                sb.Append("<h1>").Append(System.Security.SecurityElement.Escape(title)).Append("</h1>");
+                sb.Append("</div>");
+
+                sb.Append("<div class='info-card'>");
+                sb.Append("<h3 style='margin-top:0; color:#0369a1;'>⚡ Real-time Vehicle Routine</h3>");
+                sb.Append("<p style='margin: 4px 0;'>This function is an interactive diagnostic routine executed directly across the vehicle CAN/LIN bus network via the connected Electronic Control Module (ECU).</p>");
+                sb.Append("<p style='margin: 4px 0; color: #64748b; font-size: 13px;'>Interactive activation routines do not have static workshop repair procedures because their controls and parameters operate dynamically in real time.</p>");
+                sb.Append("<div style='margin-top: 14px;'>");
+                sb.Append("<a href='smarttool:").Append(cleanId).Append("?title=").Append(Uri.EscapeDataString(title)).Append("' class='exec-btn'>▶ Execute Diagnostic Routine</a>");
+                sb.Append("</div>");
+                sb.Append("</div>");
+
+                if (actions.Count > 0)
+                {
+                    sb.Append("<div class='section-title'>Available Activation Controls & Functions</div>");
+                    sb.Append("<div style='margin: 10px 0;'>");
+                    foreach (var act in actions)
+                    {
+                        sb.Append("<span class='action-tag'>⚙ ").Append(System.Security.SecurityElement.Escape(act)).Append("</span>");
+                    }
+                    sb.Append("</div>");
+                }
+
+                if (notices.Count > 0)
+                {
+                    sb.Append("<div class='section-title'>Operating Conditions & Instructions</div>");
+                    foreach (var note in notices)
+                    {
+                        sb.Append("<div class='notice-box'>").Append(System.Security.SecurityElement.Escape(note)).Append("</div>");
+                    }
+                }
+
+                if (phrases.Count > 0)
+                {
+                    sb.Append("<div class='section-title'>Additional Parameters & Descriptions</div>");
+                    sb.Append("<ul class='bullet-list'>");
+                    foreach (var ph in phrases)
+                    {
+                        sb.Append("<li>").Append(System.Security.SecurityElement.Escape(ph)).Append("</li>");
+                    }
+                    sb.Append("</ul>");
+                }
+
+                sb.Append("<div style='margin-top: 28px; padding-top: 12px; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 12px;'>");
+                sb.Append("To run this routine, click the <strong>▶ Execute Diagnostic Routine</strong> button above, or click the <strong>Execute</strong> button in the Advanced tab toolbar.");
+                sb.Append("</div>");
+
+                sb.Append("</body></html>");
+                return sb.ToString();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("[Launcher] TryRenderDiagnosticScriptHtml error: " + ex.Message);
+        }
+
+        return null;
     }
 }
