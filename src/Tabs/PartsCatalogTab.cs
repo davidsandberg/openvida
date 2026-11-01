@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Diagnostics;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
@@ -11,14 +12,36 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
-using Microsoft.Web.WebView2.Core;
-using Microsoft.Web.WebView2.WinForms;
 using Vcc.Vida.DiagSwdl.Core;
+using Vcc.Vida.DiagSwdl.Documents;
 using Vcc.Vida.DiagSwdl.ProgressHandler;
 using Vcc.Vida.DiagSwdl.UI.Diagnostics;
 
 static partial class Program
 {
+    public class FgNodeData
+    {
+        public int Id { get; set; }
+        public string Label { get; set; }
+        public string Path { get; set; }
+        public string Description { get; set; }
+        public List<SectionInfo> Sections { get; set; }
+
+        public FgNodeData()
+        {
+            Sections = new List<SectionInfo>();
+        }
+    }
+
+    public class SectionInfo
+    {
+        public int Id { get; set; }
+        public string Title { get; set; }
+        public string FunctionGroup { get; set; }
+        public string DiagramCode { get; set; }
+        public string EngineCode { get; set; }
+    }
+
     static void SetupPartsCatalogTab(object mObj)
     {
         if (_partsTabConfigured || mObj == null) return;
@@ -63,45 +86,112 @@ static partial class Program
             Label lblStatus = new Label { Text = "Loading parts database...", Location = new Point(895, 16), AutoSize = true, Font = new Font("Segoe UI", 9.0f, FontStyle.Italic), ForeColor = Color.FromArgb(100, 110, 120) };
             headerPnl.Controls.Add(lblStatus);
 
-            // 2. Main SplitContainer
-            SplitContainer splitParts = new SplitContainer();
-            splitParts.Dock = DockStyle.Fill;
-            splitParts.Orientation = Orientation.Vertical;
-            splitParts.SplitterDistance = 420;
-            splitParts.SplitterWidth = 6;
-            partsPnl.Controls.Add(splitParts);
-            splitParts.BringToFront();
+            // 2. Main 3-Pane SplitContainer Layout
+            SplitContainer splitMain = new SplitContainer();
+            splitMain.Dock = DockStyle.Fill;
+            splitMain.Orientation = Orientation.Vertical;
+            splitMain.FixedPanel = FixedPanel.Panel1;
+            splitMain.SplitterDistance = 270;
+            splitMain.SplitterWidth = 5;
+            partsPnl.Controls.Add(splitMain);
+            splitMain.BringToFront();
 
-            // Left panel: System & Assembly Tree
-            Panel leftHeader = new Panel { Dock = DockStyle.Top, Height = 32, BackColor = Color.FromArgb(230, 235, 240) };
-            Label lblLeftTitle = new Label { Text = "📂 Functional Systems & Assemblies", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 0, 0), Font = new Font("Segoe UI", 9.0f, FontStyle.Bold), ForeColor = Color.FromArgb(50, 60, 70) };
+            // Left panel: Function Group Hierarchy Tree
+            Panel leftHeader = new Panel { Dock = DockStyle.Top, Height = 34, BackColor = Color.FromArgb(230, 235, 240), BorderStyle = BorderStyle.FixedSingle };
+            Label lblLeftTitle = new Label { Text = "📂 Function Group Tree", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Padding = new Padding(8, 0, 0, 0), Font = new Font("Segoe UI", 9.0f, FontStyle.Bold), ForeColor = Color.FromArgb(40, 50, 60) };
             leftHeader.Controls.Add(lblLeftTitle);
-            splitParts.Panel1.Controls.Add(leftHeader);
+            splitMain.Panel1.Controls.Add(leftHeader);
 
             TreeView treeParts = new TreeView { Dock = DockStyle.Fill, Font = new Font("Segoe UI", 9.0f), HideSelection = false, FullRowSelect = true, ShowLines = true, BorderStyle = BorderStyle.None };
-            splitParts.Panel1.Controls.Add(treeParts);
+            splitMain.Panel1.Controls.Add(treeParts);
             treeParts.BringToFront();
 
-            // Right panel: Parts Table & Action Banner
-            Panel bannerPnl = new Panel { Dock = DockStyle.Top, Height = 46, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Padding = new Padding(8, 6, 8, 6) };
+            // Right split: Middle (Diagram) + Right (Parts List)
+            SplitContainer splitDiagParts = new SplitContainer();
+            splitDiagParts.Dock = DockStyle.Fill;
+            splitDiagParts.Orientation = Orientation.Vertical;
+            splitDiagParts.SplitterDistance = 480;
+            splitDiagParts.SplitterWidth = 5;
+            splitMain.Panel2.Controls.Add(splitDiagParts);
 
-            Button btnViewManual = new Button { Text = "📖 Service Manual", Dock = DockStyle.Right, Width = 145, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand };
-            btnViewManual.FlatAppearance.BorderSize = 0;
-            bannerPnl.Controls.Add(btnViewManual);
+            // Ensure layout maintains clean 270px tree and ~50/50 diagram & parts on display
+            bool initialSplitSet = false;
+            partsPnl.SizeChanged += (s, e) =>
+            {
+                if (!initialSplitSet && partsPnl.Width > 600)
+                {
+                    try
+                    {
+                        splitMain.SplitterDistance = 270;
+                        int rem = partsPnl.Width - 275;
+                        if (rem > 400)
+                        {
+                            splitDiagParts.SplitterDistance = rem / 2;
+                        }
+                        initialSplitSet = true;
+                    }
+                    catch {}
+                }
+            };
 
-            Panel spacerBtn = new Panel { Dock = DockStyle.Right, Width = 8 };
-            bannerPnl.Controls.Add(spacerBtn);
+            // Middle panel: Diagram Viewer
+            Panel diagContainer = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
+            splitDiagParts.Panel1.Controls.Add(diagContainer);
 
-            Button btnCopyPart = new Button { Text = "📋 Copy Part #", Dock = DockStyle.Right, Width = 120, Height = 32, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 243, 246), ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand };
+            Panel diagHeader = new Panel { Dock = DockStyle.Top, Height = 38, BackColor = Color.FromArgb(240, 243, 246), BorderStyle = BorderStyle.FixedSingle, Padding = new Padding(8, 4, 8, 4) };
+            diagContainer.Controls.Add(diagHeader);
+
+            Label lblDiagCode = new Label { Text = "Exploded Diagram", Dock = DockStyle.Left, AutoSize = true, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 9.0f, FontStyle.Bold), ForeColor = Color.FromArgb(50, 60, 70) };
+            diagHeader.Controls.Add(lblDiagCode);
+
+            FlowLayoutPanel pnlZoomTools = new FlowLayoutPanel { Dock = DockStyle.Right, AutoSize = true, FlowDirection = FlowDirection.LeftToRight };
+            Button btnZoomOut = new Button { Text = "－", Width = 30, Height = 26, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+            Button btnZoomFit = new Button { Text = "Fit", Width = 38, Height = 26, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+            Button btnZoomIn = new Button { Text = "＋", Width = 30, Height = 26, FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand };
+            pnlZoomTools.Controls.Add(btnZoomOut);
+            pnlZoomTools.Controls.Add(btnZoomFit);
+            pnlZoomTools.Controls.Add(btnZoomIn);
+            diagHeader.Controls.Add(pnlZoomTools);
+
+            Panel diagScrollPnl = new Panel { Dock = DockStyle.Fill, AutoScroll = true, BackColor = Color.White };
+            diagContainer.Controls.Add(diagScrollPnl);
+            diagScrollPnl.BringToFront();
+
+            PictureBox picDiag = new PictureBox { SizeMode = PictureBoxSizeMode.Zoom, BackColor = Color.White, Location = new Point(0, 0) };
+            diagScrollPnl.Controls.Add(picDiag);
+
+            // Right panel: Parts Table & Actions
+            Panel rightContainer = new Panel { Dock = DockStyle.Fill, BackColor = Color.White };
+            splitDiagParts.Panel2.Controls.Add(rightContainer);
+
+            Panel bannerPnl = new Panel { Dock = DockStyle.Top, Height = 56, BackColor = Color.White, BorderStyle = BorderStyle.FixedSingle, Padding = new Padding(10, 6, 10, 6) };
+            rightContainer.Controls.Add(bannerPnl);
+
+            ToolTip tipBanner = new ToolTip();
+
+            Button btnCopyPart = new Button { Text = "📋 Copy #", Dock = DockStyle.Right, Width = 80, Height = 34, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(240, 243, 246), ForeColor = Color.FromArgb(40, 50, 60), Cursor = Cursors.Hand, Font = new Font("Segoe UI", 9.0f) };
             btnCopyPart.FlatAppearance.BorderColor = Color.FromArgb(180, 185, 190);
+            tipBanner.SetToolTip(btnCopyPart, "Copy selected part number to clipboard");
             bannerPnl.Controls.Add(btnCopyPart);
 
-            Label lblAssemblyTitle = new Label { Text = "Select an assembly on the left or search by part # or keyword", Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Font = new Font("Segoe UI", 10.0f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 40, 50) };
-            bannerPnl.Controls.Add(lblAssemblyTitle);
+            Panel spacerBtn = new Panel { Dock = DockStyle.Right, Width = 6 };
+            bannerPnl.Controls.Add(spacerBtn);
 
-            splitParts.Panel2.Controls.Add(bannerPnl);
+            Button btnViewManual = new Button { Text = "📖", Dock = DockStyle.Right, Width = 36, Height = 34, FlatStyle = FlatStyle.Flat, BackColor = Color.FromArgb(0, 102, 204), ForeColor = Color.White, Cursor = Cursors.Hand, Font = new Font("Segoe UI", 11.0f) };
+            btnViewManual.FlatAppearance.BorderSize = 0;
+            tipBanner.SetToolTip(btnViewManual, "Open Workshop Service Manual for this function group");
+            bannerPnl.Controls.Add(btnViewManual);
 
-            // Parts DataGridView
+            Panel titleTextPnl = new Panel { Dock = DockStyle.Fill };
+            bannerPnl.Controls.Add(titleTextPnl);
+
+            Label lblBreadcrumb = new Label { Text = "Parts Catalog", Dock = DockStyle.Top, Height = 18, Font = new Font("Segoe UI", 8.0f), ForeColor = Color.FromArgb(120, 130, 140) };
+            titleTextPnl.Controls.Add(lblBreadcrumb);
+
+            Label lblAssemblyTitle = new Label { Text = "Select a Function Group to view parts", Dock = DockStyle.Fill, Font = new Font("Segoe UI", 11.0f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 40, 50) };
+            titleTextPnl.Controls.Add(lblAssemblyTitle);
+            lblAssemblyTitle.BringToFront();
+
             DataGridView dgvParts = new DataGridView();
             dgvParts.Dock = DockStyle.Fill;
             dgvParts.BackgroundColor = Color.White;
@@ -109,41 +199,31 @@ static partial class Program
             dgvParts.ReadOnly = true;
             dgvParts.AllowUserToAddRows = false;
             dgvParts.AllowUserToDeleteRows = false;
-            dgvParts.AllowUserToResizeRows = false;
             dgvParts.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
             dgvParts.MultiSelect = false;
             dgvParts.RowHeadersVisible = false;
-            dgvParts.GridColor = Color.FromArgb(235, 238, 242);
-            dgvParts.DefaultCellStyle.Font = new Font("Segoe UI", 9.0f);
-            dgvParts.DefaultCellStyle.SelectionBackColor = Color.FromArgb(225, 238, 255);
-            dgvParts.DefaultCellStyle.SelectionForeColor = Color.Black;
-            dgvParts.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+            dgvParts.Font = new Font("Segoe UI", 9.0f);
+            dgvParts.RowTemplate.Height = 28;
+            dgvParts.EnableHeadersVisualStyles = false;
             dgvParts.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(240, 243, 246);
             dgvParts.ColumnHeadersDefaultCellStyle.ForeColor = Color.FromArgb(40, 50, 60);
-            dgvParts.EnableHeadersVisualStyles = false;
-            dgvParts.RowTemplate.Height = 26;
+            dgvParts.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
+            dgvParts.ColumnHeadersHeight = 32;
 
-            try
-            {
-                PropertyInfo pi = typeof(DataGridView).GetProperty("DoubleBuffered", BindingFlags.Instance | BindingFlags.NonPublic);
-                if (pi != null) pi.SetValue(dgvParts, true, null);
-            }
-            catch {}
-
-            dgvParts.Columns.Add("colPos", "Pos");
+            dgvParts.Columns.Add("colPos", "#");
             dgvParts.Columns["colPos"].Width = 45;
             dgvParts.Columns["colPos"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+            dgvParts.Columns["colPos"].DefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
 
-            dgvParts.Columns.Add("colPartNo", "Part Number");
-            dgvParts.Columns["colPartNo"].Width = 115;
+            dgvParts.Columns.Add("colPartNo", "Part No.");
+            dgvParts.Columns["colPartNo"].Width = 100;
             dgvParts.Columns["colPartNo"].DefaultCellStyle.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
-            dgvParts.Columns["colPartNo"].DefaultCellStyle.ForeColor = Color.FromArgb(0, 102, 204);
 
             dgvParts.Columns.Add("colDesc", "Description");
-            dgvParts.Columns["colDesc"].Width = 230;
+            dgvParts.Columns["colDesc"].Width = 240;
 
             dgvParts.Columns.Add("colQty", "Qty");
-            dgvParts.Columns["colQty"].Width = 55;
+            dgvParts.Columns["colQty"].Width = 50;
             dgvParts.Columns["colQty"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
 
             dgvParts.Columns.Add("colUnit", "Unit");
@@ -159,7 +239,7 @@ static partial class Program
             dgvParts.Columns.Add("colFg", "FG");
             dgvParts.Columns["colFg"].Visible = false;
 
-            splitParts.Panel2.Controls.Add(dgvParts);
+            rightContainer.Controls.Add(dgvParts);
             dgvParts.BringToFront();
 
             // Populate models from BaseData
@@ -193,43 +273,79 @@ static partial class Program
             if (cboModel.Items.Count > 0) cboModel.SelectedIndex = defIdx;
 
             string currentFg = "";
+            Bitmap currentRawDiagram = null;
+            Dictionary<string, RectangleF> currentHotspots = new Dictionary<string, RectangleF>(StringComparer.OrdinalIgnoreCase);
+            string activeHighlightedHotspot = null;
+            float currentZoom = 1.0f;
 
-            // Load sections
-            Action LoadSections = () =>
+            // Diagram rendering & hotspot highlight overlay
+            Action RedrawDiagram = () =>
             {
-                int selIdx = cboModel.SelectedIndex;
-                if (selIdx < 0 || selIdx >= models.Count) return;
-                int modelCid = models[selIdx].Item1;
-                string modelName = models[selIdx].Item2;
-                bool activeEng = chkActiveEngine.Checked;
-
-                treeParts.BeginUpdate();
-                treeParts.Nodes.Clear();
-
-                Dictionary<string, TreeNode> groupNodes = new Dictionary<string, TreeNode>();
-                Action<string, string> ensureGroup = (fgKey, title) =>
+                if (currentRawDiagram == null)
                 {
-                    if (!groupNodes.ContainsKey(fgKey))
+                    picDiag.Image = null;
+                    picDiag.Visible = false;
+                    return;
+                }
+
+                int targetW = (int)(diagScrollPnl.ClientSize.Width * currentZoom);
+                if (targetW < 200) targetW = 200;
+                int targetH = (int)((float)targetW / currentRawDiagram.Width * currentRawDiagram.Height);
+
+                Bitmap bmp = new Bitmap(targetW, targetH);
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    g.Clear(Color.White);
+                    g.DrawImage(currentRawDiagram, 0, 0, targetW, targetH);
+
+                    // Draw hotspot highlights
+                    if (!string.IsNullOrEmpty(activeHighlightedHotspot) && currentHotspots.ContainsKey(activeHighlightedHotspot))
                     {
-                        TreeNode gn = new TreeNode(title);
-                        gn.Tag = "GROUP_" + fgKey;
-                        groupNodes[fgKey] = gn;
-                        treeParts.Nodes.Add(gn);
+                        RectangleF normRect = currentHotspots[activeHighlightedHotspot];
+                        float padX = Math.Max(12, targetW * 0.015f);
+                        float padY = Math.Max(10, targetH * 0.015f);
+                        float rx = normRect.X * targetW - padX;
+                        float ry = normRect.Y * targetH - padY;
+                        float rw = normRect.Width * targetW + padX * 2;
+                        float rh = normRect.Height * targetH + padY * 2;
+
+                        using (SolidBrush fillB = new SolidBrush(Color.FromArgb(60, 0, 102, 204)))
+                        {
+                            g.FillRectangle(fillB, rx, ry, rw, rh);
+                        }
+                        using (Pen pen = new Pen(Color.FromArgb(0, 102, 204), 2.5f))
+                        {
+                            g.DrawRectangle(pen, rx, ry, rw, rh);
+                        }
                     }
-                };
+                }
 
-                ensureGroup("0", "0 - Standard Parts & Service Material");
-                ensureGroup("1", "1 - Administration & Special Tools");
-                ensureGroup("2", "2 - Engine with mountings and equipment");
-                ensureGroup("3", "3 - Electrical system");
-                ensureGroup("4", "4 - Power transmission");
-                ensureGroup("5", "5 - Brakes");
-                ensureGroup("6", "6 - Suspension and steering");
-                ensureGroup("7", "7 - Springs and wheels");
-                ensureGroup("8", "8 - Body and interior");
-                ensureGroup("9", "9 - Miscellaneous & Heating/AC");
+                if (picDiag.Image != null) picDiag.Image.Dispose();
+                picDiag.Image = bmp;
+                picDiag.Size = new Size(targetW, targetH);
+                picDiag.Visible = true;
+            };
 
-                int totalSecCount = 0;
+            // Zoom tool handlers
+            btnZoomIn.Click += (s, e) => { currentZoom = Math.Min(3.0f, currentZoom + 0.25f); RedrawDiagram(); };
+            btnZoomOut.Click += (s, e) => { currentZoom = Math.Max(0.5f, currentZoom - 0.25f); RedrawDiagram(); };
+            btnZoomFit.Click += (s, e) => { currentZoom = 1.0f; RedrawDiagram(); };
+            diagScrollPnl.Resize += (s, e) => { if (currentZoom <= 1.0f) RedrawDiagram(); };
+
+            // Load Section Diagram & Parts
+            Action<int, string, string, string> LoadSectionDetails = (sectionId, fg, breadcrumb, sectionTitle) =>
+            {
+                currentFg = fg;
+                lblBreadcrumb.Text = breadcrumb;
+                lblAssemblyTitle.Text = sectionTitle;
+                dgvParts.Rows.Clear();
+                activeHighlightedHotspot = null;
+
+                // 1. Fetch Diagram Image from imagerepository via ComponentAttachments
+                string diagCode = "";
+                byte[] cgmBytes = null;
                 try
                 {
                     using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=EPC;Integrated Security=True"))
@@ -237,94 +353,63 @@ static partial class Program
                         conn.Open();
                         using (var cmd = conn.CreateCommand())
                         {
-                            if (activeEng)
+                            cmd.CommandText = "SELECT TOP 1 ad.URL " +
+                                              "FROM ComponentAttachments ca " +
+                                              "JOIN AttachmentData ad ON ca.fkAttachmentData = ad.Id " +
+                                              "WHERE ca.fkCatalogueComponent = @secId";
+                            cmd.Parameters.AddWithValue("@secId", sectionId);
+                            object val = cmd.ExecuteScalar();
+                            if (val != null && val != DBNull.Value) diagCode = val.ToString().Trim();
+                        }
+                    }
+
+                    if (!string.IsNullOrEmpty(diagCode))
+                    {
+                        using (var connImg = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=imagerepository;Integrated Security=True"))
+                        {
+                            connImg.Open();
+                            using (var cmd = connImg.CreateCommand())
                             {
-                                cmd.CommandText = "SELECT DISTINCT sec.Id, SUBSTRING(sec.VCCSectionId, 8, 2) AS FG, l.Description, eng.Description AS EngineCode " +
-                                                  "FROM ComponentConditions cond " +
-                                                  "JOIN BaseData.dbo.VehicleProfile vp ON cond.fkProfile = vp.Id " +
-                                                  "JOIN BaseData.dbo.Engine eng ON vp.fkEngine = eng.Id " +
-                                                  "JOIN CatalogueComponents sec ON cond.fkCatalogueComponent = sec.Id " +
-                                                  "LEFT JOIN Lexicon l ON sec.DescriptionId = l.DescriptionId AND l.fkLanguage = 15 " +
-                                                  "WHERE eng.Description = 'D5204T2' AND sec.TypeId = 3 AND sec.VCCSectionId IS NOT NULL AND l.Description IS NOT NULL " +
-                                                  "ORDER BY FG, l.Description";
-                            }
-                            else
-                            {
-                                cmd.CommandText = "SELECT DISTINCT sec.Id, SUBSTRING(sec.VCCSectionId, 8, 2) AS FG, l.Description, eng.Description AS EngineCode " +
-                                                  "FROM ComponentConditions cond " +
-                                                  "LEFT JOIN BaseData.dbo.VehicleProfile vp ON cond.fkProfile = vp.Id " +
-                                                  "LEFT JOIN BaseData.dbo.Engine eng ON vp.fkEngine = eng.Id " +
-                                                  "JOIN CatalogueComponents sec ON cond.fkCatalogueComponent = sec.Id " +
-                                                  "LEFT JOIN Lexicon l ON sec.DescriptionId = l.DescriptionId AND l.fkLanguage = 15 " +
-                                                  "WHERE cond.ModelCid = @cid AND sec.TypeId = 3 AND sec.VCCSectionId IS NOT NULL AND l.Description IS NOT NULL " +
-                                                  "ORDER BY FG, l.Description";
-                                cmd.Parameters.AddWithValue("@cid", modelCid);
-                            }
-
-                            using (var reader = cmd.ExecuteReader())
-                            {
-                                while (reader.Read())
-                                {
-                                    int secId = reader.GetInt32(0);
-                                    string fgCode = reader.IsDBNull(1) ? "9" : reader.GetString(1).Trim();
-                                    string secName = reader.IsDBNull(2) ? "Assembly " + secId : reader.GetString(2).Trim();
-                                    string engCode = reader.IsDBNull(3) ? "" : reader.GetString(3).Trim();
-                                    if (string.IsNullOrEmpty(secName)) continue;
-
-                                    string mainFg = fgCode.Length > 0 ? fgCode.Substring(0, 1) : "9";
-                                    TreeNode parentGroupNode;
-                                    if (!groupNodes.TryGetValue(mainFg, out parentGroupNode))
-                                    {
-                                        parentGroupNode = groupNodes["9"];
-                                    }
-
-                                    if (secName.Length > 1) secName = char.ToUpper(secName[0]) + secName.Substring(1);
-                                    string nodeLabel = secName;
-                                    if (!string.IsNullOrEmpty(engCode)) nodeLabel += " [" + engCode + "]";
-                                    nodeLabel += " (Gr. " + fgCode + ")";
-
-                                    TreeNode secNode = new TreeNode(nodeLabel);
-                                    secNode.Tag = secId;
-                                    parentGroupNode.Nodes.Add(secNode);
-                                    totalSecCount++;
-                                }
+                                cmd.CommandText = "SELECT TOP 1 imageData FROM LocalizedGraphics WHERE path = @code OR path = @code + '.cgm'";
+                                cmd.Parameters.AddWithValue("@code", diagCode);
+                                object val = cmd.ExecuteScalar();
+                                if (val != null && val != DBNull.Value) cgmBytes = (byte[])val;
                             }
                         }
                     }
                 }
-                catch (Exception exS) { Console.WriteLine("[Launcher] Load sections error: " + exS.Message); }
+                catch (Exception exDiag) { Console.WriteLine("[Launcher] Load diagram error: " + exDiag.Message); }
 
-                for (int i = treeParts.Nodes.Count - 1; i >= 0; i--)
+                if (cgmBytes != null && cgmBytes.Length > 0)
                 {
-                    TreeNode gn = treeParts.Nodes[i];
-                    if (gn.Nodes.Count == 0) treeParts.Nodes.RemoveAt(i);
-                    else gn.Text = gn.Text + " (" + gn.Nodes.Count + ")";
-                }
-
-                treeParts.EndUpdate();
-                if (treeParts.Nodes.Count > 0)
-                {
-                    treeParts.Nodes[0].Expand();
-                    if (treeParts.Nodes[0].Nodes.Count > 0)
+                    using (var decodeRes = CgmDecoder.Decode(cgmBytes))
                     {
-                        treeParts.SelectedNode = treeParts.Nodes[0].Nodes[0];
+                        if (decodeRes.Success && decodeRes.Image != null)
+                        {
+                            if (currentRawDiagram != null) currentRawDiagram.Dispose();
+                            currentRawDiagram = new Bitmap(decodeRes.Image);
+                            currentHotspots = new Dictionary<string, RectangleF>(decodeRes.NormalizedHotspots, StringComparer.OrdinalIgnoreCase);
+                            lblDiagCode.Text = "Diagram: " + diagCode;
+                        }
+                        else
+                        {
+                            if (currentRawDiagram != null) currentRawDiagram.Dispose();
+                            currentRawDiagram = null;
+                            currentHotspots.Clear();
+                            lblDiagCode.Text = "Diagram: " + diagCode + " (Vector Preview Unavailable)";
+                        }
                     }
                 }
-                lblStatus.Text = string.Format("Model: {0} | {1} assembly sections available", modelName, totalSecCount);
-            };
+                else
+                {
+                    if (currentRawDiagram != null) currentRawDiagram.Dispose();
+                    currentRawDiagram = null;
+                    currentHotspots.Clear();
+                    lblDiagCode.Text = string.IsNullOrEmpty(diagCode) ? "No diagram attached" : "Diagram: " + diagCode;
+                }
+                RedrawDiagram();
 
-            cboModel.SelectedIndexChanged += (s, e) => LoadSections();
-            chkActiveEngine.CheckedChanged += (s, e) => LoadSections();
-
-            // Select section & show parts
-            treeParts.AfterSelect += (s, e) =>
-            {
-                if (e.Node == null || !(e.Node.Tag is int)) return;
-                int sectionId = (int)e.Node.Tag;
-
-                lblAssemblyTitle.Text = e.Node.Text;
-                dgvParts.Rows.Clear();
-
+                // 2. Fetch Parts for Section
                 try
                 {
                     using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=EPC;Integrated Security=True"))
@@ -353,26 +438,343 @@ static partial class Program
                                     string qty = r.IsDBNull(4) ? "" : string.Format("{0:0}", r.GetDecimal(4));
                                     string unit = r.IsDBNull(5) ? "" : r.GetString(5).Trim();
                                     string note = r.IsDBNull(6) ? "" : r.GetString(6).Trim();
-                                    currentFg = r.IsDBNull(7) ? "" : r.GetString(7).Trim();
 
-                                    dgvParts.Rows.Add(pos, partNo, desc, qty, unit, note, sectionId, currentFg);
+                                    dgvParts.Rows.Add(pos, partNo, desc, qty, unit, note, sectionId, fg);
                                 }
                             }
                         }
                     }
-                    lblStatus.Text = string.Format("Assembly: {0} | {1} parts listed", e.Node.Text, dgvParts.Rows.Count);
+                    lblStatus.Text = string.Format("{0} | {1} parts listed", sectionTitle, dgvParts.Rows.Count);
                 }
                 catch (Exception exP) { Console.WriteLine("[Launcher] Load parts error: " + exP.Message); }
+            };
+
+            // Hotspot click & hover on diagram
+            picDiag.MouseMove += (s, e) =>
+            {
+                if (currentRawDiagram == null || currentHotspots.Count == 0 || picDiag.Image == null) return;
+                float normX = (float)e.X / picDiag.Image.Width;
+                float normY = (float)e.Y / picDiag.Image.Height;
+
+                string hitKey = null;
+                foreach (var kvp in currentHotspots)
+                {
+                    RectangleF r = kvp.Value;
+                    float expand = 0.02f;
+                    if (normX >= r.X - expand && normX <= r.Right + expand &&
+                        normY >= r.Y - expand && normY <= r.Bottom + expand)
+                    {
+                        hitKey = kvp.Key;
+                        break;
+                    }
+                }
+
+                if (hitKey != null)
+                {
+                    picDiag.Cursor = Cursors.Hand;
+                }
+                else
+                {
+                    picDiag.Cursor = Cursors.Default;
+                }
+            };
+
+            picDiag.MouseClick += (s, e) =>
+            {
+                if (currentRawDiagram == null || currentHotspots.Count == 0 || picDiag.Image == null) return;
+                float normX = (float)e.X / picDiag.Image.Width;
+                float normY = (float)e.Y / picDiag.Image.Height;
+
+                string hitKey = null;
+                foreach (var kvp in currentHotspots)
+                {
+                    RectangleF r = kvp.Value;
+                    float expand = 0.02f;
+                    if (normX >= r.X - expand && normX <= r.Right + expand &&
+                        normY >= r.Y - expand && normY <= r.Bottom + expand)
+                    {
+                        hitKey = kvp.Key;
+                        break;
+                    }
+                }
+
+                if (hitKey != null)
+                {
+                    activeHighlightedHotspot = hitKey;
+                    RedrawDiagram();
+
+                    // Find and select corresponding row in dgvParts
+                    foreach (DataGridViewRow row in dgvParts.Rows)
+                    {
+                        string pVal = Convert.ToString(row.Cells["colPos"].Value);
+                        if (pVal == hitKey)
+                        {
+                            row.Selected = true;
+                            dgvParts.CurrentCell = row.Cells[0];
+                            dgvParts.FirstDisplayedScrollingRowIndex = Math.Max(0, row.Index - 2);
+                            break;
+                        }
+                    }
+                }
+            };
+
+            // Table row selection highlights hotspot on diagram
+            dgvParts.SelectionChanged += (s, e) =>
+            {
+                if (dgvParts.CurrentRow != null)
+                {
+                    string pVal = Convert.ToString(dgvParts.CurrentRow.Cells["colPos"].Value);
+                    if (!string.IsNullOrEmpty(pVal) && pVal != activeHighlightedHotspot)
+                    {
+                        activeHighlightedHotspot = pVal;
+                        RedrawDiagram();
+                    }
+                }
+            };
+
+            // Load Function Group Hierarchy & Sections
+            Action LoadHierarchyAndSections = () =>
+            {
+                int selIdx = cboModel.SelectedIndex;
+                if (selIdx < 0 || selIdx >= models.Count) return;
+                int modelCid = models[selIdx].Item1;
+                string modelName = models[selIdx].Item2;
+                bool activeEng = chkActiveEngine.Checked;
+
+                treeParts.BeginUpdate();
+                treeParts.Nodes.Clear();
+                lblStatus.Text = "Building Volvo Function Group Tree...";
+
+                // 1. Fetch all TypeId = 2 Function Groups
+                Dictionary<int, FgNodeData> fgDict = new Dictionary<int, FgNodeData>();
+                List<FgNodeData> fgList = new List<FgNodeData>();
+
+                try
+                {
+                    using (var conn = new System.Data.SqlClient.SqlConnection("Server=localhost\\SQLEXPRESS;Database=EPC;Integrated Security=True"))
+                    {
+                        conn.Open();
+                        using (var cmd = conn.CreateCommand())
+                        {
+                            cmd.CommandText = "SELECT cc.Id, cc.FunctionGroupLabel, cc.FunctionGroupPath, l.Description " +
+                                              "FROM CatalogueComponents cc " +
+                                              "LEFT JOIN Lexicon l ON cc.DescriptionId = l.DescriptionId AND l.fkLanguage = 15 " +
+                                              "WHERE cc.TypeId = 2 " +
+                                              "ORDER BY cc.FunctionGroupPath";
+                            using (var r = cmd.ExecuteReader())
+                            {
+                                while (r.Read())
+                                {
+                                    int id = r.GetInt32(0);
+                                    string lbl = r.IsDBNull(1) ? "" : r.GetString(1).Trim();
+                                    string path = r.IsDBNull(2) ? "" : r.GetString(2).Trim();
+                                    string desc = r.IsDBNull(3) ? "" : r.GetString(3).Trim();
+
+                                    var fgData = new FgNodeData { Id = id, Label = lbl, Path = path, Description = desc };
+                                    fgDict[id] = fgData;
+                                    fgList.Add(fgData);
+                                }
+                            }
+                        }
+
+                        // 2. Fetch Sections mapped via VirtualToShared and filtered by ComponentConditions
+                        using (var cmd = conn.CreateCommand())
+                        {
+                            if (activeEng)
+                            {
+                                cmd.CommandText = "SELECT DISTINCT vts.fkCatalogueComponent_Parent, sec.Id, SUBSTRING(sec.VCCSectionId, 8, 2) AS FG, " +
+                                                  "l.Description AS SectionTitle, eng.Description AS EngineCode " +
+                                                  "FROM VirtualToShared vts " +
+                                                  "JOIN CatalogueComponents sec ON vts.fkCatalogueComponent = sec.Id " +
+                                                  "JOIN ComponentConditions cond ON cond.fkCatalogueComponent = sec.Id " +
+                                                  "LEFT JOIN BaseData.dbo.VehicleProfile vp ON cond.fkProfile = vp.Id " +
+                                                  "LEFT JOIN BaseData.dbo.Engine eng ON vp.fkEngine = eng.Id " +
+                                                  "LEFT JOIN Lexicon l ON sec.DescriptionId = l.DescriptionId AND l.fkLanguage = 15 " +
+                                                  "WHERE cond.ModelCid = @cid AND sec.TypeId = 3 AND sec.VCCSectionId IS NOT NULL " +
+                                                  "AND (eng.Description = 'D5204T2' OR vp.fkEngine IS NULL) " +
+                                                  "ORDER BY FG, SectionTitle";
+                                cmd.Parameters.AddWithValue("@cid", modelCid);
+                            }
+                            else
+                            {
+                                cmd.CommandText = "SELECT DISTINCT vts.fkCatalogueComponent_Parent, sec.Id, SUBSTRING(sec.VCCSectionId, 8, 2) AS FG, " +
+                                                  "l.Description AS SectionTitle, eng.Description AS EngineCode " +
+                                                  "FROM VirtualToShared vts " +
+                                                  "JOIN CatalogueComponents sec ON vts.fkCatalogueComponent = sec.Id " +
+                                                  "JOIN ComponentConditions cond ON cond.fkCatalogueComponent = sec.Id " +
+                                                  "LEFT JOIN BaseData.dbo.VehicleProfile vp ON cond.fkProfile = vp.Id " +
+                                                  "LEFT JOIN BaseData.dbo.Engine eng ON vp.fkEngine = eng.Id " +
+                                                  "LEFT JOIN Lexicon l ON sec.DescriptionId = l.DescriptionId AND l.fkLanguage = 15 " +
+                                                  "WHERE cond.ModelCid = @cid AND sec.TypeId = 3 AND sec.VCCSectionId IS NOT NULL " +
+                                                  "ORDER BY FG, SectionTitle";
+                                cmd.Parameters.AddWithValue("@cid", modelCid);
+                            }
+
+                            using (var r = cmd.ExecuteReader())
+                            {
+                                while (r.Read())
+                                {
+                                    int parentFgId = r.GetInt32(0);
+                                    int secId = r.GetInt32(1);
+                                    string fgCode = r.IsDBNull(2) ? "" : r.GetString(2).Trim();
+                                    string sTitle = r.IsDBNull(3) ? "Assembly " + secId : r.GetString(3).Trim();
+                                    string engCode = r.IsDBNull(4) ? "" : r.GetString(4).Trim();
+
+                                    FgNodeData targetFg;
+                                    if (fgDict.TryGetValue(parentFgId, out targetFg))
+                                    {
+                                        targetFg.Sections.Add(new SectionInfo
+                                        {
+                                            Id = secId,
+                                            Title = sTitle,
+                                            FunctionGroup = fgCode,
+                                            EngineCode = engCode
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception exH) { Console.WriteLine("[Launcher] Load hierarchy error: " + exH.Message); }
+
+                // 3. Mark which nodes (and parent branches) have active sections
+                HashSet<int> activeNodeIds = new HashSet<int>();
+                foreach (var kvp in fgDict)
+                {
+                    if (kvp.Value.Sections.Count > 0)
+                    {
+                        activeNodeIds.Add(kvp.Key);
+                        // Also mark all ancestors in FunctionGroupPath
+                        string[] parts = kvp.Value.Path.Split(new char[] { '/' }, StringSplitOptions.RemoveEmptyEntries);
+                        string runningPath = "";
+                        foreach (string p in parts)
+                        {
+                            runningPath += "/" + p;
+                            foreach (var ancestor in fgList)
+                            {
+                                if (ancestor.Path == runningPath) activeNodeIds.Add(ancestor.Id);
+                            }
+                        }
+                    }
+                }
+
+                // 4. Build TreeView nodes
+                Dictionary<string, TreeNode> pathToNode = new Dictionary<string, TreeNode>();
+                int totalActiveSections = 0;
+
+                foreach (var fg in fgList)
+                {
+                    string title = fg.Label;
+                    if (!string.IsNullOrEmpty(fg.Description)) title = fg.Label + " - " + fg.Description;
+
+                    TreeNode node = new TreeNode(title);
+                    node.Tag = fg;
+
+                    string path = fg.Path.TrimEnd('/');
+                    int lastSlash = path.LastIndexOf('/');
+                    string parentPath = lastSlash > 0 ? path.Substring(0, lastSlash) : "";
+
+                    TreeNode parentNode;
+                    if (!string.IsNullOrEmpty(parentPath) && pathToNode.TryGetValue(parentPath, out parentNode))
+                    {
+                        parentNode.Nodes.Add(node);
+                    }
+                    else
+                    {
+                        treeParts.Nodes.Add(node);
+                    }
+                    pathToNode[path] = node;
+
+                    // If leaf node has multiple section variants, add them as sub-nodes
+                    if (fg.Sections.Count > 1)
+                    {
+                        foreach (var sec in fg.Sections)
+                        {
+                            string sLabel = sec.Title;
+                            if (!string.IsNullOrEmpty(sec.EngineCode)) sLabel += " [" + sec.EngineCode + "]";
+                            TreeNode sNode = new TreeNode(sLabel);
+                            sNode.Tag = sec;
+                            node.Nodes.Add(sNode);
+                        }
+                    }
+                    totalActiveSections += fg.Sections.Count;
+                }
+
+                treeParts.EndUpdate();
+
+                // Expand first active main group
+                if (treeParts.Nodes.Count > 0)
+                {
+                    treeParts.Nodes[0].Expand();
+                    if (treeParts.Nodes[0].Nodes.Count > 0)
+                    {
+                        treeParts.Nodes[0].Nodes[0].Expand();
+                        treeParts.SelectedNode = treeParts.Nodes[0].Nodes[0];
+                    }
+                    else
+                    {
+                        treeParts.SelectedNode = treeParts.Nodes[0];
+                    }
+                }
+
+                lblStatus.Text = string.Format("Model: {0} | {1} active sections across {2} function groups", modelName, totalActiveSections, activeNodeIds.Count);
+            };
+
+            cboModel.SelectedIndexChanged += (s, e) => LoadHierarchyAndSections();
+            chkActiveEngine.CheckedChanged += (s, e) => LoadHierarchyAndSections();
+
+            // AfterSelect: drill down to section and display diagram & parts
+            treeParts.AfterSelect += (s, e) =>
+            {
+                if (e.Node == null || e.Node.Tag == null) return;
+
+                if (e.Node.Tag is SectionInfo)
+                {
+                    SectionInfo sec = (SectionInfo)e.Node.Tag;
+                    TreeNode pNode = e.Node.Parent;
+                    string fgLabel = pNode != null && pNode.Tag is FgNodeData ? ((FgNodeData)pNode.Tag).Label : sec.FunctionGroup;
+                    string breadcrumb = "Parts / " + (pNode != null ? pNode.FullPath.Replace("\\", " / ") : sec.Title);
+                    LoadSectionDetails(sec.Id, fgLabel, breadcrumb, sec.Title);
+                }
+                else if (e.Node.Tag is FgNodeData)
+                {
+                    FgNodeData fg = (FgNodeData)e.Node.Tag;
+                    if (fg.Sections.Count > 0)
+                    {
+                        SectionInfo primarySec = fg.Sections[0];
+                        string breadcrumb = "Parts / " + e.Node.FullPath.Replace("\\", " / ");
+                        string title = fg.Description.Length > 0 ? fg.Description : ("Group " + fg.Label);
+                        LoadSectionDetails(primarySec.Id, fg.Label, breadcrumb, title);
+                    }
+                    else
+                    {
+                        lblBreadcrumb.Text = "Parts / " + e.Node.FullPath.Replace("\\", " / ");
+                        lblAssemblyTitle.Text = e.Node.Text;
+                        dgvParts.Rows.Clear();
+                        if (currentRawDiagram != null) currentRawDiagram.Dispose();
+                        currentRawDiagram = null;
+                        currentHotspots.Clear();
+                        lblDiagCode.Text = "Select a sub-assembly to view parts";
+                        RedrawDiagram();
+                    }
+                }
             };
 
             // Global search
             Action DoSearch = () =>
             {
                 string q = txtSearch.Text.Trim();
-                if (string.IsNullOrEmpty(q)) { LoadSections(); return; }
+                if (string.IsNullOrEmpty(q)) { LoadHierarchyAndSections(); return; }
 
                 dgvParts.Rows.Clear();
-                lblAssemblyTitle.Text = "Search Results for '" + q + "'";
+                lblBreadcrumb.Text = "Search Results";
+                lblAssemblyTitle.Text = "Matching Parts for '" + q + "'";
+                if (currentRawDiagram != null) currentRawDiagram.Dispose();
+                currentRawDiagram = null;
+                currentHotspots.Clear();
+                lblDiagCode.Text = "Search Results (Double-click part to navigate to assembly)";
+                RedrawDiagram();
 
                 try
                 {
@@ -417,7 +819,7 @@ static partial class Program
 
             btnSearch.Click += (s, e) => DoSearch();
             txtSearch.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { e.SuppressKeyPress = true; DoSearch(); } };
-            btnReset.Click += (s, e) => { txtSearch.Clear(); LoadSections(); };
+            btnReset.Click += (s, e) => { txtSearch.Clear(); LoadHierarchyAndSections(); };
 
             // Copy part #
             Action CopySelectedPart = () =>
@@ -436,30 +838,6 @@ static partial class Program
             btnCopyPart.Click += (s, e) => CopySelectedPart();
             dgvParts.CellClick += (s, e) => { if (e.RowIndex >= 0) CopySelectedPart(); };
 
-            // Double clicking a search result navigates to its assembly in treeParts
-            dgvParts.CellDoubleClick += (s, e) =>
-            {
-                if (e.RowIndex < 0) return;
-                object secObj = dgvParts.Rows[e.RowIndex].Cells["colSecId"].Value;
-                if (secObj is int && (int)secObj > 0)
-                {
-                    int targetSecId = (int)secObj;
-                    foreach (TreeNode gn in treeParts.Nodes)
-                    {
-                        foreach (TreeNode sn in gn.Nodes)
-                        {
-                            if (sn.Tag is int && (int)sn.Tag == targetSecId)
-                            {
-                                gn.Expand();
-                                treeParts.SelectedNode = sn;
-                                sn.EnsureVisible();
-                                return;
-                            }
-                        }
-                    }
-                }
-            };
-
             // Cross-reference Service Manual
             btnViewManual.Click += (s, e) =>
             {
@@ -473,18 +851,21 @@ static partial class Program
                 {
                     _btnTabManuals.PerformClick();
                     Console.WriteLine("[Launcher] Cross-referencing Service Manuals for Function Group " + fg);
+                    if (_navigateToManualFgAction != null && !string.IsNullOrEmpty(fg))
+                    {
+                        _navigateToManualFgAction(fg);
+                    }
                 }
             };
 
             _partsCatalogPnl = partsPnl;
-            LoadSections();
+            LoadHierarchyAndSections();
             _partsTabConfigured = true;
-            Console.WriteLine("[Launcher] Electronic Parts Catalog (EPC) initialized successfully!");
+            Console.WriteLine("[Launcher] Electronic Parts Catalog (EPC) initialized successfully with 3-tier hierarchy & diagram viewer!");
         }
         catch (Exception ex)
         {
             Console.WriteLine("[Launcher] SetupPartsCatalogTab error: " + ex);
         }
     }
-
 }

@@ -534,6 +534,7 @@ static partial class Program
                             }
 
                             tvEx.EndUpdate();
+                            StyleTreeViewClean(tvEx);
 
                             Console.WriteLine("[Launcher] Direct loader populated " + tvEx.Nodes.Count + " DTCs into tree for ECU " + ecuTypeId);
 

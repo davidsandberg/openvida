@@ -407,6 +407,7 @@ static partial class Program
                                 catch {}
                             };
 
+                            _refreshVehCommStatusAction = updateVehCommStatusText;
                             updateVehCommStatusText();
                             ecuBar.Controls.Add(lblVehCommStatus);
 
@@ -421,7 +422,7 @@ static partial class Program
                                 IsMockSimulation = chkMock.Checked;
                                 Console.WriteLine("[Launcher] Mock Simulation toggled: " + IsMockSimulation);
                                 updateVehCommStatusText();
-                                if (!IsMockSimulation && wfInit != null)
+                                if (!IsMockSimulation && wfInit != null && IsDiceConnected)
                                 {
                                     MethodInfo startM = wfInit.GetType().GetMethod("StartReading");
                                     if (startM != null) startM.Invoke(wfInit, null);
@@ -1060,6 +1061,98 @@ static partial class Program
 
                                 }
 
+                                // Gate TreeView double-click on parameters when disconnected from car
+                                MethodInfo mDblOrig = rpPage.GetType().GetMethod("_parameterTreeView_DoubleClick", BindingFlags.NonPublic | BindingFlags.Instance);
+                                if (tv != null && mDblOrig != null && tv.Tag == null)
+                                {
+                                    tv.Tag = "wired_gated_dblclick";
+                                    Delegate delTv = Delegate.CreateDelegate(typeof(EventHandler), rpPage, mDblOrig);
+                                    tv.DoubleClick -= (EventHandler)delTv;
+                                    tv.DoubleClick += (sTv, eTv) => {
+                                        Point pt = tv.PointToClient(Cursor.Position);
+                                        TreeNode clickedNode = tv.GetNodeAt(pt);
+                                        TreeNode targetNode = clickedNode ?? tv.SelectedNode;
+                                        if (targetNode == null) return;
+
+                                        // Only gate actual parameter leaves, let category/folder nodes expand normally
+                                        if (targetNode.Nodes.Count > 0)
+                                        {
+                                            return;
+                                        }
+
+                                        tv.SelectedNode = targetNode;
+
+                                        if (!IsMockSimulation && !IsDiceConnected)
+                                        {
+                                            string paramTitle = targetNode.Text;
+                                            var actReq = ShowVehicleRequiredDialog(tv.FindForm(), paramTitle, "parameter");
+                                            if (actReq == VehicleRequiredAction.EnableMock)
+                                            {
+                                                if (_activeChkMock != null) _activeChkMock.Checked = true;
+                                                IsMockSimulation = true;
+                                                if (_refreshVehCommStatusAction != null) _refreshVehCommStatusAction();
+                                                mDblOrig.Invoke(rpPage, new object[] { sTv, eTv });
+                                            }
+                                            else if (actReq == VehicleRequiredAction.TryConnect)
+                                            {
+                                                InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
+                                                if (!IsDiceConnected)
+                                                {
+                                                    MessageBox.Show(tv.FindForm(), "Could not connect to vehicle.\n\nPlease ensure DiCE is connected via USB and OBD-II, and ignition is in Position II.", "Vehicle Not Detected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                                    return;
+                                                }
+                                                if (_refreshVehCommStatusAction != null) _refreshVehCommStatusAction();
+                                                mDblOrig.Invoke(rpPage, new object[] { sTv, eTv });
+                                            }
+                                            return;
+                                        }
+
+                                        mDblOrig.Invoke(rpPage, new object[] { sTv, eTv });
+                                    };
+                                }
+
+                                // Also gate the >> Add button when disconnected
+                                FieldInfo btnAddField = rpPage.GetType().GetField("_addButton", BindingFlags.NonPublic | BindingFlags.Instance);
+                                Control btnAdd = btnAddField != null ? btnAddField.GetValue(rpPage) as Control : null;
+                                MethodInfo mAddOrig = rpPage.GetType().GetMethod("_addButton_Click", BindingFlags.NonPublic | BindingFlags.Instance);
+                                if (btnAdd != null && mAddOrig != null && btnAdd.Tag == null)
+                                {
+                                    btnAdd.Tag = "wired_gated_add";
+                                    Delegate delAdd = Delegate.CreateDelegate(typeof(EventHandler), rpPage, mAddOrig);
+                                    btnAdd.Click -= (EventHandler)delAdd;
+                                    btnAdd.Click += (sBtn, eBtn) => {
+                                        TreeNode selNode = tv != null ? tv.SelectedNode : null;
+                                        if (selNode != null && selNode.Nodes.Count == 0)
+                                        {
+                                            if (!IsMockSimulation && !IsDiceConnected)
+                                            {
+                                                string paramTitle = selNode.Text;
+                                                var actReq = ShowVehicleRequiredDialog(btnAdd.FindForm(), paramTitle, "parameter");
+                                                if (actReq == VehicleRequiredAction.EnableMock)
+                                                {
+                                                    if (_activeChkMock != null) _activeChkMock.Checked = true;
+                                                    IsMockSimulation = true;
+                                                    if (_refreshVehCommStatusAction != null) _refreshVehCommStatusAction();
+                                                    mAddOrig.Invoke(rpPage, new object[] { sBtn, eBtn });
+                                                }
+                                                else if (actReq == VehicleRequiredAction.TryConnect)
+                                                {
+                                                    InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
+                                                    if (!IsDiceConnected)
+                                                    {
+                                                        MessageBox.Show(btnAdd.FindForm(), "Could not connect to vehicle.\n\nPlease ensure DiCE is connected via USB and OBD-II, and ignition is in Position II.", "Vehicle Not Detected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                                        return;
+                                                    }
+                                                    if (_refreshVehCommStatusAction != null) _refreshVehCommStatusAction();
+                                                    mAddOrig.Invoke(rpPage, new object[] { sBtn, eBtn });
+                                                }
+                                                return;
+                                            }
+                                        }
+                                        mAddOrig.Invoke(rpPage, new object[] { sBtn, eBtn });
+                                    };
+                                }
+
                                 FieldInfo lvField = rpPage.GetType().GetField("_paramListView", BindingFlags.NonPublic | BindingFlags.Instance);
                                 Control lvCtrl = lvField != null ? lvField.GetValue(rpPage) as Control : null;
                                 if (lvCtrl != null && lvCtrl.Tag == null)
@@ -1203,29 +1296,23 @@ static partial class Program
                                 try
 
                                 {
-                                    if (!IsMockSimulation) return;
-
-                                    // Stop Volvo's failing background timer so it doesn't clear parameter cells
-
-                                    FieldInfo tField = wf.GetType().GetField("_parameterReadTimer", BindingFlags.NonPublic | BindingFlags.Instance);
-
-                                    if (tField != null)
-
+                                    // When disconnected from physical vehicle and DiCE is offline,
+                                    // stop Volvo's background timer so it doesn't poll DiCE and spew exceptions/call stacks into the terminal
+                                    if (!IsDiceConnected)
                                     {
-
-                                        object tmr = tField.GetValue(wf);
-
-                                        if (tmr != null)
-
+                                        FieldInfo tField = wf.GetType().GetField("_parameterReadTimer", BindingFlags.NonPublic | BindingFlags.Instance);
+                                        if (tField != null)
                                         {
-
-                                            MethodInfo stopM = tmr.GetType().GetMethod("Stop");
-
-                                            if (stopM != null) stopM.Invoke(tmr, null);
-
+                                            object tmr = tField.GetValue(wf);
+                                            if (tmr != null)
+                                            {
+                                                MethodInfo stopM = tmr.GetType().GetMethod("Stop");
+                                                if (stopM != null) stopM.Invoke(tmr, null);
+                                            }
                                         }
-
                                     }
+
+                                    if (!IsMockSimulation) return;
 
                                     PropertyInfo piToRead = wf.GetType().GetProperty("ParametersToRead");
 

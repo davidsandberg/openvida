@@ -105,6 +105,45 @@ static partial class Program
 
                 }
 
+                                // If found single document (e.g. DTC Information), also check if it belongs to a TreeItem with associated documents (e.g. Fault-tracing)
+                if (docs.Count == 1)
+                {
+                    try
+                    {
+                        using (var cmdSib = conn.CreateCommand())
+                        {
+                            cmdSib.CommandText = @"
+                                SELECT d2.projectDocumentId, d2.title, d2.XmlContent, d2.version
+                                FROM Document d2
+                                WHERE d2.projectDocumentId IN (
+                                    SELECT tid2.projectDocumentTo
+                                    FROM Document d1
+                                    JOIN TreeItemDocument tid1 ON d1.projectDocumentId = tid1.projectDocumentTo
+                                    JOIN TreeItemDocument tid2 ON tid1.fkTreeItem = tid2.fkTreeItem
+                                    WHERE (d1.chronicleId = @id OR d1.nevisId = @id OR d1.projectDocumentId = @id)
+                                      AND tid2.projectDocumentTo != d1.projectDocumentId
+                                )
+                                ORDER BY d2.version DESC";
+                            cmdSib.Parameters.AddWithValue("@id", cleanId);
+                            using (var rSib = cmdSib.ExecuteReader())
+                            {
+                                var seenPds = new System.Collections.Generic.HashSet<string>();
+                                foreach (var d in docs) seenPds.Add(d.Item1);
+                                while (rSib.Read())
+                                {
+                                    string sibTitle = rSib[1] != DBNull.Value ? rSib[1].ToString().Trim() : "";
+                                    if (!seenPds.Contains(sibTitle) && rSib[2] != DBNull.Value)
+                                    {
+                                        seenPds.Add(sibTitle);
+                                        docs.Add(Tuple.Create(sibTitle, (byte[])rSib[2]));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch {}
+                }
+
                 // Try 2: Via TreeItem
 
                 if (docs.Count == 0)
@@ -250,11 +289,11 @@ static partial class Program
 
             var sb = new System.Text.StringBuilder();
 
-            sb.Append("<!DOCTYPE html><html><head><meta charset='utf-8'>");
+            sb.Append("<!DOCTYPE html><html><head><meta charset='utf-8'><meta http-equiv='X-UA-Compatible' content='IE=edge'>");
 
             sb.Append("<style>");
 
-            sb.Append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 24px 32px; line-height: 1.6; color: #222; background: #fff; }");
+            sb.Append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 24px 32px; padding-bottom: 80px; box-sizing: border-box; line-height: 1.6; color: #222; background: #fff; }");
 
             sb.Append(".header-bar { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #003057; padding-bottom: 10px; margin-bottom: 20px; }");
 
@@ -264,7 +303,7 @@ static partial class Program
 
             sb.Append("h3 { color: #1e293b; margin-top: 18px; font-size: 14.5px; font-weight: 600; }");
 
-            sb.Append(".section-box { margin: 16px 0 24px 0; padding: 18px 22px; border-left: 4px solid #005087; background: #f8fafc; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }");
+            sb.Append(".section-box { margin: 16px 0 28px 0; padding: 18px 22px 24px 22px; border-left: 4px solid #005087; background: #f8fafc; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }");
 
             sb.Append(".step-box { margin: 14px 0 20px 0; padding: 14px 18px; border-left: 4px solid #0284c7; background: #ffffff; border: 1px solid #e2e8f0; border-left-width: 4px; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.03); }");
 
@@ -400,6 +439,7 @@ static partial class Program
                 sb.Append("<script>window.onload = function() { var el = document.getElementById('target'); if(el) el.scrollIntoView({behavior: 'smooth', block: 'center'}); };</script>");
             }
 
+            sb.Append("<div style='height: 60px;'></div>");
             sb.Append("</body></html>");
 
             return sb.ToString();
@@ -993,9 +1033,9 @@ static partial class Program
                 }
 
                 var sb = new System.Text.StringBuilder();
-                sb.Append("<!DOCTYPE html><html><head><meta charset='utf-8'>");
+                sb.Append("<!DOCTYPE html><html><head><meta charset='utf-8'><meta http-equiv='X-UA-Compatible' content='IE=edge'>");
                 sb.Append("<style>");
-                sb.Append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 24px 32px; line-height: 1.6; color: #1e293b; background: #fff; }");
+                sb.Append("body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; margin: 24px 32px; padding-bottom: 80px; box-sizing: border-box; line-height: 1.6; color: #1e293b; background: #fff; }");
                 sb.Append(".header { border-bottom: 2px solid #005087; padding-bottom: 12px; margin-bottom: 20px; }");
                 sb.Append(".badge-pill { display: inline-block; background: #005087; color: white; padding: 4px 10px; border-radius: 4px; font-weight: 600; font-size: 12px; text-transform: uppercase; margin-bottom: 8px; }");
                 sb.Append(".id-pill { display: inline-block; background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin-left: 8px; font-family: Consolas, monospace; }");

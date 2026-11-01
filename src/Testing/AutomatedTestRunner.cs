@@ -244,9 +244,27 @@ static partial class Program
                             break;
 
                                                 case 5:
+                            try
+                            {
+                                if (_refFormCtrl != null)
+                                {
+                                    Control cscCtrl = GetFieldValue(_refFormCtrl, "_customerSymptomsCSCRefInfoControl") as Control;
+                                    if (cscCtrl != null)
+                                    {
+                                        Control statusTv = GetFieldValue(cscCtrl, "_statusTreeViewControl") as Control;
+                                        TreeView tvEx = statusTv != null ? GetFieldValue(statusTv, "_treeViewEx") as TreeView : null;
+                                        if (tvEx != null && tvEx.Nodes.Count > 2)
+                                        {
+                                            tvEx.Nodes[2].Expand();
+                                            Application.DoEvents();
+                                            System.Threading.Thread.Sleep(200);
+                                        }
+                                    }
+                                }
+                            }
+                            catch {}
 
                             captureTab("Reference Info CSC", "launcher_test_refinfo.png");
-
                             captureTab("Reference Info CSC", "launcher_test_refinfo_csc.png");
 
                             string[] testDocs = new string[] {
@@ -307,6 +325,21 @@ static partial class Program
                             break;
 
                         case 6:
+                            try
+                            {
+                                if (_activeDtcRefControl != null)
+                                {
+                                    Control statusTv = GetFieldValue(_activeDtcRefControl, "_statusTreeViewControl") as Control;
+                                    TreeView tvEx = statusTv != null ? GetFieldValue(statusTv, "_treeViewEx") as TreeView : null;
+                                    if (tvEx != null && tvEx.Nodes.Count > 0)
+                                    {
+                                        tvEx.SelectedNode = tvEx.Nodes[0];
+                                        DateTime startSel = DateTime.Now;
+                                        while ((DateTime.Now - startSel).TotalMilliseconds < 500) { Application.DoEvents(); System.Threading.Thread.Sleep(25); }
+                                    }
+                                }
+                            }
+                            catch {}
 
                             captureTab("Reference Info DTC", "launcher_test_refinfo_dtc.png");
 

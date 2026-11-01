@@ -191,6 +191,14 @@ static partial class Program
                     if (m.Success)
                     {
                         string dtc = m.Groups[1].Value;
+                        // First check TreeItem so we resolve to the complete DTC node (DTC Information + Fault-tracing)
+                        using (var cmd = conn.CreateCommand())
+                        {
+                            cmd.CommandText = "SELECT TOP 1 chronicleId FROM TreeItem WHERE title LIKE @dtc ORDER BY id DESC";
+                            cmd.Parameters.AddWithValue("@dtc", "%" + dtc + "%");
+                            var obj = cmd.ExecuteScalar();
+                            if (obj != null && obj != DBNull.Value) return obj.ToString().Trim();
+                        }
                         using (var cmd = conn.CreateCommand())
                         {
                             cmd.CommandText = "SELECT TOP 1 chronicleId FROM Document WHERE title LIKE @dtc ORDER BY version DESC";

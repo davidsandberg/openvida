@@ -175,7 +175,7 @@ static partial class Program
         TryConnect
     }
 
-    public static VehicleRequiredAction ShowVehicleRequiredDialog(IWin32Window parent, string actionName)
+    public static VehicleRequiredAction ShowVehicleRequiredDialog(IWin32Window parent, string actionName, string actionCategory = null)
     {
         using (Form dlg = new Form())
         {
@@ -195,15 +195,21 @@ static partial class Program
             }
             catch {}
 
+            bool isParam = string.Equals(actionCategory, "parameter", StringComparison.OrdinalIgnoreCase);
+
             Panel header = new Panel { Dock = DockStyle.Top, Height = 60, BackColor = Color.FromArgb(239, 246, 255) };
-            Label lblIcon = new Label { Text = "🚗", Font = new Font("Segoe UI", 20f), Location = new Point(14, 10), Size = new Size(46, 42), AutoSize = false, BackColor = Color.Transparent };
-            Label lblTitle = new Label { Text = "Vehicle Communication Required", Font = new Font("Segoe UI", 11.5f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 64, 175), Location = new Point(68, 12), AutoSize = true, BackColor = Color.Transparent };
-            Label lblSub = new Label { Text = "Live component actuations require an active DiCE vehicle connection.", Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(59, 130, 246), Location = new Point(68, 35), AutoSize = true, BackColor = Color.Transparent };
+            Label lblIcon = new Label { Text = isParam ? "📊" : "🚗", Font = new Font("Segoe UI", 20f), Location = new Point(14, 10), Size = new Size(46, 42), AutoSize = false, BackColor = Color.Transparent };
+            Label lblTitle = new Label { Text = isParam ? "Live Parameter Readout Required" : "Vehicle Communication Required", Font = new Font("Segoe UI", 11.5f, FontStyle.Bold), ForeColor = Color.FromArgb(30, 64, 175), Location = new Point(68, 12), AutoSize = true, BackColor = Color.Transparent };
+            Label lblSub = new Label { Text = isParam ? "Reading live telemetry requires an active DiCE vehicle connection." : "Live component actuations require an active DiCE vehicle connection.", Font = new Font("Segoe UI", 8.5f), ForeColor = Color.FromArgb(59, 130, 246), Location = new Point(68, 35), AutoSize = true, BackColor = Color.Transparent };
             header.Controls.AddRange(new Control[] { lblIcon, lblTitle, lblSub });
+
+            string msgText = isParam
+                ? string.Format("'{0}' reads live telemetry directly from vehicle control modules over DiCE.\n\nNo vehicle is currently detected (DiCE disconnected or ignition in Position 0).\n\nWould you like to enable Mock Simulation Mode to safely simulate live sensor data on your desktop?", actionName)
+                : string.Format("'{0}' communicates directly with vehicle control modules over DiCE.\n\nNo vehicle is currently detected (DiCE disconnected or ignition in Position 0).\n\nWould you like to enable Mock Simulation Mode to safely test this control on your desktop?", actionName);
 
             Label lblMsg = new Label
             {
-                Text = string.Format("'{0}' communicates directly with vehicle control modules over DiCE.\n\nNo vehicle is currently detected (DiCE disconnected or ignition in Position 0).\n\nWould you like to enable Mock Simulation Mode to safely test this control on your desktop?", actionName),
+                Text = msgText,
                 Location = new Point(20, 75),
                 Size = new Size(465, 80),
                 ForeColor = Color.FromArgb(51, 65, 85)
