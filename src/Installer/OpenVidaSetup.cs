@@ -270,22 +270,53 @@ namespace OpenVidaInstaller
             log("Step 1/4: Stopping OpenVIDA and JBoss background processes...");
             try
             {
-                string psKill = string.Format(
-                    "Stop-Process -Name 'VidaLauncher','VidaMcp' -Force -ErrorAction SilentlyContinue; " +
-                    "Get-WmiObject Win32_Process -Filter \"Name='java.exe' OR Name='cmd.exe'\" | " +
-                    "Where-Object {{ $_.CommandLine -match 'jboss' -or $_.CommandLine -like '*{0}*' -or $_.ExecutablePath -like '*{0}*' }} | " +
-                    "ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}",
-                    targetDir.Replace("'", "''"));
-                ProcessStartInfo psiKill = new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -Command \"" + psKill + "\"")
+                foreach (Process p in Process.GetProcesses())
+                {
+                    try
+                    {
+                        string pName = p.ProcessName;
+                        if (string.Equals(pName, "VidaLauncher", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(pName, "VidaMcp", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(pName, "java", StringComparison.OrdinalIgnoreCase))
+                        {
+                            bool match = true;
+                            try
+                            {
+                                string modPath = p.MainModule.FileName;
+                                if (!string.IsNullOrEmpty(modPath) &&
+                                    !modPath.StartsWith(targetDir + "\\", StringComparison.OrdinalIgnoreCase) &&
+                                    string.Equals(pName, "java", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    match = false;
+                                }
+                            }
+                            catch { }
+
+                            if (match)
+                            {
+                                p.Kill();
+                                p.WaitForExit(4000);
+                            }
+                        }
+                    }
+                    catch { }
+                    finally
+                    {
+                        try { p.Dispose(); } catch { }
+                    }
+                }
+
+                // Also terminate any cmd.exe wrapper running jboss.bat
+                ProcessStartInfo psiWmic = new ProcessStartInfo("wmic.exe", "process where \"name='cmd.exe' and commandline like '%jboss%'\" call terminate")
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true
                 };
-                using (Process p = Process.Start(psiKill))
+                using (Process pw = Process.Start(psiWmic))
                 {
-                    p.WaitForExit(10000);
+                    pw.WaitForExit(5000);
                 }
-                Thread.Sleep(600);
+                Thread.Sleep(800);
             }
             catch { }
 
@@ -373,26 +404,23 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
             }
             catch { }
 
-            // 4. Delete targetDir
+            // 4. Delete targetDir (with retry loop while OS releases handles)
             log("Step 4/4: Removing directory " + targetDir + "...");
-            ProcessStartInfo psiRd = new ProcessStartInfo("cmd.exe", string.Format("/c rd /s /q \"{0}\"", targetDir))
+            for (int attempt = 1; attempt <= 6 && Directory.Exists(targetDir); attempt++)
             {
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
-            using (Process pRd = Process.Start(psiRd))
-            {
-                pRd.WaitForExit(30000);
-            }
-
-            if (Directory.Exists(targetDir))
-            {
-                // Spawn delayed cleanup in case a handle was just released
-                Process.Start(new ProcessStartInfo("cmd.exe", string.Format("/c ping 127.0.0.1 -n 2 >nul & rd /s /q \"{0}\"", targetDir))
+                ProcessStartInfo psiRd = new ProcessStartInfo("cmd.exe", string.Format("/c rd /s /q \"{0}\"", targetDir))
                 {
                     UseShellExecute = false,
                     CreateNoWindow = true
-                });
+                };
+                using (Process pRd = Process.Start(psiRd))
+                {
+                    pRd.WaitForExit(30000);
+                }
+                if (Directory.Exists(targetDir))
+                {
+                    Thread.Sleep(600);
+                }
             }
         }
     }
