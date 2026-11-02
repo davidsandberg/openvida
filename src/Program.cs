@@ -352,7 +352,7 @@ static partial class Program
         topBar.Controls.Add(lblInfo);
 
         TopBarCarStatusLabel = new Label();
-        TopBarCarStatusLabel.Text = "⚪ " + TargetCommTool + " (disconnected)";
+        TopBarCarStatusLabel.Text = "⚪ " + TargetCommTool;
         TopBarCarStatusLabel.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
         TopBarCarStatusLabel.ForeColor = Color.FromArgb(100, 110, 120);
         TopBarCarStatusLabel.BackColor = Color.Transparent;
@@ -367,30 +367,36 @@ static partial class Program
         btnConnect.ForeColor = Color.FromArgb(0, 102, 204);
         btnConnect.FlatStyle = FlatStyle.Flat;
         btnConnect.FlatAppearance.BorderColor = Color.FromArgb(160, 200, 240);
-        btnConnect.SetBounds(1018, 7, 68, 24);
+        btnConnect.SetBounds(936, 7, 78, 24);
         btnConnect.Cursor = Cursors.Hand;
+        TopBarDiceConnectButton = btnConnect;
 
         Action repositionConnectBtn = () =>
         {
             if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed && btnConnect != null && !btnConnect.IsDisposed)
             {
-                btnConnect.Left = TopBarCarStatusLabel.Right + 6;
+                btnConnect.Left = TopBarCarStatusLabel.Right + 8;
             }
         };
         TopBarCarStatusLabel.SizeChanged += (s, e) => repositionConnectBtn();
 
-        Action triggerDiceConnect = () =>
+        Action triggerDiceToggle = () =>
         {
+            if (IsDiceConnected)
+            {
+                DisconnectCarStatus();
+                return;
+            }
             if (TopBarCarStatusLabel != null)
             {
-                TopBarCarStatusLabel.Text = "⏳ " + TargetCommTool + " (connecting...)";
+                TopBarCarStatusLabel.Text = "⏳ " + TargetCommTool;
                 TopBarCarStatusLabel.ForeColor = Color.FromArgb(0, 102, 204);
                 repositionConnectBtn();
             }
             InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
         };
-        TopBarCarStatusLabel.Click += (s, e) => triggerDiceConnect();
-        btnConnect.Click += (s, e) => triggerDiceConnect();
+        TopBarCarStatusLabel.Click += (s, e) => triggerDiceToggle();
+        btnConnect.Click += (s, e) => triggerDiceToggle();
 
         topBar.Controls.Add(TopBarCarStatusLabel);
         topBar.Controls.Add(btnConnect);

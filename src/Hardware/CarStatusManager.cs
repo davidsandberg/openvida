@@ -23,6 +23,7 @@ static partial class Program
     static object _cachedVehInfoInstance = null;
     static bool _carStatusEventHooked = false;
     public static Label TopBarCarStatusLabel = null;
+    public static Button TopBarDiceConnectButton = null;
     static double _lastKnownVoltVal = 0.0;
     static Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition _lastKnownKeyPos = Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos0;
     static Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState _lastKnownState = Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Disconnected;
@@ -118,8 +119,8 @@ static partial class Program
 
             bool isConn = (state == Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected);
             string diceText = isConn
-                ? string.Format("🟢 {0} (connected)", TargetCommTool)
-                : string.Format("⚪ {0} (disconnected)", TargetCommTool);
+                ? string.Format("🟢 {0}", TargetCommTool)
+                : string.Format("⚪ {0}", TargetCommTool);
             Color fg = isConn ? Color.FromArgb(22, 101, 52) : Color.FromArgb(100, 110, 120);
 
             if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed)
@@ -130,6 +131,13 @@ static partial class Program
                     {
                         TopBarCarStatusLabel.Text = diceText;
                         TopBarCarStatusLabel.ForeColor = fg;
+                        if (TopBarDiceConnectButton != null && !TopBarDiceConnectButton.IsDisposed)
+                        {
+                            TopBarDiceConnectButton.Text = isConn ? "Disconnect" : "Connect";
+                            TopBarDiceConnectButton.BackColor = isConn ? Color.FromArgb(254, 242, 242) : Color.FromArgb(230, 240, 250);
+                            TopBarDiceConnectButton.ForeColor = isConn ? Color.FromArgb(185, 28, 28) : Color.FromArgb(0, 102, 204);
+                            TopBarDiceConnectButton.FlatAppearance.BorderColor = isConn ? Color.FromArgb(248, 180, 180) : Color.FromArgb(160, 200, 240);
+                        }
                     }
                     catch {}
                 }));
@@ -142,6 +150,27 @@ static partial class Program
             }
         }
         catch {}
+    }
+
+    static void DisconnectCarStatus()
+    {
+        try
+        {
+            if (_cachedVehInfoInstance != null)
+            {
+                Type cstf = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Components.CarStatusTabForm");
+                FieldInfo csField = cstf != null ? cstf.GetField("_carStatus", BindingFlags.NonPublic | BindingFlags.Instance) : null;
+                object carStatus = csField != null ? csField.GetValue(_cachedVehInfoInstance) : null;
+                if (carStatus != null)
+                {
+                    MethodInfo miStop = carStatus.GetType().GetMethod("Stop", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    if (miStop != null) miStop.Invoke(carStatus, null);
+                }
+            }
+        }
+        catch {}
+        _lastKnownVoltVal = 0.0;
+        OnGlobalCarStatusUpdated(Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Disconnected, "0.0", Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos0);
     }
 
     static void InitializeCarStatus(object vehInfoInstance, object vehProfile)
