@@ -1861,20 +1861,22 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
             string ext = Path.GetExtension(vidaSrc).ToLowerInvariant();
             if (ext == ".ova" || ext == ".vmdk")
             {
-            // Single-pass stream extraction directly from the NTFS partition inside the VMDK/OVA (-tntfs.mbr.vmdk)
-            // without creating an intermediate 11.7 GB temporary .vmdk file on disk!
-            // Note: Keep VIDA\jdk and VIDA\eUpdate so JBoss 7 (jboss.bat) can start on port 80 for DiagSwdl SOAP services.
-            AppendLog("Extracting VIDA 2014D directly from virtual disk image (" + Path.GetFileName(vidaSrc) + ")...");
+            // Single-pass stream extraction of ONLY the required VIDA assemblies & databases directly from the NTFS partition inside the VMDK/OVA (-tntfs.mbr.vmdk)
+            // without creating an intermediate 11.7 GB temporary .vmdk file or extracting ~1 GB of unneeded legacy JBoss/JDK/InstallShield bloat!
+            AppendLog("Extracting VIDA 2014D databases & diagnostic assemblies directly from virtual disk image (" + Path.GetFileName(vidaSrc) + ")...");
             string directArgs = string.Format(
-                "x -y -aos \"-tntfs.mbr.vmdk\" \"{0}\" \"VIDA\\*\" \"-xr!VIDA\\jboss\\standalone\\tmp\\*\" \"-xr!VIDA\\jboss\\standalone\\log\\*\" \"-xr!VIDA\\uninstall\\*\" -o\"{1}\"",
+                "x -y -aos \"-tntfs.mbr.vmdk\" \"{0}\" \"VIDA\\db\\*\" \"VIDA\\jboss\\standalone\\deployments\\VidaEar.ear\\VidaWeb.war\\Diagnostics\\*\" \"VIDA\\System\\config\\*\" \"VIDA\\commToolInformation.xml\" -o\"{1}\"",
                 vidaSrc, targetDir);
             RunProcessLogged(sevenZipExe, directArgs, true);
+
+                // Ensure VIDA\System\Log\Diagnostics directory exists for runtime logging
+                Directory.CreateDirectory(Path.Combine(targetVidaDir, @"System\Log\Diagnostics"));
 
                 // Verify if VIDA\db\BaseData_Data.MDF was extracted; if the VMDK had multiple partitions (e.g. 1.ntfs), fall back to partition-prefixed extraction
                 if (!File.Exists(Path.Combine(targetVidaDir, @"db\BaseData_Data.MDF")))
                 {
                     AppendLog("Primary NTFS partition did not place VIDA\\db directly; probing multi-partition VMDK layout...");
-                    RunProcessLogged(sevenZipExe, string.Format("x -y -aos \"-tvmdk\" \"{0}\" \"VIDA\\*\" \"0.ntfs\\VIDA\\*\" \"1.ntfs\\VIDA\\*\" -o\"{1}\"", vidaSrc, targetDir), true);
+                    RunProcessLogged(sevenZipExe, string.Format("x -y -aos \"-tvmdk\" \"{0}\" \"VIDA\\db\\*\" \"VIDA\\jboss\\standalone\\deployments\\VidaEar.ear\\VidaWeb.war\\Diagnostics\\*\" \"0.ntfs\\VIDA\\db\\*\" \"0.ntfs\\VIDA\\jboss\\standalone\\deployments\\VidaEar.ear\\VidaWeb.war\\Diagnostics\\*\" \"1.ntfs\\VIDA\\db\\*\" \"1.ntfs\\VIDA\\jboss\\standalone\\deployments\\VidaEar.ear\\VidaWeb.war\\Diagnostics\\*\" -o\"{1}\"", vidaSrc, targetDir), true);
 
                     foreach (string partDir in new[] { "0.ntfs", "1.ntfs" })
                     {

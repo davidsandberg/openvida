@@ -107,12 +107,7 @@ if exist "%~dp0OpenVidaPayload.zip" del /f /q "%~dp0OpenVidaPayload.zip" >nul 2>
     "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\WebView2Loader.dll" ^
     "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\components.config.xml" ^
     "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\vida_icon.ico" ^
-    "VIDA\jboss\standalone\deployments\sqlserver-ds.xml" ^
-    "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\jsp\login\login.jsp" ^
-    "VIDA\setEnv.bat" ^
-    "VIDA\jboss.bat" ^
     "VIDA\commToolInformation.xml" ^
-    "VIDA\patch\license" ^
     "mcp\vida-mcp\VidaMcp.exe" ^
     "assets\vida_icon.ico" ^
     "assets\ewd_nav_index.zip" ^

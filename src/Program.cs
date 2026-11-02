@@ -146,7 +146,7 @@ static partial class Program
 
         // 3. Initialize DiagApplication singleton
 
-        DiagApplication.Instance.RootUrl = "http://localhost/Vida/Diagnostics/";
+        DiagApplication.Instance.RootUrl = diagDir;
 
         DiagApplication.Instance.Start();
 
@@ -948,7 +948,7 @@ static partial class Program
 
         };
 
-        diag.RootUrl = "http://localhost/Vida/Diagnostics/";
+        diag.RootUrl = diagDir;
 
         diag.LogPath = Path.Combine(vidaPath, @"System\Log\Diagnostics\");
 
