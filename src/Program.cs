@@ -114,6 +114,10 @@ static partial class Program
 
         }
 
+        if (!vidaPath.EndsWith("\\"))
+        {
+            vidaPath += "\\";
+        }
         Environment.SetEnvironmentVariable("VIDA_HOME", vidaPath);
 
         // 2. Set assembly resolver for any Diagnostics dependencies
@@ -496,13 +500,19 @@ static partial class Program
         topBar.Controls.Add(btnTabParts);
         _btnTabParts = btnTabParts;
 
+        string ewdCheck1 = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\wiring_diagrams\US_Eng"));
+        string ewdCheck2 = Path.GetFullPath(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"wiring_diagrams\US_Eng"));
+        bool hasEwdData = (Directory.Exists(ewdCheck1) && File.Exists(Path.Combine(ewdCheck1, "pdf-links.js")))
+                       || (Directory.Exists(ewdCheck2) && File.Exists(Path.Combine(ewdCheck2, "pdf-links.js")));
+
         Button btnTabWiring = new Button();
         btnTabWiring.Text = "⚡ WIRING DIAGRAMS";
         btnTabWiring.SetBounds(1080, 38, 180, 30);
         btnTabWiring.FlatStyle = FlatStyle.Flat;
         btnTabWiring.FlatAppearance.BorderSize = 1;
-        btnTabWiring.FlatAppearance.BorderColor = Color.FromArgb(180, 185, 190);
-        btnTabWiring.Cursor = Cursors.Hand;
+        btnTabWiring.FlatAppearance.BorderColor = hasEwdData ? Color.FromArgb(180, 185, 190) : Color.FromArgb(205, 210, 215);
+        btnTabWiring.Cursor = hasEwdData ? Cursors.Hand : Cursors.Default;
+        btnTabWiring.Enabled = hasEwdData;
         topBar.Controls.Add(btnTabWiring);
         _btnTabWiring = btnTabWiring;
 
@@ -516,7 +526,13 @@ static partial class Program
 
             {
 
-                if (b == activeBtn)
+                if (!b.Enabled)
+                {
+                    b.BackColor = Color.FromArgb(220, 224, 228);
+                    b.ForeColor = Color.FromArgb(145, 152, 160);
+                    b.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+                }
+                else if (b == activeBtn)
 
                 {
 

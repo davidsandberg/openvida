@@ -1432,13 +1432,14 @@ namespace OpenVidaInstaller
             string ext = Path.GetExtension(vidaSrc).ToLowerInvariant();
             if (ext == ".ova" || ext == ".vmdk")
             {
-                // Single-pass stream extraction directly from the NTFS partition inside the VMDK/OVA (-tntfs.mbr.vmdk)
-                // without creating an intermediate 11.7 GB temporary .vmdk file on disk!
-                AppendLog("Extracting VIDA 2014D directly from virtual disk image (" + Path.GetFileName(vidaSrc) + ")...");
-                string directArgs = string.Format(
-                    "x -y -aos \"-tntfs.mbr.vmdk\" \"{0}\" \"VIDA\\*\" \"-xr!VIDA\\jboss\\standalone\\tmp\\*\" \"-xr!VIDA\\jboss\\standalone\\log\\*\" \"-xr!VIDA\\jdk\\*\" \"-xr!VIDA\\eUpdate\\*\" \"-xr!VIDA\\uninstall\\*\" -o\"{1}\"",
-                    vidaSrc, targetDir);
-                RunProcessLogged(sevenZipExe, directArgs, true);
+            // Single-pass stream extraction directly from the NTFS partition inside the VMDK/OVA (-tntfs.mbr.vmdk)
+            // without creating an intermediate 11.7 GB temporary .vmdk file on disk!
+            // Note: Keep VIDA\jdk and VIDA\eUpdate so JBoss 7 (jboss.bat) can start on port 80 for DiagSwdl SOAP services.
+            AppendLog("Extracting VIDA 2014D directly from virtual disk image (" + Path.GetFileName(vidaSrc) + ")...");
+            string directArgs = string.Format(
+                "x -y -aos \"-tntfs.mbr.vmdk\" \"{0}\" \"VIDA\\*\" \"-xr!VIDA\\jboss\\standalone\\tmp\\*\" \"-xr!VIDA\\jboss\\standalone\\log\\*\" \"-xr!VIDA\\uninstall\\*\" -o\"{1}\"",
+                vidaSrc, targetDir);
+            RunProcessLogged(sevenZipExe, directArgs, true);
 
                 // Verify if VIDA\db\BaseData_Data.MDF was extracted; if the VMDK had multiple partitions (e.g. 1.ntfs), fall back to partition-prefixed extraction
                 if (!File.Exists(Path.Combine(targetVidaDir, @"db\BaseData_Data.MDF")))

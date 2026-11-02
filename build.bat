@@ -17,7 +17,7 @@ if exist "%ICON%" (
 
 pushd "%DIAG_DIR%"
 
-echo [1/2] Compiling DummyIsoView.dll (CGM Vector Network Renderer)...
+echo [1/4] Compiling DummyIsoView.dll (CGM Vector Network Renderer)...
 "%CSC%" /nologo /platform:x86 /target:library ^
     /out:DummyIsoView_new.dll ^
     /r:Interop.ISOVIEWXLib.dll ^
@@ -31,7 +31,7 @@ if errorlevel 1 (
 )
 move /y DummyIsoView_new.dll DummyIsoView.dll >nul 2>&1
 
-echo [2/2] Compiling VidaLauncher.exe from modular src\ files...
+echo [2/4] Compiling VidaLauncher.exe from modular src\ files...
 "%CSC%" /nologo /platform:x86 /target:exe /win32icon:vida_icon.ico ^
     /out:VidaLauncher_new.exe ^
     /r:UI.dll ^
@@ -77,7 +77,7 @@ if errorlevel 1 (
 )
 popd
 
-echo [3/3] Compiling VidaMcp.exe (MCP Bridge)...
+echo [3/4] Compiling VidaMcp.exe (MCP Bridge)...
 pushd "%~dp0mcp\vida-mcp"
 "%CSC%" /nologo /platform:x86 /target:exe ^
     /out:VidaMcp_new.exe ^
@@ -97,12 +97,58 @@ if not errorlevel 1 (
 )
 popd
 
+echo [4/4] Packaging Payload ^& Compiling OpenVidaSetup.exe (Standalone Installer)...
+if exist "%~dp0OpenVidaPayload.zip" del /f /q "%~dp0OpenVidaPayload.zip" >nul 2>&1
+"%~dp0tools\7z.exe" a -tzip "%~dp0OpenVidaPayload.zip" ^
+    "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\VidaLauncher.exe" ^
+    "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\DummyIsoView.dll" ^
+    "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\Microsoft.Web.WebView2.Core.dll" ^
+    "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\Microsoft.Web.WebView2.WinForms.dll" ^
+    "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\WebView2Loader.dll" ^
+    "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\components.config.xml" ^
+    "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\vida_icon.ico" ^
+    "VIDA\jboss\standalone\deployments\sqlserver-ds.xml" ^
+    "VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\jsp\login\login.jsp" ^
+    "VIDA\setEnv.bat" ^
+    "VIDA\jboss.bat" ^
+    "VIDA\commToolInformation.xml" ^
+    "VIDA\patch\license" ^
+    "mcp\vida-mcp\VidaMcp.exe" ^
+    "assets\vida_icon.ico" ^
+    "assets\ewd_nav_index.zip" ^
+    "tools\7z.exe" ^
+    "tools\7z.dll" ^
+    "DiCE\Tools\*" ^
+    "run_diagnostics.bat" ^
+    "Vida.bat" ^
+    "restart_sql.bat" ^
+    "enable_sql_tcp.bat" ^
+    "repair_sql_users.ps1" ^
+    "pack_data.bat" >nul
+
+"%CSC%" /nologo /platform:anycpu /target:winexe /win32icon:"%ICON%" ^
+    /out:"%~dp0OpenVidaSetup.exe" ^
+    /resource:"%~dp0OpenVidaPayload.zip",OpenVidaPayload.zip ^
+    /r:System.Windows.Forms.dll ^
+    /r:System.Drawing.dll ^
+    /r:System.Data.dll ^
+    /r:System.ServiceProcess.dll ^
+    /r:System.IO.Compression.dll ^
+    /r:System.IO.Compression.FileSystem.dll ^
+    "%SRC_DIR%\Installer\OpenVidaSetup.cs"
+if errorlevel 1 (
+    echo [ERROR] OpenVidaSetup.exe compilation failed!
+    if exist "%~dp0OpenVidaPayload.zip" del /f /q "%~dp0OpenVidaPayload.zip" >nul 2>&1
+    exit /b 1
+)
+if exist "%~dp0OpenVidaPayload.zip" del /f /q "%~dp0OpenVidaPayload.zip" >nul 2>&1
+
 echo.
 echo ============================================================
 echo   BUILD COMPLETED SUCCESSFULLY!
 echo ============================================================
 echo OpenVIDA Diagnostics: %DIAG_DIR%\VidaLauncher.exe
 echo OpenVIDA MCP Bridge:  %~dp0mcp\vida-mcp\VidaMcp.exe
+echo OpenVIDA Installer:   %~dp0OpenVidaSetup.exe
 echo ============================================================
 exit /b 0
-echo [OK] Build succeeded! Output: %DIAG_DIR%\VidaLauncher.exe
