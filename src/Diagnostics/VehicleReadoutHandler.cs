@@ -420,6 +420,7 @@ static partial class Program
                         Console.WriteLine("[Launcher] Triggering native PerformReadout()...");
 
                         mi.Invoke(vehInfoInstance, null);
+                        try { Vcc.Vida.DiagSwdl.UI.Diagnostics.ReadoutExporter.ExportLatestReadout(TargetVIN); } catch (Exception exExp) { Console.WriteLine("[Launcher] Readout auto-export notice: " + exExp.Message); }
 
                         return;
 
@@ -438,6 +439,7 @@ static partial class Program
                     {
 
                         mi.Invoke(internalReadoutBtn, null);
+                        try { Vcc.Vida.DiagSwdl.UI.Diagnostics.ReadoutExporter.ExportLatestReadout(TargetVIN); } catch (Exception exExp) { Console.WriteLine("[Launcher] Readout auto-export notice: " + exExp.Message); }
 
                         return;
 

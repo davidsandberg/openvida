@@ -371,11 +371,29 @@ static partial class Program
         btnConnect.Cursor = Cursors.Hand;
         TopBarDiceConnectButton = btnConnect;
 
+        Button btnReadouts = new Button();
+        btnReadouts.Text = "📁 Readouts";
+        btnReadouts.Font = new Font("Segoe UI", 8.25f, FontStyle.Bold);
+        btnReadouts.BackColor = Color.FromArgb(245, 247, 250);
+        btnReadouts.ForeColor = Color.FromArgb(60, 64, 67);
+        btnReadouts.FlatStyle = FlatStyle.Flat;
+        btnReadouts.FlatAppearance.BorderColor = Color.FromArgb(195, 200, 205);
+        btnReadouts.SetBounds(1020, 7, 85, 24);
+        btnReadouts.Cursor = Cursors.Hand;
+        btnReadouts.Click += (s, e) =>
+        {
+            ReadoutExporter.OpenReadoutsFolder();
+        };
+
         Action repositionConnectBtn = () =>
         {
             if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed && btnConnect != null && !btnConnect.IsDisposed)
             {
                 btnConnect.Left = TopBarCarStatusLabel.Right + 8;
+                if (btnReadouts != null && !btnReadouts.IsDisposed)
+                {
+                    btnReadouts.Left = btnConnect.Right + 6;
+                }
             }
         };
         TopBarCarStatusLabel.SizeChanged += (s, e) => repositionConnectBtn();
@@ -400,6 +418,7 @@ static partial class Program
 
         topBar.Controls.Add(TopBarCarStatusLabel);
         topBar.Controls.Add(btnConnect);
+        topBar.Controls.Add(btnReadouts);
         repositionConnectBtn();
 
         // Row 2: Tab Navigation Buttons
