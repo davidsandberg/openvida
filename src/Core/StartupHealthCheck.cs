@@ -256,20 +256,7 @@ static partial class Program
         }
         catch
         {
-            try
-            {
-                var reqRoot = (System.Net.HttpWebRequest)System.Net.WebRequest.Create("http://127.0.0.1/");
-                reqRoot.Timeout = 1500;
-                reqRoot.Method = "GET";
-                using (var respRoot = (System.Net.HttpWebResponse)reqRoot.GetResponse())
-                {
-                    return (int)respRoot.StatusCode == 200;
-                }
-            }
-            catch
-            {
-                return false;
-            }
+            return false;
         }
     }
 
