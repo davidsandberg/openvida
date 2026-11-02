@@ -52,7 +52,7 @@ static partial class Program
                     if (ctx != null)
                     {
                         Type scpType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.BizServices.Scripting.ScriptContext.ScriptingContextProvider")
-                            ?? Assembly.LoadFrom(@"C:\Users\david\git\vida\VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\BizServices.Scripting.DLL")
+                            ?? Assembly.LoadFrom(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BizServices.Scripting.DLL"))
                                .GetType("Vcc.Vida.DiagSwdl.BizServices.Scripting.ScriptContext.ScriptingContextProvider");
                         Type ifaceType = scpType.Assembly.GetType("Vcc.Vida.DiagSwdl.BizServices.Scripting.ScriptContext.IScriptingContext");
 
@@ -118,7 +118,7 @@ static partial class Program
 
             {
 
-                Assembly dummyAsm = Assembly.LoadFrom(@"C:\Users\david\git\vida\VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\DummyIsoView.dll");
+                Assembly dummyAsm = Assembly.LoadFrom(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "DummyIsoView.dll"));
 
                 if (dummyAsm != null) dummyType = dummyAsm.GetType("IsoViewStub.DummyIsoView");
 

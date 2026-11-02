@@ -110,7 +110,7 @@ static partial class Program
 
         {
 
-            vidaPath = @"C:\Users\david\git\vida\VIDA\";
+            vidaPath = Directory.Exists(@"C:\Users\david\git\openvida\VIDA\") ? @"C:\Users\david\git\openvida\VIDA\" : @"C:\Users\david\git\vida\VIDA\";
 
         }
 

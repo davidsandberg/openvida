@@ -137,7 +137,7 @@ static partial class Program
 
                                     Type ctType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.BizServices.VehicleCommProvider.CurrentCommTool")
 
-                                                  ?? Assembly.LoadFrom(@"C:\Users\david\git\vida\VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\BizServices.VehicleCommProvider.DLL")
+                                                  ?? Assembly.LoadFrom(Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "BizServices.VehicleCommProvider.DLL"))
 
                                                      .GetType("Vcc.Vida.DiagSwdl.BizServices.VehicleCommProvider.CurrentCommTool");
 
