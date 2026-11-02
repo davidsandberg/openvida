@@ -23,15 +23,377 @@ namespace OpenVidaInstaller
         [STAThread]
         static void Main(string[] args)
         {
-            foreach (string a in args)
-            {
-                if (string.Equals(a, "--test-ui", StringComparison.OrdinalIgnoreCase))
-                    TestUiMode = true;
-            }
-
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+
+            bool isUninstall = Path.GetFileNameWithoutExtension(Application.ExecutablePath)
+                .IndexOf("Uninstall", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool fromTemp = false;
+            bool quietUninstall = false;
+            string uninstallTarget = null;
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = args[i];
+                if (string.Equals(a, "--test-ui", StringComparison.OrdinalIgnoreCase))
+                {
+                    TestUiMode = true;
+                }
+                else if (string.Equals(a, "--uninstall", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(a, "/uninstall", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(a, "-u", StringComparison.OrdinalIgnoreCase))
+                {
+                    isUninstall = true;
+                    if (i + 1 < args.Length && !args[i + 1].StartsWith("-"))
+                        uninstallTarget = args[++i];
+                }
+                else if (string.Equals(a, "--uninstall-from-temp", StringComparison.OrdinalIgnoreCase))
+                {
+                    isUninstall = true;
+                    fromTemp = true;
+                    if (i + 1 < args.Length)
+                        uninstallTarget = args[++i];
+                }
+                else if (string.Equals(a, "--quiet", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(a, "/quiet", StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(a, "--silent", StringComparison.OrdinalIgnoreCase))
+                {
+                    quietUninstall = true;
+                }
+            }
+
+            if (isUninstall)
+            {
+                RunUninstallFlow(uninstallTarget, fromTemp, quietUninstall);
+                return;
+            }
+
             Application.Run(new SetupWizardForm());
+        }
+
+        private static void RunUninstallFlow(string targetDir, bool fromTemp, bool quiet)
+        {
+            if (string.IsNullOrEmpty(targetDir))
+            {
+                // Check if running inside an OpenVIDA installation directory
+                string exeDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+                if (Directory.Exists(Path.Combine(exeDir, "VIDA")))
+                {
+                    targetDir = exeDir;
+                }
+                else
+                {
+                    try
+                    {
+                        using (RegistryKey k = Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenVIDA"))
+                        {
+                            if (k != null && k.GetValue("InstallLocation") != null)
+                                targetDir = k.GetValue("InstallLocation").ToString();
+                        }
+                    }
+                    catch { }
+                }
+                if (string.IsNullOrEmpty(targetDir))
+                    targetDir = @"C:\OpenVIDA";
+            }
+
+            targetDir = Path.GetFullPath(targetDir).TrimEnd('\\');
+
+            // Safety guard: never allow uninstalling the developer git repository if someone accidentally passes it
+            if (Directory.Exists(Path.Combine(targetDir, ".git")) || Directory.Exists(Path.Combine(targetDir, "src")))
+            {
+                MessageBox.Show(
+                    "Refusing to run uninstaller on source code repository directory:\r\n" + targetDir,
+                    "OpenVIDA Uninstaller — Safety Guard",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return;
+            }
+
+            if (!Directory.Exists(targetDir))
+            {
+                if (!quiet)
+                {
+                    MessageBox.Show(
+                        "OpenVIDA installation directory was not found at:\r\n" + targetDir,
+                        "OpenVIDA Uninstaller",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+                return;
+            }
+
+            // If the current executable is running from inside targetDir, copy to %TEMP% and re-launch so targetDir is not locked!
+            string currentExe = Path.GetFullPath(Application.ExecutablePath);
+            if (!fromTemp && currentExe.StartsWith(targetDir + "\\", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    string tempExe = Path.Combine(Path.GetTempPath(), "OpenVidaUninstall_Runner.exe");
+                    File.Copy(currentExe, tempExe, true);
+                    string qArg = quiet ? " --quiet" : "";
+                    Process.Start(new ProcessStartInfo(tempExe, string.Format("--uninstall-from-temp \"{0}\"{1}", targetDir, qArg))
+                    {
+                        UseShellExecute = false
+                    });
+                    return;
+                }
+                catch { }
+            }
+
+            if (!quiet)
+            {
+                DialogResult dr = MessageBox.Show(
+                    "Are you sure you want to completely uninstall OpenVIDA Diagnostics from:\r\n\r\n" +
+                    "    " + targetDir + "\r\n\r\n" +
+                    "This will:\r\n" +
+                    "  • Stop any running OpenVIDA & JBoss background processes\r\n" +
+                    "  • Safely detach SQL Server databases mounted from " + targetDir + "\\VIDA\\db\r\n" +
+                    "  • Remove Desktop & Start Menu shortcuts and registry entries\r\n" +
+                    "  • Permanently delete " + targetDir + " and all extracted files",
+                    "Uninstall OpenVIDA Diagnostics",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question,
+                    MessageBoxDefaultButton.Button2);
+                if (dr != DialogResult.Yes)
+                    return;
+            }
+
+            using (Form progressForm = new Form())
+            {
+                progressForm.Text = "Uninstalling OpenVIDA Diagnostics...";
+                progressForm.Size = new Size(540, 260);
+                progressForm.StartPosition = FormStartPosition.CenterScreen;
+                progressForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                progressForm.ControlBox = false;
+                progressForm.BackColor = Color.FromArgb(245, 247, 250);
+                progressForm.Font = new Font("Segoe UI", 9.25f);
+
+                Label lblStatus = new Label
+                {
+                    Text = "Preparing to uninstall OpenVIDA...",
+                    Font = new Font("Segoe UI", 10f, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(30, 41, 59),
+                    Location = new Point(20, 18),
+                    Size = new Size(485, 24)
+                };
+
+                ProgressBar pb = new ProgressBar
+                {
+                    Style = ProgressBarStyle.Marquee,
+                    MarqueeAnimationSpeed = 25,
+                    Location = new Point(20, 48),
+                    Size = new Size(485, 22)
+                };
+
+                TextBox txtLog = new TextBox
+                {
+                    Multiline = true,
+                    ReadOnly = true,
+                    ScrollBars = ScrollBars.Vertical,
+                    BackColor = Color.FromArgb(15, 23, 42),
+                    ForeColor = Color.FromArgb(226, 232, 240),
+                    Font = new Font("Consolas", 8.5f),
+                    Location = new Point(20, 80),
+                    Size = new Size(485, 125)
+                };
+
+                progressForm.Controls.AddRange(new Control[] { lblStatus, pb, txtLog });
+
+                Action<string> log = (msg) =>
+                {
+                    try
+                    {
+                        progressForm.Invoke((MethodInvoker)delegate
+                        {
+                            lblStatus.Text = msg;
+                            txtLog.AppendText("[" + DateTime.Now.ToString("HH:mm:ss") + "] " + msg + "\r\n");
+                        });
+                    }
+                    catch { }
+                };
+
+                string uninstallError = null;
+                progressForm.Shown += (s, e) =>
+                {
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        try
+                        {
+                            PerformUninstallSteps(targetDir, log);
+                        }
+                        catch (Exception ex)
+                        {
+                            uninstallError = ex.Message;
+                        }
+                        finally
+                        {
+                            try { progressForm.Invoke((MethodInvoker)delegate { progressForm.Close(); }); } catch { }
+                        }
+                    });
+                };
+
+                if (quiet)
+                {
+                    PerformUninstallSteps(targetDir, (m) => { });
+                }
+                else
+                {
+                    progressForm.ShowDialog();
+                }
+
+                if (!quiet)
+                {
+                    if (uninstallError != null)
+                    {
+                        MessageBox.Show(
+                            "Uninstall encountered an issue:\r\n" + uninstallError,
+                            "OpenVIDA Uninstaller",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                    }
+                    else
+                    {
+                        MessageBox.Show(
+                            "OpenVIDA Diagnostics has been completely uninstalled from:\r\n" + targetDir,
+                            "Uninstall Complete",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Information);
+                    }
+                }
+            }
+        }
+
+        private static void PerformUninstallSteps(string targetDir, Action<string> log)
+        {
+            // 1. Stop VidaLauncher, VidaMcp, and JBoss java.exe/cmd.exe running from targetDir
+            log("Step 1/4: Stopping OpenVIDA and JBoss background processes...");
+            try
+            {
+                string psKill = string.Format(
+                    "Stop-Process -Name 'VidaLauncher','VidaMcp' -Force -ErrorAction SilentlyContinue; " +
+                    "Get-WmiObject Win32_Process -Filter \"Name='java.exe' OR Name='cmd.exe'\" | " +
+                    "Where-Object {{ $_.CommandLine -match 'jboss' -or $_.CommandLine -like '*{0}*' -or $_.ExecutablePath -like '*{0}*' }} | " +
+                    "ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}",
+                    targetDir.Replace("'", "''"));
+                ProcessStartInfo psiKill = new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -Command \"" + psKill + "\"")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+                using (Process p = Process.Start(psiKill))
+                {
+                    p.WaitForExit(10000);
+                }
+                Thread.Sleep(600);
+            }
+            catch { }
+
+            // 2. Detach any SQL Server databases whose physical .mdf file resides inside targetDir
+            log("Step 2/4: Checking SQL Server databases in " + targetDir + "\\VIDA\\db...");
+            try
+            {
+                string connStr = @"Server=localhost\SQLEXPRESS;Database=master;Integrated Security=True;Connection Timeout=8";
+                using (SqlConnection conn = new SqlConnection(connStr))
+                {
+                    conn.Open();
+                    List<string> dbsToDetach = new List<string>();
+                    using (SqlCommand cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = @"
+SELECT d.name, mf.physical_name
+FROM sys.databases d
+JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
+                        using (SqlDataReader rdr = cmd.ExecuteReader())
+                        {
+                            while (rdr.Read())
+                            {
+                                string dbName = rdr.GetString(0);
+                                string phys = rdr.IsDBNull(1) ? "" : rdr.GetString(1);
+                                if (phys.StartsWith(targetDir + "\\", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    dbsToDetach.Add(dbName);
+                                }
+                            }
+                        }
+                    }
+
+                    foreach (string db in dbsToDetach)
+                    {
+                        log("Detaching SQL database [" + db + "]...");
+                        try
+                        {
+                            using (SqlCommand detCmd = conn.CreateCommand())
+                            {
+                                detCmd.CommandTimeout = 30;
+                                detCmd.CommandText = string.Format(
+                                    "ALTER DATABASE [{0}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; EXEC sp_detach_db '{0}', 'true';",
+                                    db);
+                                detCmd.ExecuteNonQuery();
+                            }
+                        }
+                        catch { }
+                    }
+                }
+            }
+            catch { }
+
+            // 3. Remove Desktop & Start Menu shortcuts and Registry entries
+            log("Step 3/4: Removing shortcuts and registry entries...");
+            try
+            {
+                string desktopLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), "OpenVIDA Diagnostics.lnk");
+                string programsLnk = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), "OpenVIDA Diagnostics.lnk");
+                if (File.Exists(desktopLnk)) File.Delete(desktopLnk);
+                if (File.Exists(programsLnk)) File.Delete(programsLnk);
+            }
+            catch { }
+
+            try
+            {
+                Registry.CurrentUser.DeleteSubKeyTree(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenVIDA", false);
+            }
+            catch { }
+
+            try
+            {
+                string clsidKeyPath = @"Software\Classes\CLSID\{865B2280-2B71-11D1-BC01-006097AC382A}";
+                string devDll = @"C:\Users\david\git\openvida\VIDA\jboss\standalone\deployments\VidaEar.ear\VidaWeb.war\Diagnostics\DummyIsoView.dll";
+                if (File.Exists(devDll))
+                {
+                    using (RegistryKey ipsKey = Registry.CurrentUser.CreateSubKey(clsidKeyPath + @"\InprocServer32"))
+                    {
+                        ipsKey.SetValue("CodeBase", new Uri(devDll).AbsoluteUri);
+                    }
+                }
+                else
+                {
+                    Registry.CurrentUser.DeleteSubKeyTree(clsidKeyPath, false);
+                }
+            }
+            catch { }
+
+            // 4. Delete targetDir
+            log("Step 4/4: Removing directory " + targetDir + "...");
+            ProcessStartInfo psiRd = new ProcessStartInfo("cmd.exe", string.Format("/c rd /s /q \"{0}\"", targetDir))
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+            using (Process pRd = Process.Start(psiRd))
+            {
+                pRd.WaitForExit(30000);
+            }
+
+            if (Directory.Exists(targetDir))
+            {
+                // Spawn delayed cleanup in case a handle was just released
+                Process.Start(new ProcessStartInfo("cmd.exe", string.Format("/c ping 127.0.0.1 -n 2 >nul & rd /s /q \"{0}\"", targetDir))
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                });
+            }
         }
     }
 
@@ -1233,9 +1595,48 @@ namespace OpenVidaInstaller
             }
 
             CreateShortcuts(targetDir, desktopShortcut, startMenuShortcut);
+            RegisterUninstaller(targetDir);
 
             UpdateProgress(100, "Installation completed successfully!");
             AppendLog("OpenVIDA installation finished successfully.");
+        }
+
+        private void RegisterUninstaller(string targetDir)
+        {
+            try
+            {
+                string uninstallExe = Path.Combine(targetDir, "OpenVidaUninstall.exe");
+                File.Copy(Application.ExecutablePath, uninstallExe, true);
+
+                string uninstallBat = Path.Combine(targetDir, "uninstall.bat");
+                File.WriteAllText(uninstallBat,
+                    "@echo off\r\n" +
+                    "start \"\" \"%~dp0OpenVidaUninstall.exe\" --uninstall \"%~dp0\"\r\n");
+
+                string iconPath = Path.Combine(targetDir, @"assets\vida_icon.ico");
+                if (!File.Exists(iconPath)) iconPath = uninstallExe;
+
+                using (RegistryKey k = Registry.CurrentUser.CreateSubKey(@"Software\Microsoft\Windows\CurrentVersion\Uninstall\OpenVIDA"))
+                {
+                    if (k != null)
+                    {
+                        k.SetValue("DisplayName", "OpenVIDA Diagnostics (Volvo VIDA 2014D)");
+                        k.SetValue("DisplayVersion", "2014D.1.0");
+                        k.SetValue("Publisher", "OpenVIDA Project");
+                        k.SetValue("InstallLocation", targetDir);
+                        k.SetValue("DisplayIcon", iconPath);
+                        k.SetValue("UninstallString", string.Format("\"{0}\" --uninstall \"{1}\"", uninstallExe, targetDir));
+                        k.SetValue("QuietUninstallString", string.Format("\"{0}\" --uninstall \"{1}\" --quiet", uninstallExe, targetDir));
+                        k.SetValue("NoModify", 1, RegistryValueKind.DWord);
+                        k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+                    }
+                }
+                AppendLog("Registered OpenVIDA uninstaller (OpenVidaUninstall.exe, uninstall.bat, and Windows Installed Apps).");
+            }
+            catch (Exception ex)
+            {
+                AppendLog("Warning registering uninstaller: " + ex.Message);
+            }
         }
 
         private void VerifyVidaDataSourceContent(string vidaSrc, string sevenZipExe)

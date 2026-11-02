@@ -185,6 +185,16 @@ pack_data.bat "D:\Backups\OpenVIDA_Data_2014D.7z"
   Vida.bat --mock
   ```
 
+### Uninstalling OpenVIDA
+OpenVIDA includes a built-in GUI & CLI uninstaller that cleanly stops background services and releases database file locks before removing the installation folder:
+- **Option 1 — Windows Settings (Installed Apps)**: Open **Windows Settings → Apps → Installed apps**, find **OpenVIDA Diagnostics (Volvo VIDA 2014D)**, and click **Uninstall**.
+- **Option 2 — From the Installation Folder**: Double-click **`<TargetDir>\OpenVidaUninstall.exe`** or **`<TargetDir>\uninstall.bat`**.
+- **Option 3 — Command Line / Silent Uninstall**:
+  ```cmd
+  OpenVidaSetup.exe --uninstall "C:\OpenVIDA" --quiet
+  ```
+The uninstaller automatically terminates any running `VidaLauncher.exe` and JBoss (`java.exe`) processes, detaches any SQL Server databases mounted from `<TargetDir>\VIDA\db`, removes Desktop/Start Menu shortcuts and registry entries, and deletes `<TargetDir>`.
+
 ---
 
 ## 5. Building from Source
