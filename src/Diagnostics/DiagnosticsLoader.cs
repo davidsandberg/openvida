@@ -19,6 +19,54 @@ using Vcc.Vida.DiagSwdl.UI.Diagnostics;
 
 static partial class Program
 {
+    static void HideLegacyDiagnosticChrome(object mgr)
+    {
+        if (mgr == null) return;
+        try
+        {
+            Type mgrType = mgr.GetType();
+            FieldInfo navPnlField = mgrType.GetField("_navPanel", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            FieldInfo workPnlField = mgrType.GetField("_workAreaPanel", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            Control navPnl = navPnlField != null ? navPnlField.GetValue(mgr) as Control : null;
+            Control workPnl = workPnlField != null ? workPnlField.GetValue(mgr) as Control : null;
+            if (navPnl != null && navPnl.Visible)
+            {
+                int navH = navPnl.Height > 0 ? navPnl.Height : 28;
+                navPnl.Visible = false;
+                navPnl.Height = 0;
+                if (workPnl != null && workPnl.Dock == DockStyle.None && workPnl.Top >= navH)
+                {
+                    workPnl.Top -= navH;
+                    workPnl.Height += navH;
+                }
+            }
+
+            // Hide the legacy right-hand CarStatus box inside each CarStatusTabForm so it never overlaps Vehicle Comm buttons
+            Type cstfType = typeof(DiagnosticMainForm).Assembly.GetType("Vcc.Vida.DiagSwdl.UI.Components.CarStatusTabForm");
+            FieldInfo csField = cstfType != null ? cstfType.GetField("_carStatus", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance) : null;
+            if (csField != null)
+            {
+                string[] formFields = new string[] { "_vehicleInformationForm", "_customerSymptomsFaultTraceForm", "_networkForm", "_vehCommForm" };
+                foreach (string ff in formFields)
+                {
+                    FieldInfo fInfo = mgrType.GetField(ff, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    object fObj = fInfo != null ? fInfo.GetValue(mgr) : null;
+                    Control csCtrl = (fObj != null) ? csField.GetValue(fObj) as Control : null;
+                    if (csCtrl != null) csCtrl.Visible = false;
+                }
+            }
+
+            // Ensure ReferenceInformationForm fills _workAreaPanel cleanly without overriding its inner _tabPanel
+            FieldInfo refField = mgrType.GetField("_referenceInformationForm", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            Control refCtrl = refField != null ? refField.GetValue(mgr) as Control : null;
+            if (refCtrl != null)
+            {
+                refCtrl.Dock = DockStyle.Fill;
+            }
+        }
+        catch {}
+    }
+
     static void InitializeDiagnosticsControl(string vidaPath, DiagnosticMainForm diag)
     {
             try
@@ -582,11 +630,14 @@ static partial class Program
 
                 }
 
-                // Enable all native tab navigation buttons
+                // Enable all native tab navigation buttons and hide the redundant legacy gray navigation ribbon (_navPanel)
+                // by collapsing _navPanel to 0px and expanding _workAreaPanel up by its original height.
 
                 if (mgr != null)
 
                 {
+
+                    HideLegacyDiagnosticChrome(mgr);
 
                     string[] btnFieldNames = new string[] {
 

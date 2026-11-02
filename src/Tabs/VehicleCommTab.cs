@@ -186,7 +186,7 @@ static partial class Program
 
                             ecuBar.Name = "ecuSelectBar";
 
-                            ecuBar.SetBounds(380, 56, 920, 58);
+                            ecuBar.SetBounds(395, 56, 945, 58);
 
                             ecuBar.BackColor = Color.FromArgb(245, 247, 250);
 
@@ -198,7 +198,7 @@ static partial class Program
 
                             lblSel.ForeColor = Color.FromArgb(50, 60, 70);
 
-                            lblSel.SetBounds(2, 4, 85, 22);
+                            lblSel.SetBounds(8, 4, 85, 22);
 
                             ecuBar.Controls.Add(lblSel);
 
@@ -210,7 +210,7 @@ static partial class Program
 
                             cbEcu.Font = new Font("Segoe UI", 9.0f, FontStyle.Regular);
 
-                            cbEcu.SetBounds(90, 2, 380, 24);
+                            cbEcu.SetBounds(95, 2, 225, 24);
 
                             var ecuList = new Tuple<string, string>[] {
 
@@ -371,14 +371,14 @@ static partial class Program
                             chkMock.Name = "chkMock";
                             chkMock.Text = "Mock Data";
                             chkMock.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
-                            chkMock.SetBounds(475, 31, 95, 22);
+                            chkMock.SetBounds(430, 31, 90, 22);
                             chkMock.Checked = IsMockSimulation;
 
                             _activeChkMock = chkMock;
                             Label lblVehCommStatus = new Label();
                             lblVehCommStatus.Name = "lblVehCommStatus";
                             lblVehCommStatus.Font = new Font("Segoe UI", 8.5f, FontStyle.Regular);
-                            lblVehCommStatus.SetBounds(230, 4, 340, 20);
+                            lblVehCommStatus.SetBounds(328, 5, 200, 20);
                             lblVehCommStatus.AutoEllipsis = true;
 
 
@@ -390,17 +390,17 @@ static partial class Program
                                     if (lblVehCommStatus.IsDisposed) return;
                                     if (IsMockSimulation)
                                     {
-                                        lblVehCommStatus.Text = "🧪 Mock Simulation Mode — Simulating live vehicle telemetry for desk testing.";
+                                        lblVehCommStatus.Text = "🧪 Mock Simulation Active";
                                         lblVehCommStatus.ForeColor = Color.FromArgb(2, 132, 199);
                                     }
                                     else if (IsDiceConnected)
                                     {
-                                        lblVehCommStatus.Text = string.Format("🟢 Vehicle Connected — DiCE J2534 ({0:F1}V, Key Pos {1}). Ready for live polling & actuation.", _lastKnownVoltVal, _lastKnownKeyPos);
+                                        lblVehCommStatus.Text = string.Format("🟢 Connected ({0:F1}V, Key {1})", _lastKnownVoltVal, _lastKnownKeyPos);
                                         lblVehCommStatus.ForeColor = Color.FromArgb(22, 163, 74);
                                     }
                                     else
                                     {
-                                        lblVehCommStatus.Text = "⚪ Vehicle Disconnected — Hardware offline. Browse parameters freely, or enable [☑️ Mock Data].";
+                                        lblVehCommStatus.Text = "⚪ Hardware Offline";
                                         lblVehCommStatus.ForeColor = Color.FromArgb(100, 116, 139);
                                     }
                                 }
@@ -483,7 +483,7 @@ static partial class Program
                             };
 
                             btnSubParam.Text = "📊 Parameters";
-                            btnSubParam.SetBounds(580, 2, 95, 24);
+                            btnSubParam.SetBounds(530, 2, 102, 24);
                             btnSubParam.FlatStyle = FlatStyle.Flat;
                             btnSubParam.FlatAppearance.BorderSize = 1;
                             btnSubParam.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
@@ -495,7 +495,7 @@ static partial class Program
                             ecuBar.Controls.Add(btnSubParam);
 
                             btnSubAct.Text = "⚡ Activations";
-                            btnSubAct.SetBounds(680, 2, 95, 24);
+                            btnSubAct.SetBounds(636, 2, 98, 24);
                             btnSubAct.FlatStyle = FlatStyle.Flat;
                             btnSubAct.FlatAppearance.BorderSize = 1;
                             btnSubAct.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
@@ -506,8 +506,8 @@ static partial class Program
                             };
                             ecuBar.Controls.Add(btnSubAct);
 
-                            btnSubProg.Text = "📝 Programmed Values";
-                            btnSubProg.SetBounds(780, 2, 135, 24);
+                            btnSubProg.Text = "📝 Programmed";
+                            btnSubProg.SetBounds(738, 2, 106, 24);
                             btnSubProg.FlatStyle = FlatStyle.Flat;
                             btnSubProg.FlatAppearance.BorderSize = 1;
                             btnSubProg.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
@@ -519,7 +519,7 @@ static partial class Program
                             ecuBar.Controls.Add(btnSubProg);
 
                             btnSubSpec.Text = "🔧 Advanced";
-                            btnSubSpec.SetBounds(920, 2, 90, 24);
+                            btnSubSpec.SetBounds(848, 2, 86, 24);
                             btnSubSpec.FlatStyle = FlatStyle.Flat;
                             btnSubSpec.FlatAppearance.BorderSize = 1;
                             btnSubSpec.FlatAppearance.BorderColor = Color.FromArgb(180, 190, 200);
@@ -534,7 +534,7 @@ static partial class Program
                             // Parameters Watchlist Management Buttons
                             Button btnRemoveParam = new Button();
                             btnRemoveParam.Text = "❌ Remove Item";
-                            btnRemoveParam.SetBounds(580, 30, 95, 24);
+                            btnRemoveParam.SetBounds(530, 30, 102, 24);
                             btnRemoveParam.FlatStyle = FlatStyle.Flat;
                             btnRemoveParam.FlatAppearance.BorderSize = 1;
                             btnRemoveParam.FlatAppearance.BorderColor = Color.FromArgb(220, 180, 180);
@@ -579,7 +579,7 @@ static partial class Program
 
                             Button btnClearParams = new Button();
                             btnClearParams.Text = "🗑️ Clear All";
-                            btnClearParams.SetBounds(680, 30, 95, 24);
+                            btnClearParams.SetBounds(636, 30, 98, 24);
                             btnClearParams.FlatStyle = FlatStyle.Flat;
                             btnClearParams.FlatAppearance.BorderSize = 1;
                             btnClearParams.FlatAppearance.BorderColor = Color.FromArgb(200, 200, 200);
@@ -897,7 +897,7 @@ static partial class Program
 
                             string[] quickEcus = new string[] { "ECM", "TCM", "CEM", "BCM", "DIM", "SRS", "CCM", "DEM" };
 
-                            int btnX = 2;
+                            int btnX = 8;
 
                             foreach (var qName in quickEcus)
 

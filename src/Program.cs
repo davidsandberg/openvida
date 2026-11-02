@@ -263,7 +263,7 @@ static partial class Program
         _mainLauncherForm = mainForm;
         StartOpenVidaIpcServer();
 
-        mainForm.Text = "Volvo VIDA 2014D - Standalone Diagnostics";
+        mainForm.Text = "OpenVIDA 2014D - Standalone Diagnostics";
 
         try
         {
@@ -344,51 +344,57 @@ static partial class Program
         topBar.Controls.Add(txtVin);
 
         Label lblInfo = new Label();
-
-        lblInfo.Text = "|  Volvo V70 (08-), MY 2011, D5204T2  |  DiCE-206751  |  13 DTCs Stored";
-
+        lblInfo.Text = "|  Volvo V70 (08-), MY 2011, D5204T2  |  13 DTCs Stored  |";
         lblInfo.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
-
         lblInfo.ForeColor = Color.FromArgb(60, 64, 67);
-
         lblInfo.AutoSize = true;
-
         lblInfo.Location = new Point(485, 10);
-
         topBar.Controls.Add(lblInfo);
 
         TopBarCarStatusLabel = new Label();
-        TopBarCarStatusLabel.Text = "🔋 --.-V  |  🔑 Pos: --  |  ⚪ DiCE: Connecting...";
-        TopBarCarStatusLabel.Font = new Font("Segoe UI", 9.0f, FontStyle.Bold);
-        TopBarCarStatusLabel.ForeColor = Color.FromArgb(80, 80, 80);
-        TopBarCarStatusLabel.BackColor = Color.FromArgb(240, 243, 246);
-        TopBarCarStatusLabel.BorderStyle = BorderStyle.FixedSingle;
-        TopBarCarStatusLabel.TextAlign = ContentAlignment.MiddleCenter;
-        TopBarCarStatusLabel.SetBounds(topBar.Width - 460, 8, 300, 25);
-        TopBarCarStatusLabel.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        TopBarCarStatusLabel.Text = "⚪ " + TargetCommTool + " (disconnected)";
+        TopBarCarStatusLabel.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+        TopBarCarStatusLabel.ForeColor = Color.FromArgb(100, 110, 120);
+        TopBarCarStatusLabel.BackColor = Color.Transparent;
+        TopBarCarStatusLabel.AutoSize = true;
+        TopBarCarStatusLabel.Location = new Point(822, 10);
         TopBarCarStatusLabel.Cursor = Cursors.Hand;
-        TopBarCarStatusLabel.Click += (s, e) => {
-            if (TopBarCarStatusLabel != null) TopBarCarStatusLabel.Text = "⏳ Querying DiCE (VBatt & Keypos)...";
-            InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
-        };
-        topBar.Controls.Add(TopBarCarStatusLabel);
 
         Button btnConnect = new Button();
-        btnConnect.Text = "⚡ Connect / Status";
-        btnConnect.Font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+        btnConnect.Text = "Connect";
+        btnConnect.Font = new Font("Segoe UI", 8.25f, FontStyle.Bold);
         btnConnect.BackColor = Color.FromArgb(230, 240, 250);
         btnConnect.ForeColor = Color.FromArgb(0, 102, 204);
         btnConnect.FlatStyle = FlatStyle.Flat;
         btnConnect.FlatAppearance.BorderColor = Color.FromArgb(160, 200, 240);
-        btnConnect.SetBounds(topBar.Width - 150, 8, 140, 25);
-        btnConnect.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        btnConnect.SetBounds(1018, 7, 68, 24);
         btnConnect.Cursor = Cursors.Hand;
-        btnConnect.Click += (s, e) =>
+
+        Action repositionConnectBtn = () =>
         {
-            if (TopBarCarStatusLabel != null) TopBarCarStatusLabel.Text = "⏳ Querying DiCE (VBatt & Keypos)...";
+            if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed && btnConnect != null && !btnConnect.IsDisposed)
+            {
+                btnConnect.Left = TopBarCarStatusLabel.Right + 6;
+            }
+        };
+        TopBarCarStatusLabel.SizeChanged += (s, e) => repositionConnectBtn();
+
+        Action triggerDiceConnect = () =>
+        {
+            if (TopBarCarStatusLabel != null)
+            {
+                TopBarCarStatusLabel.Text = "⏳ " + TargetCommTool + " (connecting...)";
+                TopBarCarStatusLabel.ForeColor = Color.FromArgb(0, 102, 204);
+                repositionConnectBtn();
+            }
             InitializeCarStatus(_cachedVehInfoInstance, _cachedVehicleProfile);
         };
+        TopBarCarStatusLabel.Click += (s, e) => triggerDiceConnect();
+        btnConnect.Click += (s, e) => triggerDiceConnect();
+
+        topBar.Controls.Add(TopBarCarStatusLabel);
         topBar.Controls.Add(btnConnect);
+        repositionConnectBtn();
 
         // Row 2: Tab Navigation Buttons
 
@@ -577,6 +583,7 @@ static partial class Program
                 MethodInfo mi = mType.GetMethod(methodName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
 
                 if (mi != null) mi.Invoke(mObj, new object[] { null, EventArgs.Empty });
+                HideLegacyDiagnosticChrome(mObj);
                 UpdateAllCarStatusControls(_lastKnownVoltVal);
 
                 if (methodName.IndexOf("referenceInformation", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -1016,7 +1023,7 @@ static partial class Program
 
         diag.TitleName = "VIDA2014D";
 
-        diag.ApplicationTitle = "Volvo VIDA Standalone Diagnostics";
+        diag.ApplicationTitle = "OpenVIDA 2014D - Standalone Diagnostics";
 
         diag.UserRole = "1";
 
@@ -1078,11 +1085,11 @@ static partial class Program
 
         // If run with /test flag, systematically switch across all tabs and capture screenshots
 
-        if (args.Length > 0 && (args[0] == "/test" || args[0] == "--test"))
+        if (args.Length > 0 && Array.Exists(args, a => a == "/test" || a == "--test"))
         {
             StartAutomatedTestSequence(vidaPath, mainForm, btnTabFaultTrace, btnTabNetwork, btnTabVehComm, btnTabRefInfo, _btnTabManuals, _btnTabParts, _btnTabWiring, switchTab, setActiveTabButton);
         }
-        else if (args.Length > 0 && (args[0] == "/ewd-test" || args[0] == "--ewd-test"))
+        else if (args.Length > 0 && Array.Exists(args, a => a == "/ewd-test" || a == "--ewd-test"))
         {
             StartEwdTestSequence(vidaPath, mainForm, _btnTabWiring);
         }

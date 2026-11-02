@@ -116,14 +116,11 @@ static partial class Program
             _lastKnownKeyPos = keypos;
             _lastKnownState = state;
 
-            string voltStr = (_lastKnownVoltVal > 0.0) ? _lastKnownVoltVal.ToString("F1", System.Globalization.CultureInfo.InvariantCulture) + "V" : "--.-V";
-            string keyStr = "Pos: " + (keypos == Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos0 ? "0" :
-                                     keypos == Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos1 ? "I" :
-                                     keypos == Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos2 ? "II" :
-                                     keypos == Vcc.Vida.DiagSwdl.ValueObjects.Common.KeyPosition.Pos3 ? "III" : "?");
-            string stateIcon = (state == Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected) ? "🟢 DiCE Connected" : "⚪ DiCE Disconnected";
-            Color bg = (state == Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected) ? Color.FromArgb(235, 245, 235) : Color.FromArgb(245, 245, 245);
-            Color fg = (state == Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected) ? Color.FromArgb(0, 100, 0) : Color.FromArgb(120, 120, 120);
+            bool isConn = (state == Vcc.Vida.DiagSwdl.Workflow.CarStatus.ConnectionState.Connected);
+            string diceText = isConn
+                ? string.Format("🟢 {0} (connected)", TargetCommTool)
+                : string.Format("⚪ {0} (disconnected)", TargetCommTool);
+            Color fg = isConn ? Color.FromArgb(22, 101, 52) : Color.FromArgb(100, 110, 120);
 
             if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed)
             {
@@ -131,8 +128,7 @@ static partial class Program
                 {
                     try
                     {
-                        TopBarCarStatusLabel.Text = string.Format("🔋 {0}  |  🔑 {1}  |  {2}", voltStr, keyStr, stateIcon);
-                        TopBarCarStatusLabel.BackColor = bg;
+                        TopBarCarStatusLabel.Text = diceText;
                         TopBarCarStatusLabel.ForeColor = fg;
                     }
                     catch {}
