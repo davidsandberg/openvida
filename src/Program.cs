@@ -78,6 +78,7 @@ static partial class Program
                 }
             }
         }
+        Logger.Init();
         Console.WriteLine("[Launcher] Simulation Mode: " + (IsMockSimulation ? "ENABLED (Mock Data)" : "DISABLED (Live DiCE CAN)"));
 
         try
@@ -248,13 +249,16 @@ static partial class Program
 
             }
 
-            Console.WriteLine("[Launcher] ThreadException (caught safely): " + e.Exception.Message);
+            Logger.Error("App", "ThreadException caught: " + (e.Exception != null ? e.Exception.Message : "Unknown"), e.Exception);
+            Logger.ShowCrashDialog(e.Exception, "Application.ThreadException");
 
         };
 
         AppDomain.CurrentDomain.UnhandledException += (s, e) => {
 
-            Console.WriteLine("[Launcher] DomainException (caught safely): " + e.ExceptionObject);
+            Exception unhandledEx = e.ExceptionObject as Exception;
+            Logger.Error("App", "DomainException caught: " + (unhandledEx != null ? unhandledEx.Message : "" + e.ExceptionObject), unhandledEx);
+            Logger.LogCrash(unhandledEx, "AppDomain.CurrentDomain.UnhandledException");
 
         };
 
@@ -385,6 +389,20 @@ static partial class Program
             ReadoutExporter.OpenReadoutsFolder();
         };
 
+        Button btnLogs = new Button();
+        btnLogs.Text = "📋 Logs";
+        btnLogs.Font = new Font("Segoe UI", 8.25f, FontStyle.Bold);
+        btnLogs.BackColor = Color.FromArgb(245, 247, 250);
+        btnLogs.ForeColor = Color.FromArgb(60, 64, 67);
+        btnLogs.FlatStyle = FlatStyle.Flat;
+        btnLogs.FlatAppearance.BorderColor = Color.FromArgb(195, 200, 205);
+        btnLogs.SetBounds(1111, 7, 72, 24);
+        btnLogs.Cursor = Cursors.Hand;
+        btnLogs.Click += (s, e) =>
+        {
+            Logger.OpenLogsFolder();
+        };
+
         Action repositionConnectBtn = () =>
         {
             if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed && btnConnect != null && !btnConnect.IsDisposed)
@@ -393,6 +411,10 @@ static partial class Program
                 if (btnReadouts != null && !btnReadouts.IsDisposed)
                 {
                     btnReadouts.Left = btnConnect.Right + 6;
+                    if (btnLogs != null && !btnLogs.IsDisposed)
+                    {
+                        btnLogs.Left = btnReadouts.Right + 6;
+                    }
                 }
             }
         };
@@ -419,6 +441,7 @@ static partial class Program
         topBar.Controls.Add(TopBarCarStatusLabel);
         topBar.Controls.Add(btnConnect);
         topBar.Controls.Add(btnReadouts);
+        topBar.Controls.Add(btnLogs);
         repositionConnectBtn();
 
         // Row 2: Tab Navigation Buttons

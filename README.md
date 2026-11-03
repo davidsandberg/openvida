@@ -491,8 +491,22 @@ openvida/
 - [x] **Startup JBoss & SQL Service Health Probe**: Health sentinel checking database and backend readiness at launch with auto-recovery prompts.
 - [x] **MCP Server Evolution & In-App IPC Integration**: Built in-app Named Pipe server and unified Volvo MCP bridge connecting AI assistants to live car telemetry and offline factory data.
 - [x] **Standalone Windows Installer (`OpenVidaSetup.exe`)**: Turnkey 4-step Windows Setup Wizard with "Bring Your Own Data" archive/OVA/folder extraction, automated SQL Server database attachment, bundled 64-bit DiCE USB driver installation, persistent logging (`OpenVidaSetup.log`), and `pack_data.bat`.
+- [x] **Responsive Layout & Small Screen Audit**: Consolidated top status bar into single row with compact DiCE connect toggle; eliminated 450px of unused right boxes; removed redundant 28px legacy gray navigation ribbon across all tabs.
+- [x] **Diagnostic Readout Export & Backup (`readouts/`)**: Dual-format export of complete vehicle diagnostics in human-readable `.json` and native Volvo DRO `.xml` (`<Dro Version="1.0">`) with 1-click `[📁 Readouts]` top-bar button and auto-export on scan.
+- [x] **Post-Mortem Logging & Community Guidelines (`logs/`, `CONTRIBUTING.md`)**: Centralized rolling log system (`logs/openvida.log`), automated crash dump reports (`logs/crash_*.log`), in-app `[📋 Logs]` button, contribution guidelines, and GitHub issue templates encouraging AI coding assistant collaboration and alternative J2534 adapter testing.
 - [ ] **All-ECU DTC Clear ("Clear All Faults")**: In-car verification of DTC clearing routine over DiCE.
 - [ ] **Service Reset & Adaptations**: SRI reset, Battery Monitoring Sensor (BMS) reset, transmission adaptation counters.
+
+---
+
+## 10. Contributing, Community & Hardware Support
+
+OpenVIDA is in **active Community Technical Preview (Alpha)**. We welcome contributions from Volvo owners, independent mechanics, and software developers!
+
+- 📖 **Contribution Guidelines**: Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for code conventions, C# 4.0 architecture, and PR guidelines.
+- 🔌 **Alternative J2534 Adapters**: We actively encourage testing and compatibility reports for non-DiCE adapters (**Tactrix OpenPort 2.0**, **Scanmatik 2**, **VXDIAG VCX Nano**, **Mongoose JLR**).
+- 🤖 **AI-Assisted Contributions**: Feel free to use AI coding assistants (**Google Antigravity**, **Claude**, **ChatGPT**, **GitHub Copilot**) when exploring code, debugging, or submitting bug reports and pull requests!
+- 📋 **Logs & Crash Reports**: Find diagnostic logs anytime in `logs/openvida.log` or by clicking **`[📋 Logs]`** in OpenVIDA's top toolbar.
 
 ---
 
