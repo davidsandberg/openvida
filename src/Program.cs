@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -59,6 +59,7 @@ static partial class Program
     static object vehInfoInstance = null;
     static object vehProfile = null;
     static object diceEnumValue = null;
+    static TextBox _topBarTxtVin = null;
 
     [STAThread]
 
@@ -344,6 +345,7 @@ static partial class Program
         txtVin.SetBounds(298, 7, 175, 25);
 
         txtVin.ReadOnly = true;
+        _topBarTxtVin = txtVin;
 
         topBar.Controls.Add(txtVin);
 
@@ -1144,6 +1146,10 @@ static partial class Program
         else if (args.Length > 0 && Array.Exists(args, a => a == "/advanced-test" || a == "--advanced-test"))
         {
             StartAdvancedAuditSequence(vidaPath, mainForm, btnTabVehComm);
+        }
+        else if (args.Length > 0 && Array.Exists(args, a => a == "/car-test" || a == "--car-test"))
+        {
+            StartInCarTestSequence(vidaPath, mainForm, btnTabFaultTrace, btnTabNetwork, btnTabVehComm);
         }
 
         Console.WriteLine("[Launcher] Running Application message loop...");

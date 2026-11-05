@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -256,7 +256,7 @@ static partial class Program
         return resp;
     }
 
-    private static List<Dictionary<string, object>> RetrieveCurrentDtcs()
+    public static List<Dictionary<string, object>> RetrieveCurrentDtcs()
     {
         var list = new List<Dictionary<string, object>>();
 
@@ -326,7 +326,7 @@ static partial class Program
         return list;
     }
 
-    private static List<Dictionary<string, object>> RetrieveNetworkEcus()
+    public static List<Dictionary<string, object>> RetrieveNetworkEcus()
     {
         var list = new List<Dictionary<string, object>>();
 
@@ -387,7 +387,7 @@ static partial class Program
         return list;
     }
 
-    private static Dictionary<string, object> RetrieveLiveParameters(string ecu, Dictionary<string, object> req)
+    public static Dictionary<string, object> RetrieveLiveParameters(string ecu, Dictionary<string, object> req)
     {
         var dict = new Dictionary<string, object>();
 
