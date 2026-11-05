@@ -20,6 +20,10 @@ screenshots/*
 !screenshots/vehicle_comm_advanced.png
 !screenshots/workshop_repair_manual.png
 
+# Vehicle Diagnostic Readouts
+readouts/*
+!readouts/.gitkeep
+
 # Ignore original VIDA installation directory by default (databases, JDK, JBoss binaries)
 VIDA/*
 
