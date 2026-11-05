@@ -112,16 +112,15 @@ static partial class Program
                     MaskVinInControls(mainForm);
                     mainForm.DrawToBitmap(bmp, new Rectangle(0, 0, mainForm.Width, mainForm.Height));
 
-                    string ssPath = Path.Combine(vidaPath, @"..\" + fileName);
+                    string screensDir = Path.Combine(vidaPath, @"..\screenshots");
+                    if (!Directory.Exists(screensDir)) Directory.CreateDirectory(screensDir);
+                    string ssPath = Path.Combine(screensDir, fileName);
 
                     bmp.Save(ssPath, ImageFormat.Png);
-                    try
+                    if (fileName == "launcher_test_refinfo_dtc.png")
                     {
-                        string screensDir = Path.Combine(vidaPath, @"..\screenshots");
-                        if (!Directory.Exists(screensDir)) Directory.CreateDirectory(screensDir);
-                        bmp.Save(Path.Combine(screensDir, fileName), ImageFormat.Png);
+                        bmp.Save(Path.Combine(screensDir, "workshop_repair_manual.png"), ImageFormat.Png);
                     }
-                    catch {}
 
                     Console.WriteLine("[Launcher] Saved: " + ssPath);
 
@@ -504,7 +503,7 @@ static partial class Program
                     {
                         if (_ewdWebView != null && _ewdWebView.CoreWebView2 != null)
                         {
-                            string ssPath = Path.Combine(vidaPath, @"..\launcher_test_ewd.png");
+                            string ssPath = Path.Combine(vidaPath, @"..\screenshots\launcher_test_ewd.png");
                             if (File.Exists(ssPath))
                             {
                                 byte[] ssBytes = File.ReadAllBytes(ssPath);
@@ -842,6 +841,15 @@ static partial class Program
                                     Bitmap bmp = new Bitmap(mainForm.Width, mainForm.Height);
                                     mainForm.DrawToBitmap(bmp, new Rectangle(0, 0, mainForm.Width, mainForm.Height));
                                     bmp.Save(shotPath, ImageFormat.Png);
+                                    try
+                                    {
+                                        string screensDir = Path.Combine(vidaPath, @"..\screenshots");
+                                        if (!Directory.Exists(screensDir)) Directory.CreateDirectory(screensDir);
+                                        bmp.Save(Path.Combine(screensDir, "vehicle_comm_advanced.png"), ImageFormat.Png);
+                                        bmp.Save(Path.Combine(screensDir, "launcher_test_advanced_tab.png"), ImageFormat.Png);
+                                        Console.WriteLine("[AdvancedAudit] Saved Advanced tab screenshot to: " + Path.Combine(screensDir, "vehicle_comm_advanced.png"));
+                                    }
+                                    catch {}
                                     Console.WriteLine("[AdvancedAudit] Saved Advanced tab screenshot to: " + shotPath);
                                 }
                             }

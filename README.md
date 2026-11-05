@@ -47,13 +47,19 @@ Operating original VIDA in the modern era has become notoriously difficult:
 
 ## 2. Key Capabilities & The 6 Pillars
 
-```
-+----------------------------------------------------------------------------------------------------------+
-|                                           OpenVIDA Workspace                                             |
-+----------------------------------------------------------------------------------------------------------+
-| [🚗 Initial State] [🌐 Network] [⚡ Vehicle Comm] [📖 Ref Info] [📚 Manuals] [📦 Parts] [⚡ EWD]  ⇄ 🤖 MCP |
-+----------------------------------------------------------------------------------------------------------+
-```
+OpenVIDA runs natively on modern 64-bit Windows 10 and Windows 11 without virtual machines, Internet Explorer, or legacy browser plugins. It delivers full dealer-level bidirectional diagnostics, ECU service functions, live telemetry plotting, and instant access to the complete Volvo factory technical library.
+
+<p align="center">
+  <img src="screenshots/vehicle_comm_advanced.png" alt="OpenVIDA Vehicle Communication & Advanced Service Routines" width="900" />
+  <br>
+  <em>Figure 1: Vehicle Communication & Advanced Service Functions — Live ECU network topology, module status, and factory service routines (DPF soot burn, particle filter counter reset, injector adaptation, throttle calibration, and transmission learning).</em>
+</p>
+
+<p align="center">
+  <img src="screenshots/workshop_repair_manual.png" alt="OpenVIDA OEM Workshop Service Manuals & DTC Diagnostics" width="900" />
+  <br>
+  <em>Figure 2: Reference Information & Fault Tracing — Direct OEM repair documentation, DTC diagnostic decision trees, circuit conditions, and workshop procedures loaded instantaneously without legacy JBoss or Internet Explorer.</em>
+</p>
 
 ### 📊 Pillar 1: Live Sensor Telemetry & Streaming
 - **Multi-ECU Concurrent Polling**: Read and decode live CAN parameters simultaneously from engine (ECM), transmission (TCM), brakes (BCM), central electronics (CEM), and climate (CCM).
