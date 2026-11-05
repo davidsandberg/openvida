@@ -64,6 +64,10 @@ namespace OpenVidaInstaller
 
             if (isUninstall)
             {
+                if (!string.IsNullOrEmpty(uninstallTarget))
+                {
+                    uninstallTarget = uninstallTarget.Trim('"', '\'').TrimEnd('\\');
+                }
                 RunUninstallFlow(uninstallTarget, fromTemp, quietUninstall);
                 return;
             }
@@ -73,6 +77,22 @@ namespace OpenVidaInstaller
 
         private static void RunUninstallFlow(string targetDir, bool fromTemp, bool quiet)
         {
+            if (!string.IsNullOrEmpty(targetDir))
+            {
+                targetDir = targetDir.Trim('"', '\'').TrimEnd('\\');
+            }
+
+            try
+            {
+                Environment.CurrentDirectory = Path.GetTempPath();
+            }
+            catch { }
+
+            if (fromTemp)
+            {
+                Thread.Sleep(800);
+            }
+
             if (string.IsNullOrEmpty(targetDir))
             {
                 // Check if running inside an OpenVIDA installation directory
@@ -132,10 +152,13 @@ namespace OpenVidaInstaller
                     string tempExe = Path.Combine(Path.GetTempPath(), "OpenVidaUninstall_Runner.exe");
                     File.Copy(currentExe, tempExe, true);
                     string qArg = quiet ? " --quiet" : "";
-                    Process.Start(new ProcessStartInfo(tempExe, string.Format("--uninstall-from-temp \"{0}\"{1}", targetDir, qArg))
+                    ProcessStartInfo psiRunner = new ProcessStartInfo(tempExe, string.Format("--uninstall-from-temp \"{0}\"{1}", targetDir, qArg))
                     {
-                        UseShellExecute = false
-                    });
+                        UseShellExecute = false,
+                        WorkingDirectory = Path.GetTempPath()
+                    };
+                    Process.Start(psiRunner);
+                    Environment.Exit(0);
                     return;
                 }
                 catch { }
@@ -274,9 +297,14 @@ namespace OpenVidaInstaller
                 {
                     try
                     {
+                        if (p.Id == Process.GetCurrentProcess().Id) continue;
                         string pName = p.ProcessName;
                         if (string.Equals(pName, "VidaLauncher", StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(pName, "VidaMcp", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(pName, "OpenVidaUninstall", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(pName, "OpenVidaUninstall_Runner", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(pName, "Uninstall", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(pName, "OpenVidaSetup", StringComparison.OrdinalIgnoreCase) ||
                             string.Equals(pName, "java", StringComparison.OrdinalIgnoreCase))
                         {
                             bool match = true;
@@ -405,22 +433,82 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
             catch { }
 
             // 4. Delete targetDir (with retry loop while OS releases handles)
-            log("Step 4/4: Removing directory " + targetDir + "...");
-            for (int attempt = 1; attempt <= 6 && Directory.Exists(targetDir); attempt++)
+            log("Step 4/4: Removing directory " + targetDir + " and all files...");
+            try
             {
-                ProcessStartInfo psiRd = new ProcessStartInfo("cmd.exe", string.Format("/c rd /s /q \"{0}\"", targetDir))
+                Environment.CurrentDirectory = Path.GetTempPath();
+            }
+            catch { }
+
+            // Clear read-only and hidden attributes
+            try
+            {
+                if (Directory.Exists(targetDir))
                 {
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
-                using (Process pRd = Process.Start(psiRd))
-                {
-                    pRd.WaitForExit(30000);
+                    File.SetAttributes(targetDir, FileAttributes.Normal);
+                    foreach (string file in Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories))
+                    {
+                        try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
+                    }
                 }
+            }
+            catch { }
+
+            for (int attempt = 1; attempt <= 10 && Directory.Exists(targetDir); attempt++)
+            {
+                try
+                {
+                    ProcessStartInfo psiRd = new ProcessStartInfo("cmd.exe", string.Format("/c rd /s /q \"{0}\"", targetDir))
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WorkingDirectory = Path.GetTempPath()
+                    };
+                    using (Process pRd = Process.Start(psiRd))
+                    {
+                        pRd.WaitForExit(15000);
+                    }
+                }
+                catch { }
+
+                if (Directory.Exists(targetDir))
+                {
+                    try
+                    {
+                        Directory.Delete(targetDir, true);
+                    }
+                    catch { }
+                }
+
                 if (Directory.Exists(targetDir))
                 {
                     Thread.Sleep(600);
                 }
+            }
+
+            // If targetDir STILL exists (e.g. held briefly by open File Explorer window or antivirus scanner),
+            // launch a detached background script that retries removal once handles are completely released.
+            if (Directory.Exists(targetDir))
+            {
+                try
+                {
+                    string cleanupBat = Path.Combine(Path.GetTempPath(), "openvida_uninstall_cleanup.bat");
+                    File.WriteAllText(cleanupBat, string.Format(
+                        "@echo off\r\n" +
+                        ":retry\r\n" +
+                        "ping 127.0.0.1 -n 2 > nul\r\n" +
+                        "rd /s /q \"{0}\" > nul 2>&1\r\n" +
+                        "if exist \"{0}\" goto retry\r\n" +
+                        "del \"%~f0\" & exit\r\n", targetDir));
+                    ProcessStartInfo psiClean = new ProcessStartInfo("cmd.exe", "/c \"" + cleanupBat + "\"")
+                    {
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WorkingDirectory = Path.GetTempPath()
+                    };
+                    Process.Start(psiClean);
+                }
+                catch { }
             }
         }
     }
@@ -1639,7 +1727,9 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
                 string uninstallBat = Path.Combine(targetDir, "uninstall.bat");
                 File.WriteAllText(uninstallBat,
                     "@echo off\r\n" +
-                    "start \"\" \"%~dp0OpenVidaUninstall.exe\" --uninstall \"%~dp0\"\r\n");
+                    "set \"TARGET=%~dp0\"\r\n" +
+                    "if \"%TARGET:~-1%\"==\"\\\" set \"TARGET=%TARGET:~0,-1%\"\r\n" +
+                    "start \"\" \"%TARGET%\\OpenVidaUninstall.exe\" --uninstall \"%TARGET%\"\r\n");
 
                 string iconPath = Path.Combine(targetDir, @"assets\vida_icon.ico");
                 if (!File.Exists(iconPath)) iconPath = uninstallExe;
@@ -1648,13 +1738,14 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
                 {
                     if (k != null)
                     {
+                        string safeTarget = targetDir.TrimEnd('\\');
                         k.SetValue("DisplayName", "OpenVIDA Diagnostics (Volvo VIDA 2014D)");
                         k.SetValue("DisplayVersion", "2014D.1.0");
                         k.SetValue("Publisher", "OpenVIDA Project");
-                        k.SetValue("InstallLocation", targetDir);
+                        k.SetValue("InstallLocation", safeTarget);
                         k.SetValue("DisplayIcon", iconPath);
-                        k.SetValue("UninstallString", string.Format("\"{0}\" --uninstall \"{1}\"", uninstallExe, targetDir));
-                        k.SetValue("QuietUninstallString", string.Format("\"{0}\" --uninstall \"{1}\" --quiet", uninstallExe, targetDir));
+                        k.SetValue("UninstallString", string.Format("\"{0}\" --uninstall \"{1}\"", uninstallExe, safeTarget));
+                        k.SetValue("QuietUninstallString", string.Format("\"{0}\" --uninstall \"{1}\" --quiet", uninstallExe, safeTarget));
                         k.SetValue("NoModify", 1, RegistryValueKind.DWord);
                         k.SetValue("NoRepair", 1, RegistryValueKind.DWord);
                     }
