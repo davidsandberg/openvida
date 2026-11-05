@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -633,6 +633,7 @@ static partial class Program
                                             stTv.AfterSelect += (sAs, eAs) => {
                                                 btnExec.Enabled = (eAs.Node != null && eAs.Node.Nodes.Count == 0);
                                             };
+                                            stTv.VisibleChanged += (sVc, eVc) => { if (stTv.Visible) stTv.ExpandAll(); };
                                         }
 
                                         btnContainer.Controls.Add(btnExec);

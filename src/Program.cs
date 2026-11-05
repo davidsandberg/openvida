@@ -1141,6 +1141,10 @@ static partial class Program
         {
             StartEwdTestSequence(vidaPath, mainForm, _btnTabWiring);
         }
+        else if (args.Length > 0 && Array.Exists(args, a => a == "/advanced-test" || a == "--advanced-test"))
+        {
+            StartAdvancedAuditSequence(vidaPath, mainForm, btnTabVehComm);
+        }
 
         Console.WriteLine("[Launcher] Running Application message loop...");
 
