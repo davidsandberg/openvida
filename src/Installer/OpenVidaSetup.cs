@@ -536,6 +536,10 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern IntPtr SendMessage(IntPtr hWnd, int Msg, int wParam, IntPtr lParam);
 
+        private Icon _iconSmall = null;
+        private Icon _iconBig = null;
+        private Image _bannerLogo = null;
+
         private string _tempLogFilePath;
         private string _targetLogFilePath;
         private readonly object _logLock = new object();
@@ -590,11 +594,10 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
             {
                 try
                 {
-                    if (this.Icon != null)
-                    {
-                        SendMessage(this.Handle, 0x0080, 1, this.Icon.Handle);
-                        SendMessage(this.Handle, 0x0080, 0, this.Icon.Handle);
-                    }
+                    IntPtr hBig = _iconBig != null ? _iconBig.Handle : (this.Icon != null ? this.Icon.Handle : IntPtr.Zero);
+                    IntPtr hSmall = _iconSmall != null ? _iconSmall.Handle : (this.Icon != null ? this.Icon.Handle : IntPtr.Zero);
+                    if (hBig != IntPtr.Zero) SendMessage(this.Handle, 0x0080, 1, hBig);
+                    if (hSmall != IntPtr.Zero) SendMessage(this.Handle, 0x0080, 0, hSmall);
                 }
                 catch { }
             };
@@ -699,11 +702,27 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
                 if (File.Exists(localIcon))
                 {
                     this.Icon = new Icon(localIcon);
+                    try { _iconSmall = new Icon(localIcon, new Size(16, 16)); } catch { }
+                    try { _iconBig = new Icon(localIcon, new Size(48, 48)); } catch { }
                 }
                 else
                 {
                     Icon exeIcon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
-                    if (exeIcon != null) this.Icon = exeIcon;
+                    if (exeIcon != null)
+                    {
+                        this.Icon = exeIcon;
+                        _iconBig = exeIcon;
+                    }
+                }
+
+                string pngLogo = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"assets\vida_icon_512.png");
+                if (File.Exists(pngLogo))
+                {
+                    _bannerLogo = Image.FromFile(pngLogo);
+                }
+                else if (this.Icon != null)
+                {
+                    _bannerLogo = this.Icon.ToBitmap();
                 }
             }
             catch { }
@@ -734,16 +753,31 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
                 }
             };
 
-            Label lblBrandBadge = new Label
+            Control brandLogoControl;
+            if (_bannerLogo != null)
             {
-                Text = "⚡",
-                Font = new Font("Segoe UI", 22f, FontStyle.Bold),
-                ForeColor = Color.FromArgb(0, 210, 255),
-                BackColor = Color.Transparent,
-                Location = new Point(20, 16),
-                Size = new Size(48, 48),
-                TextAlign = ContentAlignment.MiddleCenter
-            };
+                brandLogoControl = new PictureBox
+                {
+                    Image = _bannerLogo,
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    BackColor = Color.Transparent,
+                    Location = new Point(18, 14),
+                    Size = new Size(54, 54)
+                };
+            }
+            else
+            {
+                brandLogoControl = new Label
+                {
+                    Text = "⚡",
+                    Font = new Font("Segoe UI", 22f, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(0, 210, 255),
+                    BackColor = Color.Transparent,
+                    Location = new Point(20, 16),
+                    Size = new Size(48, 48),
+                    TextAlign = ContentAlignment.MiddleCenter
+                };
+            }
 
             _lblStepTitle = new Label
             {
@@ -751,7 +785,7 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
                 Font = new Font("Segoe UI", 14.5f, FontStyle.Bold),
                 ForeColor = Color.White,
                 BackColor = Color.Transparent,
-                Location = new Point(74, 15),
+                Location = new Point(84, 15),
                 AutoSize = true,
                 UseMnemonic = false
             };
@@ -762,12 +796,12 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
                 Font = new Font("Segoe UI", 9.5f),
                 ForeColor = Color.FromArgb(175, 195, 220),
                 BackColor = Color.Transparent,
-                Location = new Point(76, 46),
+                Location = new Point(86, 46),
                 AutoSize = true,
                 UseMnemonic = false
             };
 
-            _headerPanel.Controls.Add(lblBrandBadge);
+            _headerPanel.Controls.Add(brandLogoControl);
             _headerPanel.Controls.Add(_lblStepTitle);
             _headerPanel.Controls.Add(_lblStepSubtitle);
 
