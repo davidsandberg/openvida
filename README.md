@@ -17,6 +17,15 @@
   <img src="https://img.shields.io/badge/License-Research%20%26%20Diagnostic-success.svg" alt="License" />
 </p>
 
+<p align="center">
+  <a href="https://github.com/davidsandberg/openvida/releases/latest">
+    <img src="https://img.shields.io/badge/Release-v0.1.0-blue.svg" alt="Latest Release" />
+  </a>
+  <a href="https://github.com/davidsandberg/openvida/releases/download/v0.1.0/OpenVidaSetup.exe">
+    <img src="https://img.shields.io/badge/Download-OpenVidaSetup.exe%20(v0.1.0)-success.svg?logo=windows" alt="Download OpenVidaSetup.exe" />
+  </a>
+</p>
+
 ---
 
 ## 📖 Table of Contents
