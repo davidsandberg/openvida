@@ -1,14 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
-    <!-- Background Vignette -->
-    <radialGradient id="bgGrad" cx="50%" cy="38%" r="68%">
-      <stop offset="0%" stop-color="#0e172a"/>
-      <stop offset="60%" stop-color="#0a0f1d"/>
-      <stop offset="100%" stop-color="#04060d"/>
-    </radialGradient>
-
-    <!-- Chrome Iron Gradient (Light/Top) -->
+    <!-- Chrome Metallic Gradients -->
     <linearGradient id="chromeLight" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#ffffff"/>
       <stop offset="25%" stop-color="#f8fafc"/>
@@ -16,157 +9,199 @@
       <stop offset="100%" stop-color="#94a3b8"/>
     </linearGradient>
 
-    <!-- Chrome Iron Gradient (Dark/Bottom) -->
     <linearGradient id="chromeDark" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#cbd5e1"/>
       <stop offset="35%" stop-color="#94a3b8"/>
       <stop offset="75%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+
+    <linearGradient id="ringGrad" x1="20%" y1="20%" x2="80%" y2="80%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="18%" stop-color="#f1f5f9"/>
+      <stop offset="50%" stop-color="#94a3b8"/>
+      <stop offset="82%" stop-color="#cbd5e1"/>
       <stop offset="100%" stop-color="#475569"/>
     </linearGradient>
 
-    <!-- Metallic Ring Gradient -->
-    <linearGradient id="ringGrad" x1="20%" y1="20%" x2="80%" y2="80%">
-      <stop offset="0%" stop-color="#ffffff"/>
-      <stop offset="20%" stop-color="#f1f5f9"/>
-      <stop offset="55%" stop-color="#94a3b8"/>
-      <stop offset="85%" stop-color="#cbd5e1"/>
-      <stop offset="100%" stop-color="#64748b"/>
-    </linearGradient>
-
-    <!-- Lens Glass Depth -->
-    <radialGradient id="lensDepth" cx="35%" cy="30%" r="70%">
-      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.32"/>
-      <stop offset="45%" stop-color="#0369a1" stop-opacity="0.16"/>
-      <stop offset="80%" stop-color="#082f49" stop-opacity="0.40"/>
-      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.60"/>
+    <!-- Deep Midnight-Sapphire Optical Glass Lens (Rich & High-Contrast) -->
+    <radialGradient id="lensDepth" cx="35%" cy="30%" r="72%">
+      <stop offset="0%" stop-color="#024775" stop-opacity="0.96"/>
+      <stop offset="35%" stop-color="#012b4d" stop-opacity="0.99"/>
+      <stop offset="70%" stop-color="#00162b" stop-opacity="1.0"/>
+      <stop offset="100%" stop-color="#000714" stop-opacity="1.0"/>
     </radialGradient>
 
-    <!-- Neon Wave Gradient -->
+    <!-- Electric Neon Cyan Gradient -->
     <linearGradient id="neonCyan" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#00f0ff"/>
-      <stop offset="45%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
       <stop offset="100%" stop-color="#00f0ff"/>
     </linearGradient>
 
-    <!-- Glass Specular Highlight -->
+    <!-- External Bus Line Gradient -->
+    <linearGradient id="busGradLeft" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0284c7" stop-opacity="0.2"/>
+      <stop offset="40%" stop-color="#0284c7" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="1.0"/>
+    </linearGradient>
+
+    <linearGradient id="busGradRight" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="1.0"/>
+      <stop offset="60%" stop-color="#0284c7" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#0284c7" stop-opacity="0.2"/>
+    </linearGradient>
+
+    <!-- Curved Glass Specular Highlight -->
     <linearGradient id="glassSheen" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#ffffff" stop-opacity="0.70"/>
-      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.15"/>
+      <stop offset="50%" stop-color="#ffffff" stop-opacity="0.12"/>
       <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
     </linearGradient>
 
-    <!-- Lens Clip Path -->
+    <!-- Lens Clip Circle -->
     <clipPath id="lensClip">
-      <circle cx="240" cy="208" r="90.0"/>
+      <circle cx="232.0" cy="280.0" r="156.0"/>
     </clipPath>
   </defs>
 
-  <!-- Base App Badge Squircle -->
-  <rect x="16" y="16" width="480" height="480" rx="108" ry="108" fill="url(#bgGrad)" stroke="#1e293b" stroke-width="3.5"/>
-  <rect x="22" y="22" width="468" height="468" rx="102" ry="102" fill="none" stroke="#334155" stroke-width="1.5" opacity="0.45"/>
+  <!-- ================= EXTERNAL VEHICLE BUS SIGNAL (LONGER & THICKER) ================= -->
+  <!-- Left Entry Signal (x = 4 to 86) -->
+  <!-- Dark underlay outline for grey taskbar contrast -->
+  <path d="M 4 280.0 L 82.0 280.0" 
+        fill="none" stroke="#08101e" stroke-width="13" stroke-linecap="round" opacity="0.6"/>
+  <!-- Primary colored bus line -->
+  <path d="M 4 280.0 L 82.0 280.0" 
+        fill="none" stroke="url(#busGradLeft)" stroke-width="8.5" stroke-linecap="round"/>
+  <!-- Luminous cyan core -->
+  <path d="M 6 280.0 L 82.0 280.0" 
+        fill="none" stroke="#00f0ff" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+  <!-- Pure white laser center -->
+  <path d="M 12 280.0 L 82.0 280.0" 
+        fill="none" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.95"/>
 
-  <!-- UNMAGNIFIED SIGNAL (Outside Lens) -->
-  <!-- Left Entry Baseline -->
-  <path d="M 44 208 L 116 208 L 124 202 L 134 214 L 142 208 L 143 208" 
-        fill="none" stroke="#0284c7" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
-  <!-- Right Exit Baseline -->
-  <path d="M 337 208 L 338 208 L 346 203 L 356 213 L 366 208 L 468 208" 
-        fill="none" stroke="#0284c7" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.45"/>
+  <!-- Right Exit Signal (x = 388 to 508) -->
+  <!-- Dark underlay outline -->
+  <path d="M 392.0 280.0 L 508 280.0" 
+        fill="none" stroke="#08101e" stroke-width="13" stroke-linecap="round" opacity="0.6"/>
+  <!-- Primary colored bus line -->
+  <path d="M 392.0 280.0 L 508 280.0" 
+        fill="none" stroke="url(#busGradRight)" stroke-width="8.5" stroke-linecap="round"/>
+  <!-- Luminous cyan core -->
+  <path d="M 392.0 280.0 L 506 280.0" 
+        fill="none" stroke="#00f0ff" stroke-width="3" stroke-linecap="round" opacity="0.9"/>
+  <!-- Pure white laser center -->
+  <path d="M 392.0 280.0 L 500 280.0" 
+        fill="none" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.95"/>
 
-  <!-- LENS CONTENTS (Inside the Magnifier) -->
+  <!-- ================= VOLVO MAGNIFIER WITH 3D SHADOW ================= -->
+  <!-- Ambient Vector Drop Shadow (Gives separation from grey or light backgrounds) -->
+  <circle cx="232.0" cy="287.0" r="194.0" fill="#040711" opacity="0.40"/>
+  <polygon points="472.0,47.0 382.0,47.0 427.0,92.0 472.0,137.0" fill="#040711" opacity="0.40"/>
+  <line x1="352.582" y1="166.418" x2="427.0" y2="92.0" stroke="#040711" stroke-width="40.0" stroke-linecap="square" opacity="0.40"/>
+
+  <!-- High-Contrast Perimeter Rim (Dark Slate #0a1120 for grey taskbar pop) -->
+  <circle cx="232.0" cy="280.0" r="194.5" fill="none" stroke="#090d16" stroke-width="5" opacity="0.85"/>
+
+  <!-- ================= OPTICAL GLASS LENS INTERIOR ================= -->
   <g clip-path="url(#lensClip)">
-    <!-- Optical Glass Tint -->
-    <circle cx="240" cy="208" r="100" fill="url(#lensDepth)"/>
+    <!-- Deep Midnight Sapphire Glass Backing -->
+    <circle cx="232.0" cy="280.0" r="157.0" fill="url(#lensDepth)"/>
 
-    <!-- Reticle Diagnostic Grid (Oscilloscope HUD) -->
-    <circle cx="240" cy="208" r="42" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3,4" opacity="0.22"/>
-    <circle cx="240" cy="208" r="74" fill="none" stroke="#38bdf8" stroke-width="1" stroke-dasharray="3,4" opacity="0.22"/>
-    <line x1="140" y1="208" x2="340" y2="208" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4,5" opacity="0.18"/>
-    <line x1="240" y1="108" x2="240" y2="308" stroke="#38bdf8" stroke-width="1" stroke-dasharray="4,5" opacity="0.18"/>
+    <!-- HUD Oscilloscope Reticle Grid -->
+    <circle cx="232.0" cy="280.0" r="75" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="5,6" opacity="0.25"/>
+    <circle cx="232.0" cy="280.0" r="128" fill="none" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="5,6" opacity="0.20"/>
+    <line x1="76.0" y1="280.0" x2="388.0" y2="280.0" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6,7" opacity="0.20"/>
+    <line x1="232.0" y1="124.0" x2="232.0" y2="436.0" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6,7" opacity="0.20"/>
 
     <!-- Center Crosshairs Ticks -->
-    <line x1="232" y1="208" x2="248" y2="208" stroke="#00f0ff" stroke-width="1.5" opacity="0.4"/>
-    <line x1="240" y1="200" x2="240" y2="216" stroke="#00f0ff" stroke-width="1.5" opacity="0.4"/>
+    <line x1="218.0" y1="280.0" x2="246.0" y2="280.0" stroke="#00f0ff" stroke-width="2.2" opacity="0.5"/>
+    <line x1="232.0" y1="266.0" x2="232.0" y2="294.0" stroke="#00f0ff" stroke-width="2.2" opacity="0.5"/>
 
     <!-- MAGNIFIED TELEMETRY WAVEFORM -->
-    <!-- Ambient Blur Glow -->
-    <path d="M 135 208 L 165 208 L 188 136 L 222 282 L 254 156 L 280 250 L 302 208 L 345 208"
-          fill="none" stroke="#00f0ff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round" opacity="0.25"/>
+    <!-- Wide Ambient Glow -->
+    <path d="M 74.0 280.0 L 137.0 280.0 L 172.0 158.0 L 220.0 406.0 L 270.0 192.0 L 312.0 332.0 L 347.0 280.0 L 390.0 280.0" fill="none" stroke="#00f0ff" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" opacity="0.32"/>
 
-    <!-- Primary Neon Wave -->
-    <path d="M 135 208 L 165 208 L 188 136 L 222 282 L 254 156 L 280 250 L 302 208 L 345 208"
-          fill="none" stroke="url(#neonCyan)" stroke-width="10.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Primary Neon Pulse Wave -->
+    <path d="M 74.0 280.0 L 137.0 280.0 L 172.0 158.0 L 220.0 406.0 L 270.0 192.0 L 312.0 332.0 L 347.0 280.0 L 390.0 280.0" fill="none" stroke="url(#neonCyan)" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
 
-    <!-- Crisp White Laser Core -->
-    <path d="M 135 208 L 165 208 L 188 136 L 222 282 L 254 156 L 280 250 L 302 208 L 345 208"
-          fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+    <!-- Intense White Laser Core -->
+    <path d="M 74.0 280.0 L 137.0 280.0 L 172.0 158.0 L 220.0 406.0 L 270.0 192.0 L 312.0 332.0 L 347.0 280.0 L 390.0 280.0" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.95"/>
 
-    <!-- Telemetry Sampling Nodes (Glowing Data Points) -->
-    <circle cx="165" cy="208" r="5.5" fill="#00f0ff"/>
-    <circle cx="165" cy="208" r="2.5" fill="#ffffff"/>
+    <!-- Glowing Telemetry Sampling Nodes -->
+    <circle cx="137.0" cy="280.0" r="9" fill="#00f0ff"/>
+    <circle cx="137.0" cy="280.0" r="4.2" fill="#ffffff"/>
 
-    <circle cx="188" cy="136" r="6.8" fill="#00f0ff"/>
-    <circle cx="188" cy="136" r="3" fill="#ffffff"/>
+    <circle cx="172.0" cy="158.0" r="11.5" fill="#00f0ff"/>
+    <circle cx="172.0" cy="158.0" r="5.2" fill="#ffffff"/>
 
-    <circle cx="222" cy="282" r="6.8" fill="#00f0ff"/>
-    <circle cx="222" cy="282" r="3.2" fill="#ffffff"/>
+    <circle cx="220.0" cy="406.0" r="11.5" fill="#00f0ff"/>
+    <circle cx="220.0" cy="406.0" r="5.2" fill="#ffffff"/>
 
-    <circle cx="254" cy="156" r="6.8" fill="#00f0ff"/>
-    <circle cx="254" cy="156" r="3" fill="#ffffff"/>
+    <circle cx="270.0" cy="192.0" r="11.5" fill="#00f0ff"/>
+    <circle cx="270.0" cy="192.0" r="5.2" fill="#ffffff"/>
 
-    <circle cx="302" cy="208" r="5.5" fill="#00f0ff"/>
-    <circle cx="302" cy="208" r="2.5" fill="#ffffff"/>
+    <circle cx="312.0" cy="332.0" r="9.5" fill="#00f0ff"/>
+    <circle cx="312.0" cy="332.0" r="4.5" fill="#ffffff"/>
 
-    <!-- Optical Lens Glass Reflection (Curved Sheen at top-left) -->
-    <path d="M 172 176 A 76 76 0 0 1 230 134" 
-          fill="none" stroke="url(#glassSheen)" stroke-width="5" stroke-linecap="round"/>
-    <path d="M 184 188 A 64 64 0 0 1 222 146" 
-          fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" opacity="0.3"/>
+    <circle cx="347.0" cy="280.0" r="9" fill="#00f0ff"/>
+    <circle cx="347.0" cy="280.0" r="4.2" fill="#ffffff"/>
+
+    <!-- Optical Convex Glass Specular Highlights (Top-Left Lens Sheen) -->
+    <path d="M 117.0 230.0 A 132 132 0 0 1 212.0 155.0" 
+          fill="none" stroke="url(#glassSheen)" stroke-width="9" stroke-linecap="round"/>
+    <path d="M 137.0 245.0 A 110 110 0 0 1 202.0 185.0" 
+          fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" opacity="0.32"/>
   </g>
 
-  <!-- LENS BEVEL & INNER SHADOW RIM -->
-  <circle cx="240" cy="208" r="90.0" fill="none" stroke="#0ea5e9" stroke-width="2" opacity="0.45"/>
-  <circle cx="240" cy="208" r="91.0" fill="none" stroke="#000000" stroke-width="1.5" opacity="0.55"/>
+  <!-- INNER LENS BEVEL & SHADOW RIM -->
+  <circle cx="232.0" cy="280.0" r="156.0" fill="none" stroke="#0284c7" stroke-width="3" opacity="0.5"/>
+  <circle cx="232.0" cy="280.0" r="157.0" fill="none" stroke="#00050d" stroke-width="3" opacity="0.85"/>
 
-  <!-- VOLVO IRON MARK (Outer Ring) -->
-  <circle cx="240" cy="208" r="100" fill="none" stroke="url(#ringGrad)" stroke-width="20"/>
-  <!-- Subtle 3D Edge Highlights -->
-  <circle cx="240" cy="208" r="109.3" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.45"/>
-  <circle cx="240" cy="208" r="90.7" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.45"/>
+  <!-- ================= VOLVO IRON MARK: BRUSHED CHROME RING ================= -->
+  <circle cx="232.0" cy="280.0" r="174.0" fill="none" stroke="url(#ringGrad)" stroke-width="36.0"/>
 
-  <!-- VOLVO ARROW (3D Faceted Chrome) -->
+  <!-- 3D Precision Chamfers on Ring -->
+  <circle cx="232.0" cy="280.0" r="191.0" fill="none" stroke="#ffffff" stroke-width="2.2" opacity="0.65"/>
+  <circle cx="232.0" cy="280.0" r="157.0" fill="none" stroke="#ffffff" stroke-width="1.8" opacity="0.45"/>
+
+  <!-- ================= VOLVO 3D ARROW ================= -->
   <g id="Volvo_Arrow">
-    <!-- Shaft -->
-    <line x1="309.29646455628165" y1="138.70353544371835" x2="352.0" y2="96.0" 
-          stroke="url(#ringGrad)" stroke-width="20" stroke-linecap="square"/>
-    <!-- Shaft top highlight -->
-    <line x1="305.79646455628165" y1="135.20353544371835" x2="348.5" y2="92.5" 
-          stroke="#ffffff" stroke-width="1.8" opacity="0.5"/>
+    <!-- Dark underlay on arrow contour -->
+    <line x1="352.582" y1="159.418" x2="427.0" y2="85.0" 
+          stroke="#090d16" stroke-width="41.0" stroke-linecap="square" opacity="0.85"/>
 
-    <!-- Arrowhead: Upper Facet (Light) -->
-    <polygon points="378,70 326,70 352.0,96.0" 
+    <!-- Arrow Shaft -->
+    <line x1="352.582" y1="159.418" x2="427.0" y2="85.0" 
+          stroke="url(#ringGrad)" stroke-width="36.0" stroke-linecap="square"/>
+    <!-- Top Specular Highlight on Shaft -->
+    <line x1="347.582" y1="154.418" x2="422.0" y2="80.0" 
+          stroke="#ffffff" stroke-width="2.5" opacity="0.7"/>
+
+    <!-- Arrowhead Underlay Contour -->
+    <polygon points="475.5,36.5 378.5,36.5 427.0,88.5 475.5,133.5" 
+             fill="#090d16" opacity="0.85"/>
+
+    <!-- Arrowhead Upper Facet (Luminous Light Chrome) -->
+    <polygon points="472.0,40.0 382.0,40.0 427.0,85.0" 
              fill="url(#chromeLight)"/>
 
-    <!-- Arrowhead: Lower Facet (Shadow) -->
-    <polygon points="378,70 352.0,96.0 378,122" 
+    <!-- Arrowhead Lower Facet (Deep Sculpted Shadow Chrome) -->
+    <polygon points="472.0,40.0 427.0,85.0 472.0,130.0" 
              fill="url(#chromeDark)"/>
 
-    <!-- Ridge & Outer Edges -->
-    <line x1="378" y1="70" x2="352.0" y2="96.0" 
-          stroke="#ffffff" stroke-width="1.8" stroke-linecap="round"/>
-    <polyline points="326,70 378,70 378,122" 
-              fill="none" stroke="#ffffff" stroke-width="1.2"/>
-  </g>
+    <!-- Arrowhead Ridge Highlight Line -->
+    <line x1="472.0" y1="40.0" x2="427.0" y2="85.0" 
+          stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
 
-  <!-- TYPOGRAPHY: OpenVIDA (Prominent & Clean, No Diagnostics subtext) -->
-  <g id="Wordmark">
-    <!-- Subtle drop shadow -->
-    <text x="256" y="436" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="800" font-size="64" fill="#000000" opacity="0.45" letter-spacing="2">
-      OpenVIDA
-    </text>
-    <!-- Main text -->
-    <text x="256" y="434" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="800" font-size="64" letter-spacing="2">
-      <tspan fill="#38bdf8">Open</tspan><tspan fill="#ffffff">VIDA</tspan>
-    </text>
+    <!-- Outer Boundary Highlights -->
+    <line x1="382.0" y1="40.0" x2="472.0" y2="40.0" 
+          stroke="#ffffff" stroke-width="2.5" opacity="0.85"/>
+    <line x1="472.0" y1="40.0" x2="472.0" y2="130.0" 
+          stroke="#cbd5e1" stroke-width="2" opacity="0.7"/>
+    <line x1="382.0" y1="40.0" x2="427.0" y2="85.0" 
+          stroke="#ffffff" stroke-width="2" opacity="0.5"/>
+    <line x1="427.0" y1="85.0" x2="472.0" y2="130.0" 
+          stroke="#334155" stroke-width="2.5" opacity="0.7"/>
   </g>
 </svg>
