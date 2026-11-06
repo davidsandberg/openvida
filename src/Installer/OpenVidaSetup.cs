@@ -568,7 +568,7 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
             _tempLogFilePath = Path.Combine(Path.GetTempPath(), "OpenVidaSetup.log");
             InitializeLogFile();
 
-            this.Text = "OpenVIDA — Standalone Diagnostic Suite Setup Wizard";
+            this.Text = "OpenVIDA Setup " + AppVersion.Tag + " — Standalone Diagnostic Suite";
             this.Size = new Size(760, 560);
             this.MinimumSize = new Size(720, 520);
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -767,7 +767,7 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
 
             Label lblVersion = new Label
             {
-                Text = "OpenVIDA v1.0 • Native Standalone",
+                Text = AppVersion.DisplayName + " • Native Standalone",
                 ForeColor = Color.FromArgb(110, 125, 145),
                 Font = new Font("Segoe UI", 8.5f),
                 Location = new Point(20, 21),
@@ -1739,8 +1739,8 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
                     if (k != null)
                     {
                         string safeTarget = targetDir.TrimEnd('\\');
-                        k.SetValue("DisplayName", "OpenVIDA Diagnostics (Volvo VIDA 2014D)");
-                        k.SetValue("DisplayVersion", "2014D.1.0");
+                        k.SetValue("DisplayName", "OpenVIDA " + AppVersion.Tag + " Diagnostics (Volvo VIDA 2014D)");
+                        k.SetValue("DisplayVersion", AppVersion.Version);
                         k.SetValue("Publisher", "OpenVIDA Project");
                         k.SetValue("InstallLocation", safeTarget);
                         k.SetValue("DisplayIcon", iconPath);

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -269,7 +269,7 @@ static partial class Program
         _mainLauncherForm = mainForm;
         StartOpenVidaIpcServer();
 
-        mainForm.Text = "OpenVIDA 2014D - Standalone Diagnostics";
+        mainForm.Text = "OpenVIDA " + AppVersion.Tag + " - Standalone Diagnostics";
 
         try
         {
@@ -367,6 +367,9 @@ static partial class Program
         TopBarCarStatusLabel.AutoSize = true;
         TopBarCarStatusLabel.Location = new Point(822, 10);
         TopBarCarStatusLabel.Cursor = Cursors.Hand;
+
+        ToolTip statusTip = new ToolTip();
+        statusTip.SetToolTip(TopBarCarStatusLabel, "DiCE Hardware & Battery Voltage Monitor\n\n🟢 Normal: >= 12.0 V\n⚠️ Warning: 11.5 - 11.9 V\n🛑 Critical: < 11.5 V\n\nClick to toggle DiCE connection.");
 
         Button btnConnect = new Button();
         btnConnect.Text = "Connect";

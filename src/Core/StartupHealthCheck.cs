@@ -12,7 +12,7 @@ static partial class Program
 {
     public static bool PerformStartupHealthCheck(string vidaPath)
     {
-        Console.WriteLine("[HealthCheck] Running OpenVIDA startup pre-flight health probe...");
+        Console.WriteLine("[HealthCheck] Running OpenVIDA " + AppVersion.Tag + " startup pre-flight health probe...");
 
         // 1. Verify SQL Server Responsiveness
         if (!EnsureSqlServerResponsive(vidaPath))

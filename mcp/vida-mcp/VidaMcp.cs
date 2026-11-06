@@ -54,7 +54,7 @@ class VidaMcpServer
             {
                 { "protocolVersion", "2024-11-05" },
                 { "capabilities", new Dictionary<string, object> { { "tools", new Dictionary<string, object>() } } },
-                { "serverInfo", new Dictionary<string, object> { { "name", "vida-mcp" }, { "version", "2.0.0" } } }
+                { "serverInfo", new Dictionary<string, object> { { "name", "vida-mcp" }, { "version", AppVersion.Version } } }
             };
             SendResult(id, result);
         }

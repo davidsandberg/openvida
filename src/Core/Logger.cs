@@ -40,7 +40,7 @@ public static class Logger
                 _initialized = true;
 
                 Info("Core", "================================================================================");
-                Info("Core", string.Format("OpenVIDA Diagnostic Session Started at {0}", DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")));
+                Info("Core", string.Format("OpenVIDA Diagnostic Session Started (Version {0}) at {1}", AppVersion.Tag, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")));
                 Info("Core", string.Format("Host OS: {0} ({1}), CLR: {2}, Process: {3}",
                     Environment.OSVersion,
                     Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit",
@@ -131,8 +131,31 @@ public static class Logger
         WriteEntry("DEBUG", component, message);
     }
 
+    private static bool _suppressingCommErrors = false;
+    private static int _suppressedCommErrorCount = 0;
+    private static DateTime _lastCommErrorLogTime = DateTime.MinValue;
+
+    public static void ResetCommErrorSuppression()
+    {
+        lock (_syncLock)
+        {
+            if (_suppressedCommErrorCount > 0)
+            {
+                WriteEntry("INFO", "CarStatus", string.Format("DiCE communication restored ({0} repeated disconnect errors suppressed).", _suppressedCommErrorCount), true);
+            }
+            _suppressingCommErrors = false;
+            _suppressedCommErrorCount = 0;
+        }
+    }
+
     public static void Error(string component, string message, Exception ex = null)
     {
+        if (ex != null && (ex.GetType().Name == "CommToolException" || (ex.Message != null && ex.Message.IndexOf("DEVICE_NOT_CONNECTED", StringComparison.OrdinalIgnoreCase) >= 0)))
+        {
+            WriteRawLog(message + ": " + ex.Message);
+            return;
+        }
+
         string fullMsg = message;
         if (ex != null)
         {
@@ -157,6 +180,38 @@ public static class Logger
             int closeIdx = line.IndexOf("]");
             component = line.Substring(1, closeIdx - 1).Trim();
             msg = line.Substring(closeIdx + 1).Trim();
+        }
+
+        // Suppress repeating DiCE disconnect errors
+        bool isCommDrop = msg.IndexOf("ReadSupplyKeypos caught an exception", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                          msg.IndexOf("CommToolException", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                          msg.IndexOf("DEVICE_NOT_CONNECTED", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                          msg.IndexOf("Failed to open J2534", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                          (msg.IndexOf("PassThruOpen", StringComparison.OrdinalIgnoreCase) >= 0 && msg.IndexOf("failed", StringComparison.OrdinalIgnoreCase) >= 0);
+
+        if (isCommDrop)
+        {
+            lock (_syncLock)
+            {
+                if (!_suppressingCommErrors)
+                {
+                    _suppressingCommErrors = true;
+                    _suppressedCommErrorCount = 0;
+                    _lastCommErrorLogTime = DateTime.Now;
+                    WriteEntry("WARN", "CarStatus", "DiCE disconnected or communication link lost. Halting rapid polling.", true);
+                    return;
+                }
+                else
+                {
+                    _suppressedCommErrorCount++;
+                    if ((DateTime.Now - _lastCommErrorLogTime).TotalSeconds >= 60)
+                    {
+                        _lastCommErrorLogTime = DateTime.Now;
+                        WriteEntry("DEBUG", "CarStatus", string.Format("DiCE remains offline ({0} communication retry errors dampened).", _suppressedCommErrorCount), false);
+                    }
+                    return;
+                }
+            }
         }
 
         string level = "INFO";

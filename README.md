@@ -65,7 +65,8 @@ OpenVIDA runs natively on modern 64-bit Windows 10 and Windows 11 without virtua
 - **Multi-ECU Concurrent Polling**: Read and decode live CAN parameters simultaneously from engine (ECM), transmission (TCM), brakes (BCM), central electronics (CEM), and climate (CCM).
 - **Auto-Scaling Graph View**: Live time-series plotter with dynamic 20% visual headroom padding to prevent clipping during sudden throttle or boost spikes.
 - **Watchlist Controls**: Rapidly add and remove parameters with top-bar actions (`[❌ Remove Item]`, `[🗑️ Clear All]`), <kbd>Delete</kbd> keyboard shortcuts, or right-click context menus.
-- **Battery & Key Position Monitoring**: Continuous real-time readout of terminal 30 battery voltage and ignition key position (Pos 0, Pos I, Pos II, Pos III).
+- **Continuous Top-Bar Battery Voltage Monitoring**: Real-time readout of Terminal 30 battery voltage directly in the top status bar (`🟢 DiCE-206751  |  ⚡ 12.4 V`) with color-coded safety thresholds (🟢 Normal $\ge 12.0\text{V}$, ⚠️ Warning $11.5 - 11.9\text{V}$, 🛑 Critical $< 11.5\text{V}$) to prevent battery depletion during flash routines or fault tracing.
+- **Resilient DiCE Disconnect & Auto-Recovery**: Gracefully handles unexpected USB or OBD-II disconnection without log floods or driver lockups; automatically detects hardware reconnection and restores polling without restarting the application.
 
 ### ⚡ Pillar 2: Bidirectional Actuators & Component Testing
 - **Physical Relay & Solenoid Control**: Command vehicle components directly over DiCE J2534 (e.g., fuel flap solenoid, front & rear washer sprinklers, stop lights, windshield wipers, cooling fans).
@@ -218,6 +219,24 @@ The build script invokes the native Microsoft .NET Framework C# compiler (`csc.e
 4. **`[4/4]` Packages Payload & Compiles `OpenVidaSetup.exe`**: Bundles all OpenVIDA binaries, `7z.exe`/`7z.dll`, `DiCE\Tools\Driver_amd64`, and `assets/ewd_nav_index.zip` into an embedded payload and compiles the standalone Windows Setup Wizard ([`src/Installer/OpenVidaSetup.cs`](src/Installer/OpenVidaSetup.cs)).
 
 Alternatively, you can open and build the project in Visual Studio using [`src/OpenVida.csproj`](src/OpenVida.csproj).
+
+### 🏷️ Releases & Version Synchronization
+
+OpenVIDA maintains a single-source revision model synchronized across `VidaLauncher.exe`, `OpenVidaSetup.exe`, `VidaMcp.exe`, and Windows Add/Remove Programs:
+
+1. **`VERSION`**: Plain text file at repository root specifying the active semantic version (e.g., `1.0.0`).
+2. **`build.bat`**: Automatically generates [`src/Core/VersionInfo.cs`](src/Core/VersionInfo.cs) on every build, baking the version attributes into all executables, installer banners, and MCP server info.
+3. **`set_version.ps1`**: One-step script to bump version, recompile suite and installer, and prepare GitHub release tags:
+
+```powershell
+# Bump revision and recompile all binaries & installer:
+.\set_version.ps1 1.1.0
+
+# Publish GitHub release tag:
+git commit -am "Release v1.1.0"
+git tag v1.1.0
+git push origin main --tags
+```
 
 ---
 

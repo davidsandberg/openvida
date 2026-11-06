@@ -146,7 +146,7 @@ static partial class Program
                 case "ping":
                     resp["status"] = "ok";
                     resp["app"] = "OpenVIDA";
-                    resp["version"] = "1.0.0";
+                    resp["version"] = AppVersion.Version;
                     resp["dice_connected"] = IsDiceConnected;
                     resp["mock_simulation"] = IsMockSimulation;
                     resp["battery_v"] = Math.Round(_lastKnownVoltVal, 2);

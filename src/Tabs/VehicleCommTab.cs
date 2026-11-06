@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -422,6 +422,7 @@ static partial class Program
                                 IsMockSimulation = chkMock.Checked;
                                 Console.WriteLine("[Launcher] Mock Simulation toggled: " + IsMockSimulation);
                                 updateVehCommStatusText();
+                                SyncMockSimulationStatus();
                                 if (!IsMockSimulation && wfInit != null && IsDiceConnected)
                                 {
                                     MethodInfo startM = wfInit.GetType().GetMethod("StartReading");
@@ -494,6 +495,7 @@ static partial class Program
                                                         chkMock.Checked = true;
                                                         IsMockSimulation = true;
                                                         updateVehCommStatusText();
+                                SyncMockSimulationStatus();
                                                     }
                                                     else if (actReq == VehicleRequiredAction.TryConnect)
                                                     {
@@ -669,6 +671,7 @@ static partial class Program
                                                     chkMock.Checked = true;
                                                     IsMockSimulation = true;
                                                     updateVehCommStatusText();
+                                SyncMockSimulationStatus();
                                                 }
                                                 else if (actReq == VehicleRequiredAction.TryConnect)
                                                 {
