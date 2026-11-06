@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -175,6 +175,25 @@ static partial class Program
                     resp["battery_v"] = Math.Round(_lastKnownVoltVal, 2);
                     break;
 
+                case "clear_dtcs":
+                case "clear_all_dtcs":
+                case "erase_dtcs":
+                    string clearEcu = req.ContainsKey("ecu") ? req["ecu"].ToString() : "ALL";
+                    bool force = req.ContainsKey("force") && Convert.ToBoolean(req["force"]);
+
+                    var eraseRes = ExecuteClearAllDtcs(interactive: !force, targetEcu: clearEcu, owner: _mainLauncherForm);
+                    resp["status"] = eraseRes.Success ? "ok" : (eraseRes.Cancelled ? "cancelled" : "error");
+                    resp["cleared"] = eraseRes.Success;
+                    resp["target_ecu"] = eraseRes.TargetEcu;
+                    resp["initial_dtcs"] = eraseRes.InitialCount;
+                    resp["cleared_dtcs"] = eraseRes.ClearedCount;
+                    resp["remaining_dtcs"] = eraseRes.RemainingCount;
+                    resp["dtcs"] = eraseRes.RemainingDtcs;
+                    resp["battery_v"] = eraseRes.BatteryVoltage;
+                    resp["message"] = eraseRes.Message;
+                    resp["mock_simulation"] = IsMockSimulation;
+                    break;
+
                 case "get_network_status":
                 case "scan_network":
                     resp["status"] = "ok";
@@ -260,6 +279,11 @@ static partial class Program
     {
         var list = new List<Dictionary<string, object>>();
 
+        if (_simulatedDtcsCleared && (!IsDiceConnected || IsMockSimulation))
+        {
+            return list;
+        }
+
         try
         {
             if (_activeDtcFaulttraceWf != null)
@@ -298,7 +322,7 @@ static partial class Program
         }
 
         // Fallback / mock simulation sample DTCs if no active readout exists
-        if (list.Count == 0 && IsMockSimulation)
+        if (list.Count == 0 && IsMockSimulation && !_simulatedDtcsCleared)
         {
             list.Add(new Dictionary<string, object>
             {

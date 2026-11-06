@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -1131,5 +1131,116 @@ static partial class Program
         };
 
         carTimer.Start();
+    }
+
+    public static void StartClearDtcTestSequence(string vidaPath, Form mainForm, Button btnTabFaultTrace, Action<string> switchTab, Action<Button> setActiveTabButton)
+    {
+        Console.WriteLine("[DtcTest] ============================================================");
+        Console.WriteLine("[DtcTest] Starting Automated DTC Erase / Clear Faults Verification");
+        Console.WriteLine("[DtcTest] ============================================================");
+
+        IsMockSimulation = true;
+        _simulatedDtcsCleared = false;
+        mainForm.Width = 1280;
+        mainForm.Height = 820;
+        MaskVinInControls(mainForm);
+
+        string screensDir = Path.Combine(vidaPath, @"..\screenshots");
+        if (!Directory.Exists(screensDir)) Directory.CreateDirectory(screensDir);
+
+        Timer testTimer = new Timer();
+        testTimer.Interval = 1200;
+        int step = 0;
+
+        testTimer.Tick += (s, e) =>
+        {
+            testTimer.Stop();
+            try
+            {
+                switch (step)
+                {
+                    case 0:
+                        Console.WriteLine("[DtcTest] Step 1: Navigating to FAULT TRACE tab...");
+                        switchTab("_customerSymptomsFaultTraceButton_Click");
+                        setActiveTabButton(btnTabFaultTrace);
+                        MaskVinInControls(mainForm);
+
+                        step = 1;
+                        testTimer.Interval = 2000;
+                        testTimer.Start();
+                        break;
+
+                    case 1:
+                        var initialDtcs = RetrieveCurrentDtcs();
+                        Console.WriteLine(string.Format("[DtcTest] Step 2: Verifying initial stored DTCs: {0} faults found.", initialDtcs.Count));
+                        if (initialDtcs.Count == 0)
+                        {
+                            Console.WriteLine("[DtcTest] [FAIL] Expected initial DTCs to be present for test!");
+                            Environment.Exit(1);
+                        }
+
+                        // Capture before-erase screenshot
+                        MaskVinInControls(mainForm);
+                        string beforeShot = Path.Combine(screensDir, "launcher_test_dtc_before_erase.png");
+                        Bitmap bmpBefore = new Bitmap(mainForm.Width, mainForm.Height);
+                        mainForm.DrawToBitmap(bmpBefore, new Rectangle(0, 0, mainForm.Width, mainForm.Height));
+                        bmpBefore.Save(beforeShot, ImageFormat.Png);
+                        Console.WriteLine("[DtcTest] Captured before-erase screenshot: " + beforeShot);
+
+                        step = 2;
+                        testTimer.Interval = 1000;
+                        testTimer.Start();
+                        break;
+
+                    case 2:
+                        Console.WriteLine("[DtcTest] Step 3: Triggering All-ECU DTC Clear routine...");
+                        var eraseRes = ExecuteClearAllDtcs(interactive: false, targetEcu: "ALL", owner: mainForm);
+                        Console.WriteLine(string.Format("[DtcTest] DTC Clear executed: Success={0}, Cleared={1}, Remaining={2}",
+                            eraseRes.Success, eraseRes.ClearedCount, eraseRes.RemainingCount));
+
+                        if (!eraseRes.Success)
+                        {
+                            Console.WriteLine("[DtcTest] [FAIL] ExecuteClearAllDtcs returned failure!");
+                            Environment.Exit(1);
+                        }
+
+                        step = 3;
+                        testTimer.Interval = 2000;
+                        testTimer.Start();
+                        break;
+
+                    case 3:
+                        Console.WriteLine("[DtcTest] Step 4: Verifying post-clear state and Delivery view...");
+                        var remainingDtcs = RetrieveCurrentDtcs();
+                        Console.WriteLine(string.Format("[DtcTest] Post-clear DTC count: {0} faults remaining.", remainingDtcs.Count));
+
+                        if (remainingDtcs.Count != 0)
+                        {
+                            Console.WriteLine("[DtcTest] [FAIL] Expected 0 remaining DTCs after Clear All!");
+                            Environment.Exit(1);
+                        }
+
+                        MaskVinInControls(mainForm);
+                        string afterShot = Path.Combine(screensDir, "launcher_test_dtc_cleared.png");
+                        Bitmap bmpAfter = new Bitmap(mainForm.Width, mainForm.Height);
+                        mainForm.DrawToBitmap(bmpAfter, new Rectangle(0, 0, mainForm.Width, mainForm.Height));
+                        bmpAfter.Save(afterShot, ImageFormat.Png);
+                        Console.WriteLine("[DtcTest] Captured post-clear screenshot: " + afterShot);
+
+                        Console.WriteLine("[DtcTest] ============================================================");
+                        Console.WriteLine("[DtcTest] ALL DTC ERASE VERIFICATION CHECKS PASSED!");
+                        Console.WriteLine("[DtcTest] ============================================================");
+                        Environment.Exit(0);
+                        break;
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[DtcTest] ERROR during DTC test: " + ex);
+                Environment.Exit(1);
+            }
+        };
+
+        testTimer.Start();
     }
 }

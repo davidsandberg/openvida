@@ -145,6 +145,24 @@ class VidaMcpServer
             }
         });
 
+        // 3b. clear_dtcs
+        list.Add(new Dictionary<string, object>
+        {
+            { "name", "clear_dtcs" },
+            { "description", "Clears Diagnostic Trouble Codes (DTCs) across all ECUs (or a specified ECU) over Volvo DiCE J2534 CAN, verifies battery voltage, cycles module state, and executes post-clear verification readout." },
+            { "inputSchema", new Dictionary<string, object>
+                {
+                    { "type", "object" },
+                    { "properties", new Dictionary<string, object>
+                        {
+                            { "ecu", new Dictionary<string, object> { { "type", "string" }, { "description", "Target ECU abbreviation (default: 'ALL', or specific ECU like 'ECM', 'BCM', 'CCM')." } } },
+                            { "force", new Dictionary<string, object> { { "type", "boolean" }, { "description", "Bypass interactive confirmation prompt and execute directly (default: true)." } } }
+                        }
+                    }
+                }
+            }
+        });
+
         // 4. read_parameters
         list.Add(new Dictionary<string, object>
         {
@@ -304,6 +322,12 @@ class VidaMcpServer
                 return ToolScanNetwork();
             case "read_active_dtcs":
                 return ToolReadActiveDtcs();
+            case "clear_dtcs":
+            case "clear_all_dtcs":
+            case "erase_dtcs":
+                string clrEcu = args.ContainsKey("ecu") ? args["ecu"].ToString() : "ALL";
+                bool clrForce = !args.ContainsKey("force") || Convert.ToBoolean(args["force"]);
+                return ToolClearDtcs(clrEcu, clrForce);
             case "read_parameters":
                 string pEcu = args.ContainsKey("ecu") ? args["ecu"].ToString() : "ECM";
                 return ToolReadParameters(pEcu);
@@ -528,6 +552,80 @@ class VidaMcpServer
         else
         {
             sb.AppendLine("No DTC data returned from vehicle session.");
+        }
+
+        return sb.ToString();
+    }
+
+    // -------------------------------------------------------------
+    // TOOL: clear_dtcs
+    // -------------------------------------------------------------
+    private static string ToolClearDtcs(string ecu, bool force)
+    {
+        var parameters = new Dictionary<string, object>
+        {
+            { "ecu", string.IsNullOrEmpty(ecu) ? "ALL" : ecu },
+            { "force", force }
+        };
+
+        Dictionary<string, object> resp;
+        if (!TrySendIpcRequest("clear_dtcs", parameters, out resp, 12000))
+        {
+            return GetOpenVidaNotRunningPrompt("broadcast the CAN DTC Erase command to vehicle modules");
+        }
+
+        var sb = new StringBuilder();
+        sb.AppendLine("### 🗑️ Volvo Diagnostic Trouble Code (DTC) Clear Routine");
+        sb.AppendLine();
+
+        bool cleared = resp.ContainsKey("cleared") && Convert.ToBoolean(resp["cleared"]);
+        string msg = resp.ContainsKey("message") ? resp["message"].ToString() : "";
+        int initial = resp.ContainsKey("initial_dtcs") ? Convert.ToInt32(resp["initial_dtcs"]) : 0;
+        int clearedCount = resp.ContainsKey("cleared_dtcs") ? Convert.ToInt32(resp["cleared_dtcs"]) : 0;
+        int remaining = resp.ContainsKey("remaining_dtcs") ? Convert.ToInt32(resp["remaining_dtcs"]) : 0;
+        double battV = resp.ContainsKey("battery_v") ? Convert.ToDouble(resp["battery_v"]) : 0.0;
+        string targetEcu = resp.ContainsKey("target_ecu") ? resp["target_ecu"].ToString() : "ALL";
+
+        sb.AppendLine(string.Format("- **Target Scope:** `{0}`", targetEcu == "ALL" ? "All Online ECUs (HS-CAN & LS-CAN)" : targetEcu));
+        sb.AppendLine(string.Format("- **Battery Terminal 30:** {0:F2} V", battV));
+        sb.AppendLine(string.Format("- **Initial Stored Faults:** {0}", initial));
+        sb.AppendLine(string.Format("- **Faults Cleared:** {0}", clearedCount));
+        sb.AppendLine(string.Format("- **Remaining Faults:** {0}", remaining));
+        sb.AppendLine();
+
+        if (cleared && remaining == 0)
+        {
+            sb.AppendLine("✅ **All Diagnostic Trouble Codes successfully cleared across all vehicle control modules.**");
+            sb.AppendLine();
+            sb.AppendLine("Post-clear verification scan (`ReadAllForDelivery`) confirmed **0 active faults** remaining.");
+        }
+        else if (cleared && remaining > 0)
+        {
+            sb.AppendLine(string.Format("⚠️ **DTC clearing executed, but {0} fault(s) remain active:**", remaining));
+            sb.AppendLine();
+
+            if (resp.ContainsKey("dtcs") && resp["dtcs"] is System.Collections.IEnumerable)
+            {
+                var dtcs = (System.Collections.IEnumerable)resp["dtcs"];
+                sb.AppendLine("| DTC Code | ECU | Status | Description |");
+                sb.AppendLine("| :--- | :--- | :--- | :--- |");
+                foreach (object dtcObj in dtcs)
+                {
+                    var dict = dtcObj as Dictionary<string, object>;
+                    if (dict == null) continue;
+                    string code = dict.ContainsKey("code") ? dict["code"].ToString() : "";
+                    string dEcu = dict.ContainsKey("ecu") ? dict["ecu"].ToString() : "";
+                    string st = dict.ContainsKey("status") ? dict["status"].ToString() : "";
+                    string desc = dict.ContainsKey("description") ? dict["description"].ToString() : "";
+                    sb.AppendLine(string.Format("| **{0}** | {1} | {2} | {3} |", code, dEcu, st, desc));
+                }
+            }
+            sb.AppendLine();
+            sb.AppendLine("💡 *Notice: Remaining faults represent permanent hardware faults (e.g. open circuits, failed sensors) that were immediately re-flagged by self-diagnostics.*");
+        }
+        else
+        {
+            sb.AppendLine(string.Format("❌ **DTC Clear failed or was cancelled:** {0}", msg));
         }
 
         return sb.ToString();

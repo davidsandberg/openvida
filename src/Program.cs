@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -60,6 +60,7 @@ static partial class Program
     static object vehProfile = null;
     static object diceEnumValue = null;
     static TextBox _topBarTxtVin = null;
+    static Label _topBarLblInfo = null;
 
     [STAThread]
 
@@ -355,6 +356,7 @@ static partial class Program
         lblInfo.ForeColor = Color.FromArgb(60, 64, 67);
         lblInfo.AutoSize = true;
         lblInfo.Location = new Point(485, 10);
+        _topBarLblInfo = lblInfo;
         topBar.Controls.Add(lblInfo);
 
         TopBarCarStatusLabel = new Label();
@@ -731,6 +733,10 @@ static partial class Program
                             {
 
                                 tabCtrl.GetType().GetProperty("SelectedIndex").SetValue(tabCtrl, 0, null);
+                                InstallFaultTraceActionBar(csftForm, mainForm);
+                                var curDtcs = RetrieveCurrentDtcs();
+                                UpdateTopBarDtcCount(curDtcs.Count);
+                                UpdateFaultTraceActionBarStatus(curDtcs.Count);
 
                             }
 
@@ -1150,6 +1156,10 @@ static partial class Program
         else if (args.Length > 0 && Array.Exists(args, a => a == "/car-test" || a == "--car-test"))
         {
             StartInCarTestSequence(vidaPath, mainForm, btnTabFaultTrace, btnTabNetwork, btnTabVehComm);
+        }
+        else if (args.Length > 0 && Array.Exists(args, a => a == "/clear-dtc-test" || a == "--clear-dtc-test"))
+        {
+            StartClearDtcTestSequence(vidaPath, mainForm, btnTabFaultTrace, switchTab, setActiveTabButton);
         }
 
         Console.WriteLine("[Launcher] Running Application message loop...");

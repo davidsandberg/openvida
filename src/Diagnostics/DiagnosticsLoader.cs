@@ -319,6 +319,16 @@ static partial class Program
 
                             object wf = wfField != null ? wfField.GetValue(form) : null;
                             _activeDtcFaulttraceWf = wf;
+                            _activeCustomerSymptomsFaultTraceForm = form;
+
+                            try
+                            {
+                                InstallFaultTraceActionBar(form, _mainLauncherForm);
+                            }
+                            catch (Exception exActionBar)
+                            {
+                                Console.WriteLine("[Launcher] InstallFaultTraceActionBar notice: " + exActionBar.Message);
+                            }
 
                             try
                             {

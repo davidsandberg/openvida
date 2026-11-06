@@ -260,6 +260,7 @@ Add the `vida-mcp` server definition to your client configuration file (e.g. `cl
 | **`dice_status`** | *None* | Checks physical DiCE connection, real-time terminal 30 battery voltage (mV and V), ignition key position, and profile. |
 | **`scan_network`** | *None* | Scans HS-CAN (500 kbps) and LS-CAN (125 kbps) buses for all responding ECUs (ECM, TCM, BCM, CEM, DIM, CCM, REM, etc.). |
 | **`read_active_dtcs`** | *None* | Reads currently active Diagnostic Trouble Codes (DTCs), fault states (Permanent / Intermittent), and ECU sources directly from the car. |
+| **`clear_dtcs`** | `ecu` *(optional, default "ALL")*, `force` *(optional)* | Broadcasts UDS Service 0x14 over CAN to clear stored DTCs, verifies battery voltage, prompts ignition cycle, and executes post-clear verification readout. |
 | **`read_parameters`** | `ecu` *(optional, e.g. "ECM", "CCM", "BCM")* | Streams real-time ECU live sensor data (RPM, coolant temperature, mass air flow, throttle angle, damper angles, wheel speeds). |
 
 ##### 📚 Factory Technical Library & Knowledge Base (100% Offline)
@@ -384,7 +385,7 @@ flowchart TD
     subgraph MCPBridge["VidaMcp.exe (MCP Bridge)"]
         Server["MCP Server (JSON-RPC stdio)"]
         Router{"Tool Dispatcher"}
-        LiveTools["Live Telemetry Tools\n(dice_status, scan_network,\nread_active_dtcs, read_parameters)"]
+        LiveTools["Live Telemetry Tools\n(dice_status, scan_network,\nread_active_dtcs, clear_dtcs,\nread_parameters)"]
         OfflineTools["Technical Library Tools\n(lookup_dtc, search_repair_manual,\nsearch_parts_catalog, get_wiring_schematic)"]
     end
 
@@ -421,7 +422,7 @@ flowchart TD
 
 #### Dual-Path Execution Model
 1. **Live Car Path (Arbitrated via IPC)**:
-   - When the AI invokes `dice_status`, `scan_network`, `read_active_dtcs`, or `read_parameters`, `VidaMcp.exe` connects to the local Windows Named Pipe `\\.\pipe\openvida_rpc` hosted by [`OpenVidaIpcServer.cs`](src/Core/OpenVidaIpcServer.cs).
+   - When the AI invokes `dice_status`, `scan_network`, `read_active_dtcs`, `clear_dtcs`, or `read_parameters`, `VidaMcp.exe` connects to the local Windows Named Pipe `\\.\pipe\openvida_rpc` hosted by [`OpenVidaIpcServer.cs`](src/Core/OpenVidaIpcServer.cs).
    - `VidaLauncher` streams live telemetry, active DTCs, and network status directly from its active in-memory session without relinquishing the physical DiCE J2534 hardware lock.
    - If `VidaLauncher` is closed, `VidaMcp.exe` intercepts the call and returns an informative prompt guiding the user to start OpenVIDA, completely avoiding device contention or unhandled exceptions.
 
@@ -458,7 +459,8 @@ openvida/
 │   │   └── ActuationPreflightDialog.cs # Pre-actuation prerequisite verification
 │   ├── Diagnostics/                 # Diagnostic sessions & vehicle readout
 │   │   ├── DiagnosticsLoader.cs     # DiagApplication initialization & session binding
-│   │   └── VehicleReadoutHandler.cs # All-ECU fault readout & DTC processing
+│   │   ├── VehicleReadoutHandler.cs # All-ECU fault readout & DTC processing
+│   │   ├── DtcEraseManager.cs       # Pre-flight safeguards, ignition cycling & all-ECU DTC clear
 │   ├── Documents/                   # Documentation & rendering engine
 │   │   ├── DocumentResolver.cs      # Symptom & DTC to document ID mapper
 │   │   ├── DocumentHtmlRenderer.cs  # XML-to-HTML parser with inline images & notes
@@ -500,7 +502,7 @@ openvida/
 - [x] **Responsive Layout & Small Screen Audit**: Consolidated top status bar into single row with compact DiCE connect toggle; eliminated 450px of unused right boxes; removed redundant 28px legacy gray navigation ribbon across all tabs.
 - [x] **Diagnostic Readout Export & Backup (`readouts/`)**: Dual-format export of complete vehicle diagnostics in human-readable `.json` and native Volvo DRO `.xml` (`<Dro Version="1.0">`) with 1-click `[📁 Readouts]` top-bar button and auto-export on scan.
 - [x] **Post-Mortem Logging & Community Guidelines (`logs/`, `CONTRIBUTING.md`)**: Centralized rolling log system (`logs/openvida.log`), automated crash dump reports (`logs/crash_*.log`), in-app `[📋 Logs]` button, contribution guidelines, and GitHub issue templates encouraging AI coding assistant collaboration and alternative J2534 adapter testing.
-- [ ] **All-ECU DTC Clear ("Clear All Faults")**: In-car verification of DTC clearing routine over DiCE.
+- [x] **All-ECU DTC Clear ("Clear All Faults")**: High-speed broadcast UDS 0x14 fault clearing across all alive ECUs over DiCE J2534, featuring pre-flight battery voltage safeguards, KOEO ignition cycling guidance, post-erase verification readout (`ReadAllForDelivery`), prominent UI action bar, CLI test runner (`--clear-dtc-test`), and MCP AI tool (`clear_dtcs`).
 - [ ] **Service Reset & Adaptations**: SRI reset, Battery Monitoring Sensor (BMS) reset, transmission adaptation counters.
 
 ---

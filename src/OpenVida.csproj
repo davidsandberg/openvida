@@ -87,6 +87,7 @@
     <Compile Include="Hardware\ActuationPreflightDialog.cs" />
     <Compile Include="Diagnostics\DiagnosticsLoader.cs" />
     <Compile Include="Diagnostics\VehicleReadoutHandler.cs" />
+    <Compile Include="Diagnostics\DtcEraseManager.cs" />
     <Compile Include="Documents\DocumentResolver.cs" />
     <Compile Include="Documents\DocumentHtmlRenderer.cs" />
     <Compile Include="Documents\DocumentViewerWindow.cs" />
