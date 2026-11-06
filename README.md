@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/vida_icon_512.png" alt="OpenVIDA Logo" width="180" height="180" />
+  <img src="assets/openvida_icon.png" alt="OpenVIDA Logo" width="190" height="190" />
 </p>
 
 <h1 align="center">OpenVIDA</h1>
