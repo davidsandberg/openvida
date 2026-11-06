@@ -8,6 +8,7 @@ using System.Drawing.Imaging;
 using System.Globalization;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
@@ -19,6 +20,12 @@ using Vcc.Vida.DiagSwdl.UI.Diagnostics;
 
 static partial class Program
 {
+    [DllImport("shell32.dll", SetLastError = true)]
+    private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int Msg, int wParam, IntPtr lParam);
+
     public static bool IsMockSimulation = false;
 
     const string TargetVIN = "YV1BW5251B1189886";
@@ -271,15 +278,44 @@ static partial class Program
 
         mainForm.Text = "OpenVIDA " + AppVersion.Tag + " - Standalone Diagnostics";
 
+        mainForm.ShowIcon = true;
+        try
+        {
+            SetCurrentProcessExplicitAppUserModelID("OpenVIDA.Diagnostics.App");
+        }
+        catch {}
+
         try
         {
             string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vida_icon.ico");
+            if (!File.Exists(icoPath))
+            {
+                string cand = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\..\..\assets\vida_icon.ico");
+                if (File.Exists(cand)) icoPath = cand;
+            }
+
             if (File.Exists(icoPath))
                 mainForm.Icon = new Icon(icoPath);
             else
                 mainForm.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
         }
-        catch {}
+        catch (Exception exIco)
+        {
+            Console.WriteLine("[Launcher] Warning loading icon: " + exIco.Message);
+        }
+
+        mainForm.HandleCreated += (sH, eH) =>
+        {
+            try
+            {
+                if (mainForm.Icon != null)
+                {
+                    SendMessage(mainForm.Handle, 0x0080, 1, mainForm.Icon.Handle);
+                    SendMessage(mainForm.Handle, 0x0080, 0, mainForm.Icon.Handle);
+                }
+            }
+            catch {}
+        };
 
         mainForm.Width = 1366;
 

@@ -13,6 +13,7 @@ using System.Text;
 using System.Threading;
 using System.Windows.Forms;
 using Microsoft.Win32;
+using System.Runtime.InteropServices;
 
 namespace OpenVidaInstaller
 {
@@ -20,11 +21,15 @@ namespace OpenVidaInstaller
     {
         public static bool TestUiMode = false;
 
+        [DllImport("shell32.dll", SetLastError = true)]
+        private static extern int SetCurrentProcessExplicitAppUserModelID([MarshalAs(UnmanagedType.LPWStr)] string AppID);
+
         [STAThread]
         static void Main(string[] args)
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            try { SetCurrentProcessExplicitAppUserModelID("OpenVIDA.Installer"); } catch { }
 
             bool isUninstall = Path.GetFileNameWithoutExtension(Application.ExecutablePath)
                 .IndexOf("Uninstall", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -528,6 +533,9 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
         private Panel[] _pages;
 
         // Persistent Log File Paths
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        private static extern IntPtr SendMessage(IntPtr hWnd, int Msg, int wParam, IntPtr lParam);
+
         private string _tempLogFilePath;
         private string _targetLogFilePath;
         private readonly object _logLock = new object();
@@ -577,6 +585,19 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
             this.BackColor = Color.FromArgb(245, 247, 250);
             this.Font = new Font("Segoe UI", 9.25f);
 
+            this.ShowIcon = true;
+            this.HandleCreated += (s, e) =>
+            {
+                try
+                {
+                    if (this.Icon != null)
+                    {
+                        SendMessage(this.Handle, 0x0080, 1, this.Icon.Handle);
+                        SendMessage(this.Handle, 0x0080, 0, this.Icon.Handle);
+                    }
+                }
+                catch { }
+            };
             TryLoadEmbeddedIcon();
             BuildLayout();
             ShowStep(0);
