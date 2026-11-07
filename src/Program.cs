@@ -133,7 +133,7 @@ static partial class Program
 
         if (TopBarDeviceSelectButton != null && !TopBarDeviceSelectButton.IsDisposed)
         {
-            TopBarDeviceSelectButton.Text = "🔌 " + newTool.Name + " ▾";
+            TopBarDeviceSelectButton.Text = " " + newTool.Name + " ▾";
         }
         if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed)
         {
@@ -357,37 +357,42 @@ static partial class Program
         }
         catch {}
 
-        try
-        {
-            string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vida_icon.ico");
-            if (!File.Exists(icoPath))
-            {
-                string cand = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\..\..\assets\vida_icon.ico");
-                if (File.Exists(cand)) icoPath = cand;
-            }
-
-            if (File.Exists(icoPath))
-                mainForm.Icon = new Icon(icoPath);
-            else
-                mainForm.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
-        }
-        catch (Exception exIco)
-        {
-            Console.WriteLine("[Launcher] Warning loading icon: " + exIco.Message);
-        }
-
-        mainForm.HandleCreated += (sH, eH) =>
+        Action applyWindowIcon = () =>
         {
             try
             {
-                if (mainForm.Icon != null)
+                string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vida_icon.ico");
+                if (!File.Exists(icoPath))
                 {
-                    SendMessage(mainForm.Handle, 0x0080, 1, mainForm.Icon.Handle);
-                    SendMessage(mainForm.Handle, 0x0080, 0, mainForm.Icon.Handle);
+                    string cand = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\..\..\assets\vida_icon.ico");
+                    if (File.Exists(cand)) icoPath = cand;
+                }
+
+                if (File.Exists(icoPath))
+                {
+                    Icon ico32 = new Icon(icoPath, 32, 32);
+                    Icon ico16 = new Icon(icoPath, 16, 16);
+                    mainForm.Icon = ico32;
+                    if (mainForm.IsHandleCreated)
+                    {
+                        SendMessage(mainForm.Handle, 0x0080, 1, ico32.Handle); // WM_SETICON, ICON_BIG
+                        SendMessage(mainForm.Handle, 0x0080, 0, ico16.Handle); // WM_SETICON, ICON_SMALL
+                    }
+                }
+                else
+                {
+                    mainForm.Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath);
                 }
             }
-            catch {}
+            catch (Exception exIco)
+            {
+                Console.WriteLine("[Launcher] Warning loading icon: " + exIco.Message);
+            }
         };
+
+        applyWindowIcon();
+        mainForm.HandleCreated += (sH, eH) => applyWindowIcon();
+        mainForm.Shown += (sS, eS) => applyWindowIcon();
 
         mainForm.Width = 1366;
 
@@ -468,7 +473,7 @@ static partial class Program
         topBar.Controls.Add(lblInfo);
 
         Button btnDevice = new Button();
-        btnDevice.Text = "🔌 " + CommToolManager.CurrentToolName + " ▾";
+        btnDevice.Text = " " + CommToolManager.CurrentToolName + " ▾";
         btnDevice.Font = new Font("Segoe UI", 8.25f, FontStyle.Bold);
         btnDevice.BackColor = Color.FromArgb(245, 247, 250);
         btnDevice.ForeColor = Color.FromArgb(40, 44, 48);
@@ -479,6 +484,24 @@ static partial class Program
         btnDevice.AutoSize = true;
         btnDevice.AutoSizeMode = AutoSizeMode.GrowAndShrink;
         btnDevice.Padding = new Padding(3, 0, 3, 0);
+
+        try
+        {
+            string icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "vida_icon.ico");
+            if (!File.Exists(icoPath))
+                icoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\..\..\assets\vida_icon.ico");
+            if (File.Exists(icoPath))
+            {
+                using (Icon ico16 = new Icon(icoPath, 16, 16))
+                {
+                    btnDevice.Image = ico16.ToBitmap();
+                    btnDevice.ImageAlign = ContentAlignment.MiddleLeft;
+                    btnDevice.TextImageRelation = TextImageRelation.ImageBeforeText;
+                }
+            }
+        }
+        catch {}
+
         TopBarDeviceSelectButton = btnDevice;
         topBar.Controls.Add(btnDevice);
 
@@ -515,7 +538,7 @@ static partial class Program
                 CommToolManager.RescanTools();
                 if (TopBarDeviceSelectButton != null && !TopBarDeviceSelectButton.IsDisposed)
                 {
-                    TopBarDeviceSelectButton.Text = "🔌 " + CommToolManager.CurrentToolName + " ▾";
+                    TopBarDeviceSelectButton.Text = " " + CommToolManager.CurrentToolName + " ▾";
                     devTip.SetToolTip(TopBarDeviceSelectButton, "Diagnostic Adapter Selection\r\n\r\nCurrent: " + CommToolManager.CurrentDisplayName + "\r\n\r\nClick to switch between Volvo DiCE and any installed J2534 PassThru adapters (Mongoose, Tactrix, Scanmatik, VCX Nano, etc.).");
                 }
             };

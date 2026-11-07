@@ -533,6 +533,9 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
         private Panel[] _pages;
 
         // Persistent Log File Paths
+        [DllImport("shell32.dll")]
+        private static extern void SHChangeNotify(int wEventId, uint uFlags, IntPtr dwItem1, IntPtr dwItem2);
+
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern IntPtr SendMessage(IntPtr hWnd, int Msg, int wParam, IntPtr lParam);
 
@@ -1768,6 +1771,11 @@ JOIN sys.master_files mf ON d.database_id = mf.database_id AND mf.file_id = 1";
             CreateShortcuts(targetDir, desktopShortcut, startMenuShortcut);
             RegisterUninstaller(targetDir);
 
+            try
+            {
+                SHChangeNotify(0x08000000, 0x0000, IntPtr.Zero, IntPtr.Zero); // SHCNE_ASSOCCHANGED: Refresh Explorer icon cache
+            }
+            catch {}
             UpdateProgress(100, "Installation completed successfully!");
             AppendLog("OpenVIDA installation finished successfully.");
         }
