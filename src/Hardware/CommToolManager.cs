@@ -103,8 +103,7 @@ public static class CommToolManager
 
     private static void RescanToolsInternal()
     {
-        var foundTools = new List<CommToolItem>();
-        var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var rawTools = new List<CommToolItem>();
 
         // Method A: Query Util.DLL RegistryScanner if available
         try
@@ -138,23 +137,21 @@ public static class CommToolManager
                                     try { isDice = Convert.ToBoolean(pDice.GetValue(dev, null)); } catch {}
                                 }
                                 if (!isDice && (name.IndexOf("dice", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                               (keyName != null && keyName.IndexOf("dice", StringComparison.OrdinalIgnoreCase) >= 0)))
+                                               (keyName != null && keyName.IndexOf("dice", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                                               (dll != null && dll.IndexOf("dice", StringComparison.OrdinalIgnoreCase) >= 0)))
                                 {
                                     isDice = true;
                                 }
 
-                                if (!string.IsNullOrEmpty(name) && !seenNames.Contains(name))
+                                if (!string.IsNullOrEmpty(name))
                                 {
-                                    seenNames.Add(name);
-                                    string disp = BuildDisplayName(name, vendor, isDice);
-                                    foundTools.Add(new CommToolItem
+                                    rawTools.Add(new CommToolItem
                                     {
                                         Name = name,
                                         KeyName = keyName ?? name,
                                         Vendor = vendor,
                                         FunctionLibrary = dll,
-                                        IsDice = isDice,
-                                        DisplayName = disp
+                                        IsDice = isDice
                                     });
                                 }
                             }
@@ -185,7 +182,6 @@ public static class CommToolManager
                                 if (subKey == null) continue;
                                 string name = subKey.GetValue("Name") as string;
                                 if (string.IsNullOrEmpty(name)) name = subName;
-                                if (seenNames.Contains(name)) continue;
 
                                 string vendor = subKey.GetValue("Vendor") as string ?? "";
                                 string dll = subKey.GetValue("FunctionLibrary") as string ?? "";
@@ -196,21 +192,19 @@ public static class CommToolManager
                                     try { isDice = Convert.ToInt32(diceComp) == 1; } catch {}
                                 }
                                 if (!isDice && (name.IndexOf("dice", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                               subName.IndexOf("dice", StringComparison.OrdinalIgnoreCase) >= 0))
+                                               subName.IndexOf("dice", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                               dll.IndexOf("dice", StringComparison.OrdinalIgnoreCase) >= 0))
                                 {
                                     isDice = true;
                                 }
 
-                                seenNames.Add(name);
-                                string disp = BuildDisplayName(name, vendor, isDice);
-                                foundTools.Add(new CommToolItem
+                                rawTools.Add(new CommToolItem
                                 {
                                     Name = name,
                                     KeyName = subName,
                                     Vendor = vendor,
                                     FunctionLibrary = dll,
-                                    IsDice = isDice,
-                                    DisplayName = disp
+                                    IsDice = isDice
                                 });
                             }
                         }
@@ -221,21 +215,67 @@ public static class CommToolManager
         }
         catch {}
 
-        // Guarantee at least one DiCE fallback
-        if (!seenNames.Contains("DiCE-206751"))
+        // --- De-duplication & Normalization ---
+        var finalTools = new List<CommToolItem>();
+        CommToolItem primaryDiceTool = null;
+        var seenGenericNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var seenDllPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var t in rawTools)
         {
-            bool hasAnyDice = false;
-            foreach (var t in foundTools)
+            if (t.IsDice)
             {
-                if (t.IsDice) { hasAnyDice = true; break; }
+                if (primaryDiceTool == null)
+                {
+                    primaryDiceTool = t;
+                    // Standardize DiCE name to "DiCE-206751"
+                    if (string.IsNullOrEmpty(primaryDiceTool.Name) ||
+                        primaryDiceTool.Name.IndexOf("SETEK", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        primaryDiceTool.Name = "DiCE-206751";
+                    }
+                    if (string.IsNullOrEmpty(primaryDiceTool.Vendor)) primaryDiceTool.Vendor = "SETEK";
+                }
+                else
+                {
+                    // If secondary entry has a preferred name or existing DLL file, adopt it
+                    if (string.Equals(t.Name, "DiCE-206751", StringComparison.OrdinalIgnoreCase))
+                    {
+                        primaryDiceTool.Name = "DiCE-206751";
+                    }
+                    if (File.Exists(t.FunctionLibrary) && !File.Exists(primaryDiceTool.FunctionLibrary))
+                    {
+                        primaryDiceTool.FunctionLibrary = t.FunctionLibrary;
+                    }
+                }
             }
-            if (!hasAnyDice)
+            else
             {
-                foundTools.Insert(0, CreateFallbackDiceTool());
+                // Generic J2534 device (Mongoose, Tactrix, Scanmatik, etc.)
+                string dllKey = !string.IsNullOrEmpty(t.FunctionLibrary) ? Path.GetFileName(t.FunctionLibrary).ToLowerInvariant() : "";
+                if (!seenGenericNames.Contains(t.Name) && (string.IsNullOrEmpty(dllKey) || !seenDllPaths.Contains(dllKey)))
+                {
+                    seenGenericNames.Add(t.Name);
+                    if (!string.IsNullOrEmpty(dllKey)) seenDllPaths.Add(dllKey);
+
+                    t.DisplayName = BuildDisplayName(t.Name, t.Vendor, false);
+                    finalTools.Add(t);
+                }
             }
         }
 
-        _availableTools = foundTools;
+        // Always put DiCE as the first option if available, otherwise fallback
+        if (primaryDiceTool == null)
+        {
+            primaryDiceTool = CreateFallbackDiceTool();
+        }
+        else
+        {
+            primaryDiceTool.DisplayName = BuildDisplayName(primaryDiceTool.Name, primaryDiceTool.Vendor, true);
+        }
+        finalTools.Insert(0, primaryDiceTool);
+
+        _availableTools = finalTools;
 
         // Restore saved preference if possible
         string savedToolName = LoadSavedToolPreference();
@@ -259,7 +299,6 @@ public static class CommToolManager
         }
         else if (_currentTool != null)
         {
-            // Keep current if still present in list
             CommToolItem existing = null;
             foreach (var t in _availableTools)
             {
@@ -374,7 +413,6 @@ public static class CommToolManager
         }
         catch {}
 
-        // Fallback to local appdata if not in base dir
         try
         {
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
@@ -411,7 +449,6 @@ public static class CommToolManager
         }
         catch {}
 
-        // Fallback to local appdata on write permission failure
         try
         {
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
