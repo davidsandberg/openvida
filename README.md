@@ -112,7 +112,15 @@ OpenVIDA runs natively on modern 64-bit Windows 10 and Windows 11 without virtua
 
 ### Supported Hardware
 - **Volvo DiCE (Diagnostic Communication Equipment)**: Genuine or high-quality clone hardware communicating over native USB (`dice_usb.dll` / J2534 PassThru).
-- **Generic J2534 PassThru Interfaces**: Standard J2534 PassThru compliant devices.
+  - *Validation*: **Verified on Physical Vehicle** (tested on Volvo V70 P3 with live CAN telemetry, UDS 0x14 fault clear, and relay actuations).
+- **Alternative SAE J2534 PassThru Devices (v0.1.1+)**:
+  - OpenVIDA automatically scans 32-bit Windows registry entries (`HKLM\SOFTWARE\WOW6432Node\PassThruSupport.04.04`) on startup and provides a top-bar **`[🔌 Adapter ▾]`** dropdown to switch between interfaces on the fly.
+  - Automatically toggles VIDA's underlying `VehCom2` stack between `CommToolType.DICE` (`1`) and generic `CommToolType.J2534` (`0`) and persists your preference in `openvida_settings.json`.
+  - **Drew Technologies MongoosePro JLR**: Supported in v0.1.1 (*Community Testing*).
+  - **Tactrix OpenPort 2.0**: Supported (*Community Testing*).
+  - **Scanmatik 2 Pro (SM2)**: Supported (*Community Testing*).
+  - **VXDIAG VCX Nano**: Supported (*Community Testing*).
+  - *Have another J2534 adapter? Plug it in, pick it from the dropdown, and share your compatibility report!*
 
 ### Supported Volvo Platforms
 - **P3 Platform**: V70 (08-), XC70 (08-), S80 (07-), XC60 (-17), S60 (11-18), V60 (-18).
@@ -531,6 +539,7 @@ openvida/
 - [x] **Diagnostic Readout Export & Backup (`readouts/`)**: Dual-format export of complete vehicle diagnostics in human-readable `.json` and native Volvo DRO `.xml` (`<Dro Version="1.0">`) with 1-click `[📁 Readouts]` top-bar button and auto-export on scan.
 - [x] **Post-Mortem Logging & Community Guidelines (`logs/`, `CONTRIBUTING.md`)**: Centralized rolling log system (`logs/openvida.log`), automated crash dump reports (`logs/crash_*.log`), in-app `[📋 Logs]` button, contribution guidelines, and GitHub issue templates encouraging AI coding assistant collaboration and alternative J2534 adapter testing.
 - [x] **All-ECU DTC Clear ("Clear All Faults")**: High-speed broadcast UDS 0x14 fault clearing across all alive ECUs over DiCE J2534, featuring pre-flight battery voltage safeguards, KOEO ignition cycling guidance, post-erase verification readout (`ReadAllForDelivery`), prominent UI action bar, CLI test runner (`--clear-dtc-test`), and MCP AI tool (`clear_dtcs`).
+- [x] **Dynamic J2534 Hardware Discovery & Adapter Selector (v0.1.1)**: Automatic registry scanning for installed J2534 PassThru drivers (`HKLM\SOFTWARE\WOW6432Node\PassThruSupport.04.04`), top-bar `[🔌 Adapter ▾]` dropdown menu, dynamic runtime session configuration (`CommToolType.DICE` vs `CommToolType.J2534`), and persistent adapter choice in `openvida_settings.json`.
 - [ ] **Service Reset & Adaptations**: SRI reset, Battery Monitoring Sensor (BMS) reset, transmission adaptation counters.
 
 ---
