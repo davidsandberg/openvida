@@ -84,9 +84,6 @@ static partial class Program
     static TextBox _topBarTxtVin = null;
     static Label _topBarLblInfo = null;
 
-    [STAThread]
-
-
     public static void SwitchDiagnosticAdapter(CommToolItem newTool)
     {
         if (newTool == null) return;
@@ -145,6 +142,7 @@ static partial class Program
         }
     }
 
+    [STAThread]
     static void Main(string[] args)
 
     {
