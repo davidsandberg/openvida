@@ -84,6 +84,7 @@
     <Compile Include="Core\ReflectionHelpers.cs" />
     <Compile Include="Core\ScriptingContext.cs" />
     <Compile Include="Hardware\CarStatusManager.cs" />
+    <Compile Include="Hardware\CommToolManager.cs" />
     <Compile Include="Hardware\ActuationPreflightDialog.cs" />
     <Compile Include="Diagnostics\DiagnosticsLoader.cs" />
     <Compile Include="Diagnostics\VehicleReadoutHandler.cs" />

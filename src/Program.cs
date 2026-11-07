@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Data;
@@ -34,7 +34,20 @@ static partial class Program
 
     const string TargetPartnerGroup = "1002";
 
-    const string TargetCommTool = "DiCE-206751";
+    public static string TargetCommTool
+    {
+        get { return CommToolManager.CurrentToolName; }
+    }
+
+    public static object CurrentCommToolEnumValue
+    {
+        get { return CommToolManager.IsCurrentToolDice ? diceEnumValue : (j2534EnumValue ?? diceEnumValue); }
+    }
+
+    public static int CurrentCommToolTypeInt
+    {
+        get { return CommToolManager.IsCurrentToolDice ? 1 : 0; }
+    }
 
     const string TargetCulture = "en-US";
 
@@ -66,10 +79,71 @@ static partial class Program
     static object vehInfoInstance = null;
     static object vehProfile = null;
     static object diceEnumValue = null;
+    static object j2534EnumValue = null;
+    static Button TopBarDeviceSelectButton = null;
     static TextBox _topBarTxtVin = null;
     static Label _topBarLblInfo = null;
 
     [STAThread]
+
+
+    public static void SwitchDiagnosticAdapter(CommToolItem newTool)
+    {
+        if (newTool == null) return;
+        if (string.Equals(newTool.Name, CommToolManager.CurrentToolName, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (IsDiceConnected)
+        {
+            var dr = MessageBox.Show(
+                "Changing the diagnostic adapter will disconnect the active car session.\r\n\r\nSwitch adapter to: " + newTool.DisplayName + "?",
+                "Switch Diagnostic Adapter",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+            if (dr != DialogResult.Yes) return;
+            DisconnectCarStatus();
+        }
+
+        CommToolManager.SelectTool(newTool);
+        Logger.Info("CommTool", "Switched diagnostic communication adapter to: " + newTool.DisplayName);
+
+        if (vehInfoInstance != null)
+        {
+            try
+            {
+                FieldInfo viCtName = vehInfoInstance.GetType().GetField("_commToolName", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (viCtName != null) viCtName.SetValue(vehInfoInstance, TargetCommTool);
+            }
+            catch {}
+        }
+        if (_cachedVehInfoInstance != null && _cachedVehInfoInstance != vehInfoInstance)
+        {
+            try
+            {
+                FieldInfo viCtName = _cachedVehInfoInstance.GetType().GetField("_commToolName", BindingFlags.NonPublic | BindingFlags.Instance);
+                if (viCtName != null) viCtName.SetValue(_cachedVehInfoInstance, TargetCommTool);
+            }
+            catch {}
+        }
+
+        if (_mainLauncherForm != null)
+        {
+            ConfigureAllCommTools(_mainLauncherForm, new HashSet<object>(), CurrentCommToolEnumValue);
+        }
+
+        _activeVehicleCommunicationWf = null;
+        vehCommInitialized = false;
+
+        if (TopBarDeviceSelectButton != null && !TopBarDeviceSelectButton.IsDisposed)
+        {
+            TopBarDeviceSelectButton.Text = "🔌 " + newTool.Name + " ▾";
+        }
+        if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed)
+        {
+            TopBarCarStatusLabel.Text = "⚪ " + newTool.Name;
+            TopBarCarStatusLabel.ForeColor = Color.FromArgb(100, 110, 120);
+        }
+    }
 
     static void Main(string[] args)
 
@@ -395,6 +469,63 @@ static partial class Program
         _topBarLblInfo = lblInfo;
         topBar.Controls.Add(lblInfo);
 
+        Button btnDevice = new Button();
+        btnDevice.Text = "🔌 " + CommToolManager.CurrentToolName + " ▾";
+        btnDevice.Font = new Font("Segoe UI", 8.25f, FontStyle.Bold);
+        btnDevice.BackColor = Color.FromArgb(245, 247, 250);
+        btnDevice.ForeColor = Color.FromArgb(40, 44, 48);
+        btnDevice.FlatStyle = FlatStyle.Flat;
+        btnDevice.FlatAppearance.BorderColor = Color.FromArgb(195, 200, 205);
+        btnDevice.SetBounds(750, 7, 130, 24);
+        btnDevice.Cursor = Cursors.Hand;
+        btnDevice.AutoSize = true;
+        btnDevice.AutoSizeMode = AutoSizeMode.GrowAndShrink;
+        btnDevice.Padding = new Padding(3, 0, 3, 0);
+        TopBarDeviceSelectButton = btnDevice;
+        topBar.Controls.Add(btnDevice);
+
+        ToolTip devTip = new ToolTip();
+        devTip.SetToolTip(btnDevice, "Diagnostic Adapter Selection\r\n\r\nCurrent: " + CommToolManager.CurrentDisplayName + "\r\n\r\nClick to switch between Volvo DiCE and any installed J2534 PassThru adapters (Mongoose, Tactrix, Scanmatik, VCX Nano, etc.).");
+
+        btnDevice.Click += (s, e) =>
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9f);
+
+            var tools = CommToolManager.AvailableTools;
+            foreach (var tool in tools)
+            {
+                var item = new ToolStripMenuItem();
+                bool isSelected = string.Equals(tool.Name, CommToolManager.CurrentToolName, StringComparison.OrdinalIgnoreCase);
+                item.Text = tool.DisplayName;
+                item.Checked = isSelected;
+                item.Font = new Font("Segoe UI", 9f, isSelected ? FontStyle.Bold : FontStyle.Regular);
+
+                var captured = tool;
+                item.Click += (ts, te) =>
+                {
+                    SwitchDiagnosticAdapter(captured);
+                };
+                menu.Items.Add(item);
+            }
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            var rescanItem = new ToolStripMenuItem("🔄 Rescan J2534 Adapters");
+            rescanItem.Click += (ts, te) =>
+            {
+                CommToolManager.RescanTools();
+                if (TopBarDeviceSelectButton != null && !TopBarDeviceSelectButton.IsDisposed)
+                {
+                    TopBarDeviceSelectButton.Text = "🔌 " + CommToolManager.CurrentToolName + " ▾";
+                    devTip.SetToolTip(TopBarDeviceSelectButton, "Diagnostic Adapter Selection\r\n\r\nCurrent: " + CommToolManager.CurrentDisplayName + "\r\n\r\nClick to switch between Volvo DiCE and any installed J2534 PassThru adapters (Mongoose, Tactrix, Scanmatik, VCX Nano, etc.).");
+                }
+            };
+            menu.Items.Add(rescanItem);
+
+            menu.Show(btnDevice, new Point(0, btnDevice.Height));
+        };
+
         TopBarCarStatusLabel = new Label();
         TopBarCarStatusLabel.Text = "⚪ " + TargetCommTool;
         TopBarCarStatusLabel.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
@@ -448,19 +579,31 @@ static partial class Program
 
         Action repositionConnectBtn = () =>
         {
-            if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed && btnConnect != null && !btnConnect.IsDisposed)
+            if (btnDevice != null && !btnDevice.IsDisposed && _topBarLblInfo != null && !_topBarLblInfo.IsDisposed)
             {
-                btnConnect.Left = TopBarCarStatusLabel.Right + 8;
-                if (btnReadouts != null && !btnReadouts.IsDisposed)
+                btnDevice.Left = Math.Max(730, _topBarLblInfo.Right + 12);
+            }
+            if (TopBarCarStatusLabel != null && !TopBarCarStatusLabel.IsDisposed)
+            {
+                if (btnDevice != null && !btnDevice.IsDisposed)
                 {
-                    btnReadouts.Left = btnConnect.Right + 6;
-                    if (btnLogs != null && !btnLogs.IsDisposed)
+                    TopBarCarStatusLabel.Left = btnDevice.Right + 8;
+                }
+                if (btnConnect != null && !btnConnect.IsDisposed)
+                {
+                    btnConnect.Left = TopBarCarStatusLabel.Right + 8;
+                    if (btnReadouts != null && !btnReadouts.IsDisposed)
                     {
-                        btnLogs.Left = btnReadouts.Right + 6;
+                        btnReadouts.Left = btnConnect.Right + 6;
+                        if (btnLogs != null && !btnLogs.IsDisposed)
+                        {
+                            btnLogs.Left = btnReadouts.Right + 6;
+                        }
                     }
                 }
             }
         };
+        btnDevice.SizeChanged += (s, e) => repositionConnectBtn();
         TopBarCarStatusLabel.SizeChanged += (s, e) => repositionConnectBtn();
 
         Action triggerDiceToggle = () =>
@@ -1134,26 +1277,23 @@ static partial class Program
 
         mainForm.Controls.Add(topBar);
 
-        // Resolve CommToolType.DICE enum
-
+        // Resolve CommToolType.DICE and J2534 enums
+        Type commToolTypeEnum = null;
         foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
-
         {
-
-            Type t = asm.GetType("Vcc.Vida.DiagSwdl.VehCom2.CommToolType");
-
-            if (t != null) { diceEnumValue = Enum.Parse(t, "DICE"); break; }
-
+            commToolTypeEnum = asm.GetType("Vcc.Vida.DiagSwdl.VehCom2.CommToolType");
+            if (commToolTypeEnum != null) break;
         }
 
-        if (diceEnumValue == null)
-
+        if (commToolTypeEnum == null)
         {
+            commToolTypeEnum = Assembly.LoadFrom(Path.Combine(diagDir, "VehCom2.DLL")).GetType("Vcc.Vida.DiagSwdl.VehCom2.CommToolType");
+        }
 
-            Type t = Assembly.LoadFrom(Path.Combine(diagDir, "VehCom2.DLL")).GetType("Vcc.Vida.DiagSwdl.VehCom2.CommToolType");
-
-            diceEnumValue = Enum.Parse(t, "DICE");
-
+        if (commToolTypeEnum != null)
+        {
+            try { diceEnumValue = Enum.Parse(commToolTypeEnum, "DICE"); } catch {}
+            try { j2534EnumValue = Enum.Parse(commToolTypeEnum, "J2534"); } catch {}
         }
 
         Type vpType = typeof(DiagApplication).Assembly.GetType("Vcc.Vida.DiagSwdl.Core.VehicleProfile");

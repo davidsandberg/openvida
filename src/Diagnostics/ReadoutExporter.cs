@@ -384,7 +384,7 @@ namespace Vcc.Vida.DiagSwdl.UI.Diagnostics
                     roDict["sessionId"] = sessionId;
                     roDict["readoutId"] = readoutId;
                     roDict["timestamp"] = readoutTime.ToString("yyyy-MM-ddTHH:mm:ss");
-                    roDict["commTool"] = "DiCE-206751";
+                    roDict["commTool"] = Program.TargetCommTool;
 
                     var vehDict = new Dictionary<string, object>();
                     vehDict["vin"] = safeVin;
@@ -433,7 +433,7 @@ namespace Vcc.Vida.DiagSwdl.UI.Diagnostics
                                 new XElement("ExecutionTime", readoutTime.ToString("HH:mm:ss")),
                                 new XElement("GlobalTime", globalTime.ToString()),
                                 new XElement("ClientVersion", "OpenVIDA 2014D Standalone"),
-                                new XElement("CommTool", "DiCE-206751")
+                                new XElement("CommTool", Program.TargetCommTool)
                             ),
                             new XElement("Ecus",
                                 BuildEcuXmlElements(ecus)

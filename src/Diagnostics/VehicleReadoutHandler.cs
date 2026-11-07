@@ -31,9 +31,9 @@ static partial class Program
 
                 object mgr = mgrType != null ? mgrType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static).GetValue(null, null) : null;
 
-                ConfigureAllCommTools(diag, new HashSet<object>(), diceEnumValue);
+                ConfigureAllCommTools(diag, new HashSet<object>(), CurrentCommToolEnumValue);
 
-                if (mgr != null) ConfigureAllCommTools(mgr, new HashSet<object>(), diceEnumValue);
+                if (mgr != null) ConfigureAllCommTools(mgr, new HashSet<object>(), CurrentCommToolEnumValue);
 
                 PopulateAllSessions(vehProfile);
 

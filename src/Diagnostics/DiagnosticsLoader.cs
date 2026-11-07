@@ -238,9 +238,9 @@ static partial class Program
 
                 // Configure all CommTools and Sessions across all singletons and forms
 
-                ConfigureAllCommTools(diag, new HashSet<object>(), diceEnumValue);
+                ConfigureAllCommTools(diag, new HashSet<object>(), CurrentCommToolEnumValue);
 
-                if (mgr != null) ConfigureAllCommTools(mgr, new HashSet<object>(), diceEnumValue);
+                if (mgr != null) ConfigureAllCommTools(mgr, new HashSet<object>(), CurrentCommToolEnumValue);
 
                 PopulateAllSessions(vehProfile);
 

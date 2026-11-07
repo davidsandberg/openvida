@@ -148,6 +148,8 @@ static partial class Program
                     resp["app"] = "OpenVIDA";
                     resp["version"] = AppVersion.Version;
                     resp["dice_connected"] = IsDiceConnected;
+                    resp["comm_tool"] = TargetCommTool;
+                    resp["comm_tool_type"] = CommToolManager.IsCurrentToolDice ? "DiCE" : "J2534";
                     resp["mock_simulation"] = IsMockSimulation;
                     resp["battery_v"] = Math.Round(_lastKnownVoltVal, 2);
                     resp["key_position"] = _lastKnownKeyPos.ToString();

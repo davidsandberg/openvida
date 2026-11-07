@@ -47,7 +47,7 @@ static partial class Program
 
                 var typeProp = t.GetProperty("CommToolType");
 
-                if (typeProp != null && typeProp.CanWrite) typeProp.SetValue(obj, diceEnum, null);
+                if (typeProp != null && typeProp.CanWrite) typeProp.SetValue(obj, CurrentCommToolEnumValue ?? diceEnum, null);
 
             }
 
@@ -189,9 +189,9 @@ static partial class Program
 
         SetFieldOrProp(s, "PartnerGroup", TargetPartnerGroup);
 
-        SetFieldOrProp(s, "commToolType", 1);
+        SetFieldOrProp(s, "commToolType", CurrentCommToolTypeInt);
 
-        SetFieldOrProp(s, "CommToolType", 1);
+        SetFieldOrProp(s, "CommToolType", CurrentCommToolTypeInt);
 
         SetFieldOrProp(s, "VehicleCommAvailable", true);
 
